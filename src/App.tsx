@@ -22,80 +22,20 @@ import DatePicker from 'react-datepicker';
 import Select, { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
-type TransactionCategory = 'Income' | 'Expense' | 'Transfer';
-
-interface Transaction {
-  id: number;
-  date: string;
-  category: TransactionCategory;
-  subcategory: string;
-  sender: string;
-  receiver: string;
-  custodian: string;
-  counterparty: string;
-  remarks: string;
-  amount: number;
-  created_at?: string;
-  modifieddate?: string;
-}
-
-interface FormState {
-  date: string;
-  category: TransactionCategory;
-  subcategory: string;
-  amount: string;
-  custodian: string;
-  counterparty: string;
-  remarks: string;
-}
-
-const getDefaultFormState = (): FormState => ({
-    date: new Date().toISOString().split('T')[0],
-    category: 'Income',
-    subcategory: 'Donations',
-    amount: '',
-  custodian: '',
-  counterparty: '',
-  remarks: '',
-});
-
-interface CategoryOption {
-  value: TransactionCategory;
-  label: string;
-}
-
-interface SubcategoryOption {
-  value: string;
-  label: string;
-}
-
-interface TrusteeOption {
-  value: string;
-  label: string;
-}
-
-interface Entity {
-  id: number;
-  entity_name: string;
-  entity_type: 'trustee' | 'donor' | 'vendor' | 'other';
-  IsDeleted: string;
-  ModifiedDate: string | null;
-  IsTrial: string;
-  created_at: string;
-}
-
-interface UserTypeOption {
-  value: 'admin' | 'trial';
-  label: string;
-}
-
-type ColorPalette = 'indigo' | 'blue' | 'purple' | 'emerald' | 'rose';
-type ThemeMode = 'light' | 'dark';
-
-interface Theme {
-  mode: ThemeMode;
-  palette: ColorPalette;
-}
+import type {
+  TransactionCategory,
+  Transaction,
+  FormState,
+  CategoryOption,
+  SubcategoryOption,
+  TrusteeOption,
+  Entity,
+  UserTypeOption,
+  ColorPalette,
+  Theme,
+  ColumnFilter,
+} from './types';
+import { getDefaultFormState, defaultColumnFilter } from './types';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -144,26 +84,7 @@ export default function AccountingSystem() {
   });
   const [dateFilterMode, setDateFilterMode] = useState<'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom'>('allTime'); // 'custom', 'thisMonth', 'thisQuarter', 'thisFiscalYear', 'allTime'
 
-  // Enhanced table state for View Transactions tab
-  interface ColumnFilter {
-    textFilter: string;
-    textOperator: 'contains' | 'equals' | 'starts' | 'ends';
-    selectedValues: string[];
-    dateFrom: string;
-    dateTo: string;
-    amountMin: string;
-    amountMax: string;
-  }
 
-  const defaultColumnFilter: ColumnFilter = {
-    textFilter: '',
-    textOperator: 'contains',
-    selectedValues: [],
-    dateFrom: '',
-    dateTo: '',
-    amountMin: '',
-    amountMax: '',
-  };
 
   const [tableColumnFilters, setTableColumnFilters] = useState<Record<string, ColumnFilter>>({
     date: { ...defaultColumnFilter },
