@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Plus,
   Download,
-  Eye,
-  EyeOff,
   LogOut,
   Calendar,
   TrendingUp,
@@ -36,6 +34,8 @@ import type {
   ColumnFilter,
 } from './types';
 import { getDefaultFormState, defaultColumnFilter } from './types';
+import LoginPage from './components/LoginPage';
+import LoadingScreen from './components/LoadingScreen';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -50,13 +50,11 @@ export default function AccountingSystem() {
     return savedUserType === 'trial' ? 'Trial account for Demo Purpose' : 'Millat Quran Learning Centre';
   });
   const [isTitleAnimating, setIsTitleAnimating] = useState(false);
-  const [loginPassword, setLoginPassword] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [authError, setAuthError] = useState('');
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
-  const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('add');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -209,10 +207,7 @@ export default function AccountingSystem() {
 
   const fieldLabels = getFieldLabels(formData.category);
 
-  const userTypeOptions: UserTypeOption[] = [
-    { value: 'admin', label: 'Admin' },
-    { value: 'trial', label: 'Trial' },
-  ];
+
 
   // Handle user type change with animated title transition (countdown timer-like effect)
   const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
@@ -579,9 +574,9 @@ export default function AccountingSystem() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleLogin = async () => {
+  const handleLogin = async (password: string) => {
     // For admin mode, require password
-    if (userType === 'admin' && !loginPassword.trim()) {
+    if (userType === 'admin' && !password.trim()) {
       setAuthError('Enter the password');
       return;
     }
@@ -593,7 +588,7 @@ export default function AccountingSystem() {
       const response = await fetch('/.netlify/functions/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: loginPassword, userType: userType }),
+        body: JSON.stringify({ password, userType: userType }),
       });
 
       if (response.ok) {
@@ -603,7 +598,6 @@ export default function AccountingSystem() {
         setDataError('');
         
         setIsLoggedIn(true);
-        setLoginPassword('');
         sessionStorage.setItem('madrasah_logged_in', 'true');
         sessionStorage.setItem('madrasah_user_type', userType);
         // Update displayTitle based on userType
@@ -634,7 +628,6 @@ export default function AccountingSystem() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setLoginPassword('');
     // Clear session on logout but maintain userType
     sessionStorage.removeItem('madrasah_logged_in');
     // Keep madrasah_user_type in sessionStorage to maintain userType selection
@@ -1437,133 +1430,21 @@ export default function AccountingSystem() {
   // Login Screen
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white/5 backdrop-blur-lg border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-          <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 text-white p-10">
-            <div>
-              <p className={`text-sm font-medium text-white/80 transition-all duration-200 ease-in-out ${isTitleAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                {displayTitle}
-              </p>
-              <h1 className="text-3xl font-bold mt-2 leading-tight">Accounting & Reporting</h1>
-              <p className="mt-4 text-white/80 text-sm leading-relaxed">
-                Secure access to your finance workspace. All data stays protected;
-                passwords are validated on the server and never stored in the browser.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-white/80">
-              <span className="h-2 w-2 rounded-full bg-emerald-300"></span>
-              Encrypted connection • Server-side auth
-            </div>
-          </div>
-
-          <div className="bg-white text-slate-900 p-8 md:p-10">
-            <div className="mb-8">
-              <p className="text-sm font-semibold text-indigo-600 mb-2">Welcome back</p>
-              <h2 className="text-2xl font-bold text-slate-900">Sign in to continue</h2>
-              <p className="text-sm text-slate-500 mt-1">Use the admin password provided.</p>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLogin();
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">User</label>
-                <Select<UserTypeOption>
-                  options={userTypeOptions}
-                  value={userTypeOptions.find((opt) => opt.value === userType)}
-                  onChange={handleUserTypeChange}
-                  classNamePrefix="hk-select"
-                  className="text-sm"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderRadius: 12,
-                      borderColor: '#cbd5e1',
-                      minHeight: '44px',
-                      boxShadow: 'none',
-                      '&:hover': {
-                        borderColor: '#cbd5e1',
-                      },
-                    }),
-                    placeholder: (base) => ({
-                      ...base,
-                      color: '#64748b',
-                    }),
-                  }}
-                />
-                {userType === 'trial' && (
-                  <p className="mt-1 text-xs text-slate-500">Trial mode shows sample data. No password required.</p>
-                )}
-              </div>
-              {userType === 'admin' && (
-                <div className="relative">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-9 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-              )}
-
-              {authError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
-                  {authError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isAuthenticating}
-                className={`w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow hover:bg-indigo-700 transition ${isAuthenticating ? 'opacity-80 cursor-not-allowed' : ''
-                  }`}
-              >
-                {isAuthenticating ? 'Signing in...' : 'Sign in'}
-              </button>
-
-              {userType === 'admin' && (
-                <p className="text-xs text-slate-500 text-center">
-                  Password is verified securely on the server and never stored in the browser.
-                </p>
-              )}
-            </form>
-            </div>
-        </div>
-      </div>
+      <LoginPage
+        userType={userType}
+        displayTitle={displayTitle}
+        isTitleAnimating={isTitleAnimating}
+        onUserTypeChange={handleUserTypeChange}
+        onLogin={handleLogin}
+        isAuthenticating={isAuthenticating}
+        authError={authError}
+      />
     );
   }
 
   // Show loader while initializing after login or userType change
   if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative inline-block mb-6">
-            <div className="h-20 w-20 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-12 w-12 bg-white/20 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">₹</span>
-              </div>
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Loading your data</h2>
-          <p className="text-white/80 text-sm">Please wait while we fetch your transactions...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
