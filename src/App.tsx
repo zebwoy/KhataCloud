@@ -1326,13 +1326,13 @@ export default function AccountingSystem() {
           className="fixed inset-0 bg-black/20 z-40 md:hidden"
           onClick={() => setOpenFilterPopup(null)}
         />
-        <div className="filter-popup fixed md:absolute z-50 bg-white border border-gray-300 rounded-lg shadow-xl w-[calc(100vw-2rem)] max-w-sm md:w-80 md:max-w-none max-h-[80vh] md:max-h-96 overflow-y-auto top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 md:translate-y-0 -translate-y-1/2 md:mt-1">
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="filter-popup fixed md:absolute z-50 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] w-[calc(100vw-2rem)] max-w-sm md:w-80 md:max-w-none max-h-[80vh] md:max-h-96 overflow-y-auto top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 md:translate-y-0 -translate-y-1/2 md:mt-1">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-900">Filter by {label}</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Filter by {label}</h3>
             <button
               onClick={() => setOpenFilterPopup(null)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
               <X size={16} />
             </button>
@@ -1341,15 +1341,15 @@ export default function AccountingSystem() {
 
         <div className="p-4 space-y-4">
           {/* Sort Options */}
-          <div className="border-b border-gray-200 pb-3">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Sort</p>
+          <div className="border-b border-gray-200 dark:border-gray-700 pb-3">
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Sort</p>
             <div className="space-y-1">
               <button
                 onClick={() => {
                   handleTableSort(column);
                   setOpenFilterPopup(null);
                 }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 rounded flex items-center justify-between"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center justify-between text-gray-900 dark:text-gray-100"
               >
                 <span>Sort A to Z</span>
                 {tableSortColumn === column && tableSortDirection === 'asc' && (
@@ -1367,7 +1367,7 @@ export default function AccountingSystem() {
                   setTableCurrentPage(1);
                   setOpenFilterPopup(null);
                 }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 rounded flex items-center justify-between"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center justify-between text-gray-900 dark:text-gray-100"
               >
                 <span>Sort Z to A</span>
                 {tableSortColumn === column && tableSortDirection === 'desc' && (
@@ -1381,7 +1381,7 @@ export default function AccountingSystem() {
           {isTextColumn && (
             <>
               <div>
-                <p className="text-xs font-semibold text-gray-700 mb-2">Text Filters</p>
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Text Filters</p>
                 <Select
                   value={{ value: filter.textOperator, label: filter.textOperator.charAt(0).toUpperCase() + filter.textOperator.slice(1) }}
                   onChange={(option) => updateColumnFilter(column, { textOperator: (option?.value || 'contains') as any })}
@@ -1399,19 +1399,19 @@ export default function AccountingSystem() {
                   placeholder={`Filter ${label.toLowerCase()}...`}
                   value={filter.textFilter}
                   onChange={(e) => updateColumnFilter(column, { textFilter: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               {/* Multi-select for unique values */}
               {uniqueValues.length > 0 && uniqueValues.length <= 50 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Select values</p>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 space-y-1">
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Select values</p>
+                  <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-2 space-y-1">
                     {uniqueValues.map((value) => (
                       <label
                         key={value}
-                        className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer"
+                        className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -1424,7 +1424,7 @@ export default function AccountingSystem() {
                           }}
                           className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                         />
-                        <span className="text-sm text-gray-700">{value}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
                       </label>
                     ))}
                   </div>
@@ -1436,24 +1436,24 @@ export default function AccountingSystem() {
           {/* Date Range Filter */}
           {isDateColumn && (
             <div>
-              <p className="text-xs font-semibold text-gray-700 mb-2">Date Range</p>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Date Range</p>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">From</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">From</label>
                   <input
                     type="date"
                     value={filter.dateFrom}
                     onChange={(e) => updateColumnFilter(column, { dateFrom: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">To</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">To</label>
                   <input
                     type="date"
                     value={filter.dateTo}
                     onChange={(e) => updateColumnFilter(column, { dateTo: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -1463,28 +1463,28 @@ export default function AccountingSystem() {
           {/* Amount Range Filter */}
           {isAmountColumn && (
             <div>
-              <p className="text-xs font-semibold text-gray-700 mb-2">Amount Range</p>
+              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Amount Range</p>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Minimum</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Minimum</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={filter.amountMin}
                     onChange={(e) => updateColumnFilter(column, { amountMin: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Maximum</label>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Maximum</label>
                   <input
                     type="number"
                     step="0.01"
                     placeholder="0.00"
                     value={filter.amountMax}
                     onChange={(e) => updateColumnFilter(column, { amountMax: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -1497,7 +1497,7 @@ export default function AccountingSystem() {
               onClick={() => {
                 updateColumnFilter(column, defaultColumnFilter);
               }}
-              className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-semibold"
+              className="w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg font-semibold"
             >
               Clear Filter
             </button>
@@ -2277,8 +2277,14 @@ export default function AccountingSystem() {
                         disabled={isLabelInRemarks}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                           isLabelInRemarks
-                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed line-through'
-                            : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 hover:scale-105 active:scale-95 shadow-sm'
+                            ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed line-through'
+                            : theme.mode === 'dark'
+                              ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 hover:scale-105 active:scale-95 shadow-sm'
+                              : (theme.palette === 'indigo' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' :
+                                 theme.palette === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                                 theme.palette === 'purple' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
+                                 theme.palette === 'emerald' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                                 'bg-rose-100 text-rose-700 hover:bg-rose-200') + ' hover:scale-105 active:scale-95 shadow-sm'
                         }`}
                         title={isLabelInRemarks ? 'Label already added' : `Add ${label}`}
                       >
@@ -2288,7 +2294,6 @@ export default function AccountingSystem() {
                   })}
                 </div>
 
-                <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Remarks *</label>
                 <textarea
                   placeholder="Type your remarks or click labels above to add them"
                   value={formData.remarks}
