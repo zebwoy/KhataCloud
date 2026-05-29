@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Plus,
   Download,
@@ -722,18 +722,23 @@ export default function AccountingSystem() {
 
   // Ka-ching cash register sound for transaction acknowledgment
   // Place your sound file at: public/sounds/ka-ching.mp3
+  const kachingAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    kachingAudioRef.current = new Audio('/sounds/ka-ching.mp3');
+    kachingAudioRef.current.volume = 0.7;
+  }, []);
+
   const playChime = () => {
     if (!playSoundOnSuccess) return;
     
     try {
-      const audio = new Audio('/sounds/ka-ching.mp3');
-      audio.volume = 0.7; // Set volume to 70%
-      audio.play().catch((err) => {
-        // Silently fail if audio can't play (e.g., user interaction required or file not found)
-        console.debug('Audio playback failed:', err);
-      });
+      if (kachingAudioRef.current) {
+        kachingAudioRef.current.currentTime = 0;
+        kachingAudioRef.current.play().catch((err) => {
+          console.debug('Audio playback failed:', err);
+        });
+      }
     } catch (error) {
-      // Silently fail if audio creation fails
       console.debug('Audio creation failed:', error);
     }
   };
@@ -1029,12 +1034,12 @@ export default function AccountingSystem() {
     }));
   };
 
-  // Filtered transactions for Financial Reports tab (with date and receiver filters)
-  const filteredTransactions = getFilteredTransactions();
-  const stats = calculateStats(filteredTransactions);
-  const allTimeStats = calculateStats(transactions);
-  const previousPeriodStats = calculateStats(getPreviousPeriodTransactions());
-  const previousRange = getPreviousPeriodRange();
+  // Memoized filtered transactions and stats for Financial Reports tab
+  const filteredTransactions = useMemo(() => getFilteredTransactions(), [transactions, dateFilterMode, dateRange, trusteeFilter]);
+  const stats = useMemo(() => calculateStats(filteredTransactions), [filteredTransactions]);
+  const allTimeStats = useMemo(() => calculateStats(transactions), [transactions]);
+  const previousPeriodStats = useMemo(() => calculateStats(getPreviousPeriodTransactions()), [transactions, dateFilterMode, dateRange]);
+  const previousRange = useMemo(() => getPreviousPeriodRange(), [dateFilterMode, dateRange]);
 
   // Enhanced table filtering, sorting, and pagination for View Transactions tab
   const getTableFilteredTransactions = (): Transaction[] => {
@@ -2381,99 +2386,7 @@ export default function AccountingSystem() {
             </div>
 
             {/* Date Filter for View Tab */}
-            {/* <div className="mb-6 p-4 bg-gray-50 dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)]">
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                  onClick={() => handleQuickFilter('thisMonth')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
-                    dateFilterMode === 'thisMonth'
-                        ? (theme.mode === 'dark' 
-                            ? 'bg-gray-700 text-white' 
-                            : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-                               theme.palette === 'blue' ? 'bg-blue-600' :
-                               theme.palette === 'purple' ? 'bg-purple-600' :
-                               theme.palette === 'emerald' ? 'bg-emerald-600' :
-                               'bg-rose-600') + ' text-white')
-                        : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
-                  }`}
-                >
-                  This Month
-                </button>
-                <button
-                  onClick={() => handleQuickFilter('thisQuarter')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
-                    dateFilterMode === 'thisQuarter'
-                        ? (theme.mode === 'dark' 
-                            ? 'bg-gray-700 text-white' 
-                            : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-                               theme.palette === 'blue' ? 'bg-blue-600' :
-                               theme.palette === 'purple' ? 'bg-purple-600' :
-                               theme.palette === 'emerald' ? 'bg-emerald-600' :
-                               'bg-rose-600') + ' text-white')
-                        : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
-                  }`}
-                >
-                  This Quarter
-                </button>
-                <button
-                  onClick={() => handleQuickFilter('thisFiscalYear')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
-                    dateFilterMode === 'thisFiscalYear'
-                        ? (theme.mode === 'dark' 
-                            ? 'bg-gray-700 text-white' 
-                            : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-                               theme.palette === 'blue' ? 'bg-blue-600' :
-                               theme.palette === 'purple' ? 'bg-purple-600' :
-                               theme.palette === 'emerald' ? 'bg-emerald-600' :
-                               'bg-rose-600') + ' text-white')
-                        : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
-                  }`}
-                >
-                  This Fiscal Year
-                </button>
-                <button
-                  onClick={() => handleQuickFilter('allTime')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
-                    dateFilterMode === 'allTime'
-                        ? (theme.mode === 'dark' 
-                            ? 'bg-gray-700 text-white' 
-                            : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-                               theme.palette === 'blue' ? 'bg-blue-600' :
-                               theme.palette === 'purple' ? 'bg-purple-600' :
-                               theme.palette === 'emerald' ? 'bg-emerald-600' :
-                               'bg-rose-600') + ' text-white')
-                        : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
-                  }`}
-                >
-                  All Time
-                </button>
-                <button
-                  onClick={() => {
-                    const csv = [
-                      ['Date', 'Category', 'Subcategory', 'From', 'To', 'Amount', 'Remarks'],
-                      ...tableFilteredTransactions.map(t => [
-                        t.date,
-                        t.category,
-                        t.subcategory || '',
-                        t.sender,
-                        t.receiver,
-                        t.amount,
-                        t.remarks || ''
-                      ])
-                    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-                    const blob = new Blob([csv], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `madrasah_transactions_${new Date().toISOString().split('T')[0]}.csv`;
-                    a.click();
-                  }}
-                  className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600"
-                >
-                  <Download size={18} /> Export CSV
-                </button>
-              </div>
-            </div> */}
+
 
             {isLoadingData ? (
               <p className="text-gray-500 text-center py-8">Loading transactions...</p>
@@ -2764,113 +2677,6 @@ export default function AccountingSystem() {
           </div>
         )}
 
-        {/* Financial Reports Tab
-        {activeTab === 'report' && (
-          <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
-            {/* Date Filter for Financial Reports */}
-            {/* <div className="mb-6 p-4 bg-gray-50 dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)]">
-              {dateFilterMode === 'custom' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">From Date</label>
-                    <div className="relative">
-                    <input
-                      type="date"
-                      value={dateRange.fromDate}
-                        onChange={(e) => setDateRange({ ...dateRange, fromDate: e.target.value })}
-                        className={`w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                          theme.mode === 'dark' 
-                            ? 'focus:ring-gray-700' 
-                            : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                               theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                               theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                               theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                               'focus:ring-rose-500')
-                        } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-3 [&::-webkit-calendar-picker-indicator]:w-4 [&::-webkit-calendar-picker-indicator]:h-4 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
-                      />
-                      <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none z-10" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">To Date</label>
-                    <div className="relative">
-                    <input
-                      type="date"
-                      value={dateRange.toDate}
-                        onChange={(e) => setDateRange({ ...dateRange, toDate: e.target.value })}
-                        className={`w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                          theme.mode === 'dark' 
-                            ? 'focus:ring-gray-700' 
-                            : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                               theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                               theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                               theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                               'focus:ring-rose-500')
-                        } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100 [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-3 [&::-webkit-calendar-picker-indicator]:w-4 [&::-webkit-calendar-picker-indicator]:h-4 [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
-                      />
-                      <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none z-10" />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {isLoadingData ? (
-              <p className="text-gray-600 dark:text-gray-400 text-center py-8">Loading transactions...</p>
-            ) : filteredTransactions.length === 0 ? (
-              <p className="text-gray-600 dark:text-gray-400 text-center py-8">No transactions found for the selected period</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-100 dark:bg-black dark:border-b dark:border-gray-900">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Date</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Category</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Subcategory</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Sender</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Receiver</th>
-                      <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700 dark:text-gray-300">Amount</th>
-                      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Remarks</th>
-                      <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTransactions.map(t => (
-                      <tr key={t.id} className="border-t border-gray-200 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900">
-                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatDisplayDate(t.date)}</td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${t.category === 'Income' 
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' 
-                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
-                          }`}>
-                            {t.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.subcategory}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.sender}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.receiver}</td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">
-                          <span className={t.category === 'Income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                            {t.category === 'Income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.remarks}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleDeleteTransaction(t.id)}
-                            disabled={isSyncing}
-                            className={`text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold text-sm ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div> */}
 
         {/* Monthly Report Tab */}
         {activeTab === 'report' && (
@@ -2996,8 +2802,10 @@ export default function AccountingSystem() {
                 <button
                   onClick={() => setTrusteeFilter('')}
                   className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${trusteeFilter === ''
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      ? (theme.mode === 'dark'
+                          ? 'bg-gray-700 text-white'
+                          : getPrimaryButtonClasses() + ' text-white')
+                      : 'bg-white dark:bg-black text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                     }`}
                 >
                   All Trustees
@@ -3007,8 +2815,10 @@ export default function AccountingSystem() {
                     key={option.value}
                     onClick={() => setTrusteeFilter(option.value)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${trusteeFilter === option.value
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                        ? (theme.mode === 'dark'
+                            ? 'bg-gray-700 text-white'
+                            : getPrimaryButtonClasses() + ' text-white')
+                        : 'bg-white dark:bg-black text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
                       }`}
                   >
                     {option.label}
