@@ -44,16 +44,18 @@ const handler: Handler = async (event) => {
     const userType = event.queryStringParameters?.userType || 'admin';
     const tableName = userType === 'trial' ? 'trial_transactions' : 'transactions';
 
-    // Ensure trial_transactions table exists (seeding is done manually via SQL)
+    // Ensure trial_transactions table exists with updated schema
     if (userType === 'trial') {
       await runQuery(`
         CREATE TABLE IF NOT EXISTS trial_transactions (
           id SERIAL PRIMARY KEY,
           date DATE NOT NULL,
-          category VARCHAR(20) NOT NULL CHECK (category IN ('Income', 'Expense')),
-          subcategory VARCHAR(100) NOT NULL,
-          sender VARCHAR(255) NOT NULL,
-          receiver VARCHAR(255) NOT NULL,
+          category VARCHAR(20) NOT NULL CHECK (category IN ('Income', 'Expense', 'Transfer')),
+          subcategory VARCHAR(100),
+          sender VARCHAR(255),
+          receiver VARCHAR(255),
+          custodian VARCHAR(255),
+          counterparty VARCHAR(255),
           remarks TEXT,
           amount DECIMAL(15, 2) NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -82,6 +84,7 @@ const handler: Handler = async (event) => {
         ? `WHERE ${softDeleteFilter} AND ${filters.join(' AND ')}` 
         : `WHERE ${softDeleteFilter}`;
       
+      // Return custodian/counterparty with COALESCE fallback for pre-migration data
       const result = await runQuery<{
         id: number;
         date: string;
@@ -89,12 +92,17 @@ const handler: Handler = async (event) => {
         subcategory: string;
         sender: string;
         receiver: string;
+        custodian: string;
+        counterparty: string;
         remarks: string;
         amount: number;
         created_at: string;
         modifieddate: string;
       }>(
-        `SELECT id, date, category, subcategory, sender, receiver, remarks, amount, created_at, ModifiedDate as modifieddate
+        `SELECT id, date, category, subcategory, sender, receiver,
+                COALESCE(custodian, receiver) as custodian,
+                COALESCE(counterparty, sender) as counterparty,
+                remarks, amount, created_at, ModifiedDate as modifieddate
          FROM ${tableName}
          ${whereClause}
          ORDER BY date DESC, created_at DESC`,
@@ -118,8 +126,10 @@ const handler: Handler = async (event) => {
       }
 
       const payload = JSON.parse(event.body);
-      const requiredFields = ['date', 'category', 'subcategory', 'sender', 'receiver', 'amount', 'remarks'];
-      for (const field of requiredFields) {
+
+      // Validate required fields — subcategory optional for Transfer
+      const alwaysRequired = ['date', 'category', 'custodian', 'counterparty', 'amount', 'remarks'];
+      for (const field of alwaysRequired) {
         if (!payload[field]) {
           return {
             statusCode: 400,
@@ -128,17 +138,31 @@ const handler: Handler = async (event) => {
           };
         }
       }
+      if (payload.category !== 'Transfer' && !payload.subcategory) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'subcategory is required for Income/Expense.' }),
+        };
+      }
+
+      // Compute sender/receiver from custodian/counterparty for backward compat
+      // In existing data: sender = external party, receiver = trust member (for all categories)
+      const sender: string = payload.counterparty;   // External party / source trustee
+      const receiver: string = payload.custodian;     // Trust member / dest trustee
 
       const result = await runQuery(
-        `INSERT INTO ${tableName} (date, category, subcategory, sender, receiver, remarks, amount, IsDeleted)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'N')
-         RETURNING id, date, category, subcategory, sender, receiver, remarks, amount, created_at`,
+        `INSERT INTO ${tableName} (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, IsDeleted)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'N')
+         RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at`,
         [
           payload.date,
           payload.category,
-          payload.subcategory,
-          payload.sender,
-          payload.receiver,
+          payload.subcategory || null,
+          sender,
+          receiver,
+          payload.custodian,
+          payload.counterparty,
           payload.remarks,
           payload.amount,
         ]
@@ -171,8 +195,8 @@ const handler: Handler = async (event) => {
         };
       }
 
-      const requiredFields = ['date', 'category', 'subcategory', 'sender', 'receiver', 'amount'];
-      for (const field of requiredFields) {
+      const alwaysRequired = ['date', 'category', 'custodian', 'counterparty', 'amount'];
+      for (const field of alwaysRequired) {
         if (!transactionData[field]) {
           return {
             statusCode: 400,
@@ -181,16 +205,27 @@ const handler: Handler = async (event) => {
           };
         }
       }
+      if (transactionData.category !== 'Transfer' && !transactionData.subcategory) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'subcategory is required for Income/Expense.' }),
+        };
+      }
 
       // Remarks is optional, default to empty string if not provided
       if (!transactionData.remarks) {
         transactionData.remarks = '';
       }
 
+      // Compute sender/receiver for backward compat
+      // In existing data: sender = external party, receiver = trust member
+      const sender: string = transactionData.counterparty;
+      const receiver: string = transactionData.custodian;
+
       // ModifiedDate should come from client, use it or fallback to current time
       const timestampToUse = modifiedDate || new Date().toISOString().replace('T', ' ').replace('Z', '');
 
-      // Soft edit: Mark old transaction as deleted and insert new one
       const connectionString = getConnectionString();
       if (!connectionString) {
         return {
@@ -216,17 +251,19 @@ const handler: Handler = async (event) => {
           [Number(id)]
         );
 
-        // Insert new transaction with ModifiedDate from client machine
+        // Insert new transaction with all fields
         const insertResult = await client.query(
-          `INSERT INTO ${tableName} (date, category, subcategory, sender, receiver, remarks, amount, ModifiedDate)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamp)
-           RETURNING id, date, category, subcategory, sender, receiver, remarks, amount, created_at, ModifiedDate as modifieddate`,
+          `INSERT INTO ${tableName} (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, ModifiedDate)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamp)
+           RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at, ModifiedDate as modifieddate`,
           [
             transactionData.date,
             transactionData.category,
-            transactionData.subcategory,
-            transactionData.sender,
-            transactionData.receiver,
+            transactionData.subcategory || null,
+            sender,
+            receiver,
+            transactionData.custodian,
+            transactionData.counterparty,
             transactionData.remarks,
             transactionData.amount,
             timestampToUse,
@@ -286,4 +323,3 @@ const handler: Handler = async (event) => {
 };
 
 export { handler };
-

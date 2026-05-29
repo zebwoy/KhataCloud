@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   Download,
@@ -22,13 +22,17 @@ import DatePicker from 'react-datepicker';
 import Select, { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
+type TransactionCategory = 'Income' | 'Expense' | 'Transfer';
+
 interface Transaction {
   id: number;
   date: string;
-  category: 'Income' | 'Expense';
+  category: TransactionCategory;
   subcategory: string;
   sender: string;
   receiver: string;
+  custodian: string;
+  counterparty: string;
   remarks: string;
   amount: number;
   created_at?: string;
@@ -37,11 +41,11 @@ interface Transaction {
 
 interface FormState {
   date: string;
-  category: 'Income' | 'Expense';
+  category: TransactionCategory;
   subcategory: string;
   amount: string;
-  sender: string;
-  receiver: string;
+  custodian: string;
+  counterparty: string;
   remarks: string;
 }
 
@@ -50,13 +54,13 @@ const getDefaultFormState = (): FormState => ({
     category: 'Income',
     subcategory: 'Donations',
     amount: '',
-  sender: '',
-  receiver: '',
+  custodian: '',
+  counterparty: '',
   remarks: '',
 });
 
 interface CategoryOption {
-  value: 'Income' | 'Expense';
+  value: TransactionCategory;
   label: string;
 }
 
@@ -65,12 +69,7 @@ interface SubcategoryOption {
   label: string;
 }
 
-interface ReceiverOption {
-  value: string;
-  label: string;
-}
-
-interface SenderOption {
+interface TrusteeOption {
   value: string;
   label: string;
 }
@@ -78,7 +77,7 @@ interface SenderOption {
 interface Entity {
   id: number;
   entity_name: string;
-  entity_type: 'sender' | 'receiver' | 'both';
+  entity_type: 'trustee' | 'donor' | 'vendor' | 'other';
   IsDeleted: string;
   ModifiedDate: string | null;
   IsTrial: string;
@@ -122,13 +121,12 @@ export default function AccountingSystem() {
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataError, setDataError] = useState('');
-  const [receiverFilter, setReceiverFilter] = useState<string>('');
+  const [trusteeFilter, setTrusteeFilter] = useState<string>('');
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
   const [playSoundOnSuccess, setPlaySoundOnSuccess] = useState(true);
-  const [senderOptions, setSenderOptions] = useState<SenderOption[]>([]);
-  const [receiverOptions, setReceiverOptions] = useState<ReceiverOption[]>([]);
+  const [trusteeOptions, setTrusteeOptions] = useState<TrusteeOption[]>([]);
   const [isInitializing, setIsInitializing] = useState(() => {
     // Initialize as true if user is already logged in (prevents showing old data on refresh)
     return sessionStorage.getItem('madrasah_logged_in') === 'true';
@@ -136,8 +134,8 @@ export default function AccountingSystem() {
 
   
   // Saved senders state (loaded from server)
-  const [savedSenders, setSavedSenders] = useState<string[]>([]);
-  const [showSenderDropdown, setShowSenderDropdown] = useState(false);
+  const [savedCounterparties, setSavedCounterparties] = useState<string[]>([]);
+  const [showCounterpartyDropdown, setShowCounterpartyDropdown] = useState(false);
   
   // Date range filter state
   const [dateRange, setDateRange] = useState({
@@ -171,8 +169,8 @@ export default function AccountingSystem() {
     date: { ...defaultColumnFilter },
     category: { ...defaultColumnFilter },
     subcategory: { ...defaultColumnFilter },
-    sender: { ...defaultColumnFilter },
-    receiver: { ...defaultColumnFilter },
+    custodian: { ...defaultColumnFilter },
+    counterparty: { ...defaultColumnFilter },
     amount: { ...defaultColumnFilter },
     remarks: { ...defaultColumnFilter },
   });
@@ -244,13 +242,51 @@ export default function AccountingSystem() {
   const categoryOptions: CategoryOption[] = [
     { value: 'Income', label: 'Income' },
     { value: 'Expense', label: 'Expense' },
+    { value: 'Transfer', label: 'Transfer' },
   ];
 
   const getSubcategoryOptions = (): SubcategoryOption[] => {
+    if (formData.category === 'Transfer') return [];
     const list = formData.category === 'Income' ? incomeSubcategories : expenseSubcategories;
     return list.map((sub) => ({ value: sub, label: sub }));
   };
   const subcategoryOptions = getSubcategoryOptions();
+
+  // Dynamic labels based on category for sender/receiver fields
+  const getFieldLabels = (category: TransactionCategory) => {
+    switch (category) {
+      case 'Income':
+        return {
+          custodianLabel: 'Received by',
+          custodianPlaceholder: 'Trust member who received',
+          counterpartyLabel: 'Donor',
+          counterpartyPlaceholder: 'Name of donor',
+        };
+      case 'Expense':
+        return {
+          custodianLabel: 'Paid by',
+          custodianPlaceholder: 'Trust member who paid',
+          counterpartyLabel: 'Vendor / Payee',
+          counterpartyPlaceholder: 'Vendor or shop name',
+        };
+      case 'Transfer':
+        return {
+          custodianLabel: 'From Trustee',
+          custodianPlaceholder: 'Source trustee',
+          counterpartyLabel: 'To Trustee',
+          counterpartyPlaceholder: 'Destination trustee',
+        };
+      default:
+        return {
+          custodianLabel: 'Custodian',
+          custodianPlaceholder: 'Trust member',
+          counterpartyLabel: 'Counterparty',
+          counterpartyPlaceholder: 'Other party',
+        };
+    }
+  };
+
+  const fieldLabels = getFieldLabels(formData.category);
 
   const userTypeOptions: UserTypeOption[] = [
     { value: 'admin', label: 'Admin' },
@@ -301,26 +337,16 @@ export default function AccountingSystem() {
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
       
-      // Fetch senders and receivers in parallel for better performance
-      const [sendersResponse, receiversResponse] = await Promise.all([
-        fetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=sender`),
-        fetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=receiver`)
-      ]);
+      // Fetch trustees for custodian dropdown
+      const trusteesResponse = await fetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=trustee`);
 
-      if (sendersResponse.ok) {
-        const senders: Entity[] = await sendersResponse.json();
-        setSenderOptions(senders.map(e => ({ value: e.entity_name, label: e.entity_name })));
-      }
-
-      if (receiversResponse.ok) {
-        const receivers: Entity[] = await receiversResponse.json();
-        setReceiverOptions(receivers.map(e => ({ value: e.entity_name, label: e.entity_name })));
+      if (trusteesResponse.ok) {
+        const trustees: Entity[] = await trusteesResponse.json();
+        setTrusteeOptions(trustees.map(e => ({ value: e.entity_name, label: e.entity_name })));
       }
     } catch (error) {
       console.error('Error fetching entities:', error);
-      // Set empty arrays on error to avoid breaking the UI
-      setSenderOptions([]);
-      setReceiverOptions([]);
+      setTrusteeOptions([]);
     }
   }, []);
 
@@ -349,18 +375,17 @@ export default function AccountingSystem() {
 
   // Fetch entities and transactions when logged in or userType changes
   // Fetch saved senders from server
-  const fetchSavedSenders = useCallback(async () => {
+  const fetchSavedCounterparties = useCallback(async () => {
     try {
       const response = await fetch('/.netlify/functions/saved-senders');
       if (!response.ok) {
-        throw new Error('Unable to load saved senders from the server.');
+        throw new Error('Unable to load saved counterparties from the server.');
       }
       const data: string[] = await response.json();
-      setSavedSenders(data);
+      setSavedCounterparties(data);
     } catch (error) {
-      console.error('Error loading saved senders:', error);
-      // Don't show error to user, just use empty array
-      setSavedSenders([]);
+      console.error('Error loading saved counterparties:', error);
+      setSavedCounterparties([]);
     }
   }, []);
 
@@ -370,16 +395,15 @@ export default function AccountingSystem() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      fetchSavedSenders();
+      fetchSavedCounterparties();
     }
-  }, [isLoggedIn, fetchSavedSenders]);
+  }, [isLoggedIn, fetchSavedCounterparties]);
 
   useEffect(() => {
     if (isLoggedIn) {
       // Clear old data when userType changes to prevent showing wrong data
       setTransactions([]);
-      setSenderOptions([]);
-      setReceiverOptions([]);
+      setTrusteeOptions([]);
       setIsInitializing(true);
       
       // Fetch new data for the current user type
@@ -388,8 +412,7 @@ export default function AccountingSystem() {
       });
     } else {
       // Clear entities when logged out
-      setSenderOptions([]);
-      setReceiverOptions([]);
+      setTrusteeOptions([]);
     }
   }, [isLoggedIn, userType, fetchTransactions, fetchEntities]);
 
@@ -439,8 +462,8 @@ export default function AccountingSystem() {
   const getFilteredTransactions = (): Transaction[] => {
     let filtered = transactions;
     
-    if (receiverFilter) {
-      filtered = filtered.filter(t => t.receiver === receiverFilter);
+    if (trusteeFilter) {
+      filtered = filtered.filter(t => t.custodian === trusteeFilter);
     }
 
     if (dateFilterMode !== 'allTime') {
@@ -511,10 +534,19 @@ export default function AccountingSystem() {
 
   const handleCategorySelect = (option: SingleValue<CategoryOption>) => {
     const value = option?.value ?? 'Income';
+    let subcategory = '';
+    if (value === 'Income') {
+      subcategory = 'Donations';
+    } else if (value === 'Expense') {
+      subcategory = 'Salaries';
+    }
+    // For Transfer, subcategory stays empty
     setFormData({
       ...formData,
       category: value,
-      subcategory: value === 'Income' ? 'Donations' : 'Salaries',
+      subcategory: subcategory,
+      // Clear counterparty when switching categories to avoid stale selections
+      counterparty: '',
     });
   };
 
@@ -523,9 +555,14 @@ export default function AccountingSystem() {
     setFormData({ ...formData, subcategory: value });
   };
 
-  const handleReceiverSelect = (option: SingleValue<ReceiverOption>) => {
+  const handleCustodianSelect = (option: SingleValue<TrusteeOption>) => {
     const value = option?.value ?? '';
-    setFormData({ ...formData, receiver: value });
+    setFormData({ ...formData, custodian: value });
+  };
+
+  const handleCounterpartySelect = (option: SingleValue<TrusteeOption>) => {
+    const value = option?.value ?? '';
+    setFormData({ ...formData, counterparty: value });
   };
 
   const handleLabelClick = (label: string) => {
@@ -541,47 +578,44 @@ export default function AccountingSystem() {
     setFormData({ ...formData, remarks: newRemarks });
   };
 
-  // Handle delete saved sender
-  const handleDeleteSavedSender = async (senderToDelete: string, e: React.MouseEvent) => {
+  // Handle delete saved counterparty
+  const handleDeleteSavedCounterparty = async (cpToDelete: string, e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent dropdown from closing and parent click handler
+    e.stopPropagation();
     
     // Optimistic update: remove from UI immediately
-    const previousSenders = savedSenders;
-    const newSavedSenders = savedSenders.filter(s => s !== senderToDelete);
-    setSavedSenders(newSavedSenders);
+    const previousCounterparties = savedCounterparties;
+    const newSavedCounterparties = savedCounterparties.filter(s => s !== cpToDelete);
+    setSavedCounterparties(newSavedCounterparties);
     
     try {
-      const response = await fetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(senderToDelete)}`, {
+      const response = await fetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        throw new Error('Unable to delete sender from server.');
+        throw new Error('Unable to delete counterparty from server.');
       }
       
-      // Optionally refresh from server to ensure sync (but UI already updated)
-      // No need to wait, just fire and forget
-      fetchSavedSenders().catch(() => {
-        // If refresh fails, revert to previous state
-        setSavedSenders(previousSenders);
+      fetchSavedCounterparties().catch(() => {
+        setSavedCounterparties(previousCounterparties);
       });
     } catch (error) {
-      console.error('Error deleting sender:', error);
-      // Revert to previous state if server delete failed
-      setSavedSenders(previousSenders);
+      console.error('Error deleting counterparty:', error);
+      setSavedCounterparties(previousCounterparties);
     }
   };
 
-  // Filter saved senders based on input
-  const filteredSavedSenders = savedSenders.filter(sender =>
-    sender.toLowerCase().includes(formData.sender.toLowerCase())
+  // Filter saved counterparties based on input
+  const filteredSavedCounterparties = savedCounterparties.filter(cp =>
+    cp.toLowerCase().includes(formData.counterparty.toLowerCase())
   );
 
   // ---- AUTH & VALIDATION ----
 
   const validateTransactionForm = () => {
     const errors: Record<string, string> = {};
+    const labels = getFieldLabels(formData.category);
 
     if (!formData.date) {
       errors.date = 'Date is required';
@@ -589,14 +623,19 @@ export default function AccountingSystem() {
     if (!formData.category) {
       errors.category = 'Category is required';
     }
-    if (!formData.subcategory) {
+    // Subcategory not required for Transfer
+    if (formData.category !== 'Transfer' && !formData.subcategory) {
       errors.subcategory = 'Subcategory is required';
     }
-    if (!formData.sender.trim()) {
-      errors.sender = 'Sender is required';
+    if (!formData.custodian.trim()) {
+      errors.custodian = `${labels.custodianLabel} is required`;
     }
-    if (!formData.receiver.trim()) {
-      errors.receiver = 'Receiver is required';
+    if (!formData.counterparty.trim()) {
+      errors.counterparty = `${labels.counterpartyLabel} is required`;
+    }
+    // For Transfer, custodian and counterparty must be different
+    if (formData.category === 'Transfer' && formData.custodian.trim() && formData.counterparty.trim() && formData.custodian.trim() === formData.counterparty.trim()) {
+      errors.counterparty = 'Source and destination trustee cannot be the same';
     }
     if (!formData.remarks.trim()) {
       errors.remarks = 'Remarks is required';
@@ -639,8 +678,7 @@ export default function AccountingSystem() {
       if (response.ok) {
         // Clear old data immediately to prevent showing previous user's data
         setTransactions([]);
-        setSenderOptions([]);
-        setReceiverOptions([]);
+        setTrusteeOptions([]);
         setDataError('');
         
         setIsLoggedIn(true);
@@ -724,8 +762,8 @@ export default function AccountingSystem() {
 
     const payload = {
       ...formData,
-      sender: formData.sender.trim(),
-      receiver: formData.receiver.trim(),
+      custodian: formData.custodian.trim(),
+      counterparty: formData.counterparty.trim(),
       remarks: formData.remarks.trim(),
       amount: Number(formData.amount),
     };
@@ -747,27 +785,25 @@ export default function AccountingSystem() {
       const created: Transaction = await response.json();
       setTransactions((prev) => [created, ...prev]);
       
-      // Save sender to server if not already present
-      const trimmedSender = formData.sender.trim();
-      if (trimmedSender && !savedSenders.includes(trimmedSender)) {
+      // Save counterparty to server if not already present
+      const trimmedCounterparty = formData.counterparty.trim();
+      if (trimmedCounterparty && !savedCounterparties.includes(trimmedCounterparty) && formData.category !== 'Transfer') {
         try {
-          const senderResponse = await fetch('/.netlify/functions/saved-senders', {
+          const cpResponse = await fetch('/.netlify/functions/saved-senders', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ sender: trimmedSender }),
+            body: JSON.stringify({ sender: trimmedCounterparty }),
           });
           
-          if (senderResponse.ok) {
-            // Refresh the saved senders list from server
-            fetchSavedSenders();
+          if (cpResponse.ok) {
+            fetchSavedCounterparties();
           }
         } catch (error) {
-          console.error('Error saving sender:', error);
-          // Still update local state for better UX
-          if (!savedSenders.includes(trimmedSender)) {
-            setSavedSenders([...savedSenders, trimmedSender].sort());
+          console.error('Error saving counterparty:', error);
+          if (!savedCounterparties.includes(trimmedCounterparty)) {
+            setSavedCounterparties([...savedCounterparties, trimmedCounterparty].sort());
           }
         }
       }
@@ -813,8 +849,8 @@ export default function AccountingSystem() {
       date: transaction.date,
       category: transaction.category,
       subcategory: transaction.subcategory,
-      sender: transaction.sender,
-      receiver: transaction.receiver,
+      custodian: transaction.custodian || '',
+      counterparty: transaction.counterparty || '',
       remarks: transaction.remarks || '',
       amount: transaction.amount.toString(),
     });
@@ -851,8 +887,8 @@ export default function AccountingSystem() {
     const payload = {
       id: editingTransactionId,
       ...formData,
-      sender: formData.sender.trim(),
-      receiver: formData.receiver.trim(),
+      custodian: formData.custodian.trim(),
+      counterparty: formData.counterparty.trim(),
       remarks: formData.remarks.trim(),
       amount: Number(formData.amount),
       modifiedDate: modifiedDate,
@@ -897,18 +933,22 @@ export default function AccountingSystem() {
       .filter(t => t.category === 'Expense')
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
 
-    return { income, expenses, balance: income - expenses };
+    const transfers = trans
+      .filter(t => t.category === 'Transfer')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+    return { income, expenses, balance: income - expenses, transfers };
   };
 
   const exportToCSV = () => {
     const filteredTrans = getFilteredTransactions();
-    const headers = ['Date', 'Category', 'Subcategory', 'Sender', 'Receiver', 'Amount', 'Remarks'];
+    const headers = ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
     const rows = filteredTrans.map(t => [
       t.date,
       t.category,
-      t.subcategory,
-      t.sender,
-      t.receiver,
+      t.subcategory || '',
+      t.custodian,
+      t.counterparty,
       t.amount,
       t.remarks || ''
     ]);
@@ -930,39 +970,62 @@ export default function AccountingSystem() {
   };
 
   // Get category-wise breakdown
-  const getCategoryBreakdown = (transList: Transaction[], category: 'Income' | 'Expense') => {
+  const getCategoryBreakdown = (transList: Transaction[], category: TransactionCategory) => {
     type BreakdownRow = { sub: string; total: number; count: number };
     return transList
       .filter((t: Transaction) => t.category === category)
       .reduce<BreakdownRow[]>((acc, t) => {
-        const existing = acc.find((x) => x.sub === t.subcategory);
+        // For Reimbursement, use 'Reimbursement' as the subcategory label since it has no subcategory
+        const subKey = t.subcategory || 'Reimbursement';
+        const existing = acc.find((x) => x.sub === subKey);
         if (existing) {
           existing.total += (Number(t.amount) || 0);
           existing.count += 1;
         } else {
-          acc.push({ sub: t.subcategory, total: (Number(t.amount) || 0), count: 1 });
+          acc.push({ sub: subKey, total: (Number(t.amount) || 0), count: 1 });
         }
         return acc;
       }, [])
       .sort((a, b) => b.total - a.total);
   };
 
-  const getReceiverStats = (transList: Transaction[]) => {
-    const map = new Map<string, { income: number; expenses: number }>();
-    transList.forEach((t) => {
-      const key = t.receiver || 'Unassigned';
-      if (!map.has(key)) {
-        map.set(key, { income: 0, expenses: 0 });
+  // Get total transfers
+  const getTransferTotal = (transList: Transaction[]) => {
+    return transList
+      .filter(t => t.category === 'Transfer')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+  };
+
+  // Get trustee-wise ledger (proper per-trustee fund tracking)
+  const getTrusteeLedger = (transList: Transaction[]) => {
+    const ledger = new Map<string, { incomeCollected: number; expensesPaid: number; transfersIn: number; transfersOut: number }>();
+
+    const ensureTrustee = (name: string) => {
+      if (!ledger.has(name)) {
+        ledger.set(name, { incomeCollected: 0, expensesPaid: 0, transfersIn: 0, transfersOut: 0 });
       }
-      const entry = map.get(key)!;
-      if (t.category === 'Income') entry.income += (Number(t.amount) || 0);
-      else entry.expenses += (Number(t.amount) || 0);
+    };
+
+    transList.forEach((t) => {
+      const custodian = t.custodian || 'Unassigned';
+      ensureTrustee(custodian);
+      const entry = ledger.get(custodian)!;
+
+      if (t.category === 'Income') entry.incomeCollected += (Number(t.amount) || 0);
+      if (t.category === 'Expense') entry.expensesPaid += (Number(t.amount) || 0);
+      if (t.category === 'Transfer') {
+        entry.transfersOut += (Number(t.amount) || 0);
+        // Also credit the destination trustee
+        const dest = t.counterparty || 'Unassigned';
+        ensureTrustee(dest);
+        ledger.get(dest)!.transfersIn += (Number(t.amount) || 0);
+      }
     });
-    return Array.from(map.entries()).map(([receiver, { income, expenses }]) => ({
-      receiver,
-      income,
-      expenses,
-      balance: income - expenses,
+
+    return Array.from(ledger.entries()).map(([trustee, data]) => ({
+      trustee,
+      ...data,
+      netPosition: data.incomeCollected - data.expensesPaid + data.transfersIn - data.transfersOut,
     }));
   };
 
@@ -1091,8 +1154,8 @@ export default function AccountingSystem() {
       date: { ...defaultColumnFilter },
       category: { ...defaultColumnFilter },
       subcategory: { ...defaultColumnFilter },
-      sender: { ...defaultColumnFilter },
-      receiver: { ...defaultColumnFilter },
+      custodian: { ...defaultColumnFilter },
+      counterparty: { ...defaultColumnFilter },
       amount: { ...defaultColumnFilter },
       remarks: { ...defaultColumnFilter },
     });
@@ -1133,15 +1196,12 @@ export default function AccountingSystem() {
 
   // Get unique values for a column (for multi-select filters)
   const getUniqueColumnValues = (column: keyof Transaction): string[] => {
-    // For sender and receiver columns, use fetched entities instead of transaction data
-    if (column === 'sender') {
-      return senderOptions.map(opt => opt.value).sort();
-    }
-    if (column === 'receiver') {
-      return receiverOptions.map(opt => opt.value).sort();
+    // For custodian column, use trustee entities
+    if (column === 'custodian') {
+      return trusteeOptions.map(opt => opt.value).sort();
     }
     
-    // For other columns, extract unique values from transactions
+    // For other columns (including counterparty), extract unique values from transactions
     const values = new Set<string>();
     transactions.forEach(t => {
       const value = String(t[column] || '').trim();
@@ -1928,7 +1988,8 @@ export default function AccountingSystem() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid grid-cols-1 ${formData.category !== 'Transfer' ? 'md:grid-cols-2' : ''} gap-4`}>
+                {formData.category !== 'Transfer' && (
                 <div>
                   <label className="block text-sm font-semibold mb-1 dark:text-gray-300">Subcategory *</label>
                   <Select<SubcategoryOption>
@@ -1979,6 +2040,7 @@ export default function AccountingSystem() {
                     <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.subcategory}</p>
                   )}
                 </div>
+                )}
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Amount (₹) *</label>
                   <input
@@ -2004,102 +2066,18 @@ export default function AccountingSystem() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    {formData.category === 'Income' ? 'Sender *' : 'Receiver *'}
-                  </label>
-                <div className="relative">
-                <input
-                  type="text"
-                      placeholder={
-                        formData.category === 'Income'
-                          ? 'Name or entity sending funds'
-                          : 'Name or entity receiving funds'
-                      }
-                      value={formData.sender}
-                      onChange={(e) => {
-                        setFormData({ ...formData, sender: e.target.value });
-                        setShowSenderDropdown(true);
-                      }}
-                      onFocus={() => {
-                        if (filteredSavedSenders.length > 0) {
-                          setShowSenderDropdown(true);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay hiding dropdown to allow clicking on items
-                        setTimeout(() => setShowSenderDropdown(false), 200);
-                      }}
-                      className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                        theme.mode === 'dark' 
-                          ? 'focus:ring-gray-700' 
-                          : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                             theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                             theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                             theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                             'focus:ring-rose-500')
-                      } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100`}
-                    />
-                  
-                  {/* Saved Senders Dropdown */}
-                  {showSenderDropdown && filteredSavedSenders.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] max-h-60 overflow-y-auto">
-                      {filteredSavedSenders.map((sender) => (
-                        <div
-                          key={sender}
-                          className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-                          onMouseDown={(e) => {
-                            // Don't trigger selection if clicking on delete button
-                            if ((e.target as HTMLElement).closest('button')) {
-                              return;
-                            }
-                            e.preventDefault(); // Prevent onBlur from firing
-                            setFormData({ ...formData, sender });
-                            setShowSenderDropdown(false);
-                          }}
-                        >
-                          <span 
-                            className="text-sm text-gray-900 dark:text-gray-100 flex-1"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setFormData({ ...formData, sender });
-                              setShowSenderDropdown(false);
-                            }}
-                          >
-                            {sender}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteSavedSender(sender, e)}
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            className="ml-2 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                            title="Delete"
-                          >
-                            <X size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                  {formErrors.sender && (
-                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.sender}</p>
-                  )}
-                </div>
+                {/* Custodian Field — Always a trustee dropdown */}
                 <div>
                   <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    {formData.category === 'Income' ? 'Receiver *' : 'Sender *'}
+                    {fieldLabels.custodianLabel} *
                   </label>
-                  <Select<ReceiverOption>
-                    options={receiverOptions}
-                    value={receiverOptions.find((opt) => opt.value === formData.receiver) ?? null}
-                    onChange={handleReceiverSelect}
+                  <Select<TrusteeOption>
+                    options={trusteeOptions}
+                    value={trusteeOptions.find((opt) => opt.value === formData.custodian) ?? null}
+                    onChange={handleCustodianSelect}
                     classNamePrefix="hk-select"
                     className="text-sm"
-                    placeholder={formData.category === 'Income' ? 'Select Receiver' : 'Select Sender'}
+                    placeholder={fieldLabels.custodianPlaceholder}
                     styles={{
                       control: (base) => ({
                         ...base,
@@ -2142,8 +2120,141 @@ export default function AccountingSystem() {
                       }),
                     }}
                   />
-                  {formErrors.receiver && (
-                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.receiver}</p>
+                  {formErrors.custodian && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.custodian}</p>
+                  )}
+                </div>
+
+                {/* Counterparty Field — Dropdown for Transfer, text input for Income/Expense */}
+                <div className="relative">
+                  <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                    {fieldLabels.counterpartyLabel} *
+                  </label>
+                  {formData.category === 'Transfer' ? (
+                    <>
+                      <Select<TrusteeOption>
+                        options={trusteeOptions.filter(opt => opt.value !== formData.custodian.trim())}
+                        value={trusteeOptions.find((opt) => opt.value === formData.counterparty) ?? null}
+                        onChange={handleCounterpartySelect}
+                        classNamePrefix="hk-select"
+                        className="text-sm"
+                        placeholder={fieldLabels.counterpartyPlaceholder}
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            borderRadius: 8,
+                            borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
+                            minHeight: '36px',
+                            backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
+                          }),
+                          menu: (base) => ({
+                            ...base,
+                            backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
+                            borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
+                          }),
+                          option: (base, state) => ({
+                            ...base,
+                            backgroundColor: state.isSelected
+                              ? (theme.mode === 'dark' 
+                                  ? '#1f2937' 
+                                  : (theme.palette === 'indigo' ? '#4f46e5' :
+                                     theme.palette === 'blue' ? '#2563eb' :
+                                     theme.palette === 'purple' ? '#9333ea' :
+                                     theme.palette === 'emerald' ? '#059669' :
+                                     '#e11d48'))
+                              : state.isFocused
+                              ? (theme.mode === 'dark' ? '#1f2937' : '#f3f4f6')
+                              : 'transparent',
+                            color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
+                          }),
+                          singleValue: (base) => ({
+                            ...base,
+                            color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
+                          }),
+                          input: (base) => ({
+                            ...base,
+                            color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
+                          }),
+                          placeholder: (base) => ({
+                            ...base,
+                            color: theme.mode === 'dark' ? '#9ca3af' : '#6b7280',
+                          }),
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={fieldLabels.counterpartyPlaceholder}
+                        value={formData.counterparty}
+                        onChange={(e) => {
+                          setFormData({ ...formData, counterparty: e.target.value });
+                          setShowCounterpartyDropdown(true);
+                        }}
+                        onFocus={() => {
+                          if (filteredSavedCounterparties.length > 0) {
+                            setShowCounterpartyDropdown(true);
+                          }
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setShowCounterpartyDropdown(false), 200);
+                        }}
+                        className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
+                          theme.mode === 'dark' 
+                            ? 'focus:ring-gray-700' 
+                            : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
+                               theme.palette === 'blue' ? 'focus:ring-blue-500' :
+                               theme.palette === 'purple' ? 'focus:ring-purple-500' :
+                               theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
+                               'focus:ring-rose-500')
+                        } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100`}
+                      />
+                      
+                      {/* Saved Counterparties Dropdown */}
+                      {showCounterpartyDropdown && filteredSavedCounterparties.length > 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] max-h-60 overflow-y-auto">
+                          {filteredSavedCounterparties.map((cp) => (
+                            <div
+                              key={cp}
+                              className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
+                              onMouseDown={(e) => {
+                                if ((e.target as HTMLElement).closest('button')) return;
+                                e.preventDefault();
+                                setFormData({ ...formData, counterparty: cp });
+                                setShowCounterpartyDropdown(false);
+                              }}
+                            >
+                              <span 
+                                className="text-sm text-gray-900 dark:text-gray-100 flex-1"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  setFormData({ ...formData, counterparty: cp });
+                                  setShowCounterpartyDropdown(false);
+                                }}
+                              >
+                                {cp}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSavedCounterparty(cp, e)}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                className="ml-2 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                                title="Delete"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {formErrors.counterparty && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.counterparty}</p>
                   )}
                 </div>
               </div>
@@ -2334,11 +2445,11 @@ export default function AccountingSystem() {
                 <button
                   onClick={() => {
                     const csv = [
-                      ['Date', 'Category', 'Subcategory', 'Sender', 'Receiver', 'Amount', 'Remarks'],
+                      ['Date', 'Category', 'Subcategory', 'From', 'To', 'Amount', 'Remarks'],
                       ...tableFilteredTransactions.map(t => [
                         t.date,
                         t.category,
-                        t.subcategory,
+                        t.subcategory || '',
                         t.sender,
                         t.receiver,
                         t.amount,
@@ -2450,57 +2561,57 @@ export default function AccountingSystem() {
                             </div>
                           )}
                         </th>
-                        {/* Sender Column */}
+                        {/* Custodian Column */}
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('sender')}
+                              onClick={() => handleTableSort('custodian')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
-                              Sender
-                              {tableSortColumn === 'sender' ? (
+                              Custodian
+                              {tableSortColumn === 'custodian' ? (
                                 tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('sender', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('sender') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => handleFilterPopupToggle('custodian', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('custodian') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
-                              aria-label="Filter by Sender"
+                              aria-label="Filter by Custodian"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'sender' && (
+                          {openFilterPopup === 'custodian' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
-                              <FilterPopup column="sender" label="Sender" />
+                              <FilterPopup column="custodian" label="Custodian" />
                             </div>
                           )}
                         </th>
-                        {/* Receiver Column */}
+                        {/* Counterparty Column */}
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('receiver')}
+                              onClick={() => handleTableSort('counterparty')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
-                              Receiver
-                              {tableSortColumn === 'receiver' ? (
+                              Counterparty
+                              {tableSortColumn === 'counterparty' ? (
                                 tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('receiver', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('receiver') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => handleFilterPopupToggle('counterparty', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('counterparty') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
-                              aria-label="Filter by Receiver"
+                              aria-label="Filter by Counterparty"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'receiver' && (
+                          {openFilterPopup === 'counterparty' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
-                              <FilterPopup column="receiver" label="Receiver" />
+                              <FilterPopup column="counterparty" label="Counterparty" />
                             </div>
                           )}
                         </th>
@@ -2561,17 +2672,28 @@ export default function AccountingSystem() {
                         <tr key={t.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatDisplayDate(t.date)}</td>
                           <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-1 rounded text-xs font-semibold ${t.category === 'Income' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              t.category === 'Income' 
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' 
+                                : t.category === 'Transfer'
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400'
+                                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
                               }`}>
                               {t.category}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.subcategory}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.sender}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.receiver}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.subcategory || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.custodian}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.counterparty}</td>
                           <td className="px-4 py-3 text-sm text-right font-semibold">
-                            <span className={t.category === 'Income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                              {t.category === 'Income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
+                            <span className={
+                              t.category === 'Income' 
+                                ? 'text-green-600 dark:text-green-400' 
+                                : t.category === 'Transfer'
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }>
+                              {t.category === 'Income' ? '+' : t.category === 'Transfer' ? '↔' : '-'}{formatCurrency(Number(t.amount))}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.remarks || '-'}</td>
@@ -2864,22 +2986,22 @@ export default function AccountingSystem() {
                 </button>
               </div>
 
-              {/* Receiver Filter Buttons */}
+              {/* Trustee Filter Buttons */}
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
-                  onClick={() => setReceiverFilter('')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${receiverFilter === ''
+                  onClick={() => setTrusteeFilter('')}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${trusteeFilter === ''
                       ? 'bg-indigo-600 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                     }`}
                 >
-                  All Receivers
+                  All Trustees
                 </button>
-                {receiverOptions.map((option) => (
+                {trusteeOptions.map((option) => (
                   <button
                     key={option.value}
-                    onClick={() => setReceiverFilter(option.value)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${receiverFilter === option.value
+                    onClick={() => setTrusteeFilter(option.value)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${trusteeFilter === option.value
                         ? 'bg-indigo-600 text-white'
                         : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       }`}
@@ -3137,51 +3259,92 @@ export default function AccountingSystem() {
               </div>
             </div>
 
-            {/* Receiver-wise Funds */}
+            {/* Transfer Summary */}
+            {getTransferTotal(filteredTransactions) > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-bold mb-4 text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                  ↔ Transfer Summary
+                </h3>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border-l-4 border-blue-600 dark:border-blue-700 shadow-lg dark:shadow-[0_10px_25px_rgba(37,99,235,0.2)]">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-gray-700 dark:text-gray-300 font-semibold">Total Internal Transfers</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        {filteredTransactions.filter(t => t.category === 'Transfer').length} transaction(s)
+                      </p>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(getTransferTotal(filteredTransactions))}
+                    </p>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
+                    Transfers are internal fund movements between trustees and don't affect the income/expense balance.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Trustee Ledger */}
             <div className="mt-6">
-              <h3 className="text-lg font-bold mb-3 text-indigo-700 dark:text-indigo-400">Receiver-wise Funds</h3>
-              {getReceiverStats(filteredTransactions).length === 0 ? (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">No receiver data for this period.</p>
+              <h3 className="text-lg font-bold mb-3 text-indigo-700 dark:text-indigo-400">Trustee Ledger</h3>
+              {getTrusteeLedger(filteredTransactions).length === 0 ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">No trustee data for this period.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {getReceiverStats(filteredTransactions).map((item) => (
+                  {getTrusteeLedger(filteredTransactions).map((item) => (
                      <div
-                       key={item.receiver}
+                       key={item.trustee}
                        className="rounded-lg border border-gray-200 dark:border-gray-900 bg-white dark:bg-black p-4 shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] hover:shadow-xl dark:hover:shadow-[0_15px_35px_rgba(0,0,0,0.8)] transition-all duration-300 hover:-translate-y-1"
                      >
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Receiver</p>
-                          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{item.receiver}</p>
-          </div>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">Trustee</p>
+                          <p className="text-lg font-semibold text-gray-800 dark:text-gray-200">{item.trustee}</p>
+                        </div>
                         <span
-                          className={`text-xs font-semibold px-2 py-1 rounded-full ${item.balance >= 0 
+                          className={`text-xs font-semibold px-2 py-1 rounded-full ${item.netPosition >= 0 
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
                             : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
                             }`}
                         >
-                          {item.balance >= 0 ? 'In Surplus' : 'Needs Reimbursement'}
+                          {item.netPosition >= 0 ? 'Surplus' : 'Deficit'}
                         </span>
                       </div>
                       <div className="space-y-1 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Income</span>
-                          <span className="font-semibold text-green-700 dark:text-green-400">{formatCurrency(item.income)}</span>
+                          <span className="text-gray-600 dark:text-gray-400">Income Collected</span>
+                          <span className="font-semibold text-green-700 dark:text-green-400">{formatCurrency(item.incomeCollected)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600 dark:text-gray-400">Expenses</span>
-                          <span className="font-semibold text-red-700 dark:text-red-400">{formatCurrency(item.expenses)}</span>
+                          <span className="text-gray-600 dark:text-gray-400">Expenses Paid</span>
+                          <span className="font-semibold text-red-700 dark:text-red-400">{formatCurrency(item.expensesPaid)}</span>
                         </div>
+                        {(item.transfersIn > 0 || item.transfersOut > 0) && (
+                          <>
+                            {item.transfersIn > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Transfers In</span>
+                                <span className="font-semibold text-blue-700 dark:text-blue-400">+{formatCurrency(item.transfersIn)}</span>
+                              </div>
+                            )}
+                            {item.transfersOut > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600 dark:text-gray-400">Transfers Out</span>
+                                <span className="font-semibold text-blue-700 dark:text-blue-400">-{formatCurrency(item.transfersOut)}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
                         <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
-                          <span className="text-gray-700 dark:text-gray-300 font-semibold">Net</span>
-                          <span className={`font-bold ${item.balance >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-orange-700 dark:text-orange-400'}`}>
-                            {formatCurrency(item.balance)}
+                          <span className="text-gray-700 dark:text-gray-300 font-semibold">Net Position</span>
+                          <span className={`font-bold ${item.netPosition >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-orange-700 dark:text-orange-400'}`}>
+                            {formatCurrency(item.netPosition)}
                           </span>
                         </div>
                       </div>
-                      {item.balance < 0 && (
+                      {item.netPosition < 0 && (
                         <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-                          Receiver has paid beyond available funds. Reimbursement advised.
+                          Trustee has spent beyond available funds. Transfer from surplus trustee advised.
                         </p>
                       )}
                     </div>

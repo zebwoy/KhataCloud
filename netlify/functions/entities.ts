@@ -31,7 +31,7 @@ const corsHeaders = {
 interface Entity {
   id: number;
   entity_name: string;
-  entity_type: 'sender' | 'receiver' | 'both';
+  entity_type: 'trustee' | 'donor' | 'vendor' | 'other';
   IsDeleted: string;
   ModifiedDate: string | null;
   IsTrial: string;
@@ -53,7 +53,9 @@ export const handler: Handler = async (event) => {
     const isTrial = userType === 'trial' ? 'Y' : 'N';
 
     // Get entity type filter from query parameter (optional)
-    const entityType = event.queryStringParameters?.entityType; // 'sender', 'receiver', or undefined for all
+    // Supports: 'trustee', 'donor', 'vendor', 'other', 'counterparty' (all non-trustee)
+    // Also supports legacy values: 'sender' (maps to non-trustee), 'receiver' (maps to trustee)
+    const entityType = event.queryStringParameters?.entityType;
 
     if (event.httpMethod === 'GET') {
       let query = `
@@ -64,9 +66,17 @@ export const handler: Handler = async (event) => {
       const params: unknown[] = [isTrial];
 
       // Add entity_type filter if provided
-      if (entityType && (entityType === 'sender' || entityType === 'receiver')) {
-        query += ` AND (entity_type = 'both' OR entity_type = $2)`;
-        params.push(entityType);
+      if (entityType) {
+        if (entityType === 'trustee' || entityType === 'receiver') {
+          // Fetch trustees (supports both new and legacy type names)
+          query += ` AND entity_type IN ('trustee', 'receiver')`;
+        } else if (entityType === 'counterparty' || entityType === 'sender') {
+          // Fetch all non-trustee entities (donors, vendors, other)
+          query += ` AND entity_type NOT IN ('trustee', 'receiver')`;
+        } else if (['donor', 'vendor', 'other'].includes(entityType)) {
+          query += ` AND entity_type = $2`;
+          params.push(entityType);
+        }
       }
 
       query += ` ORDER BY entity_name ASC`;
