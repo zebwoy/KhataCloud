@@ -32,6 +32,8 @@ import LoadingScreen from './components/LoadingScreen';
 import Header from './components/Header';
 import FilterPopupComponent from './components/FilterPopup';
 import useTableState from './hooks/useTableState';
+import { formatCurrency, formatDisplayDate, formatDisplayDateShort } from './utils/formatters';
+import { calculateStats, getCategoryBreakdown, getTransferTotal, getTrusteeLedger } from './utils/calculations';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -827,22 +829,6 @@ export default function AccountingSystem() {
     }
   };
 
-  const calculateStats = (trans: Transaction[]) => {
-    const income = trans
-      .filter(t => t.category === 'Income')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-    
-    const expenses = trans
-      .filter(t => t.category === 'Expense')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-    const transfers = trans
-      .filter(t => t.category === 'Transfer')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-    return { income, expenses, balance: income - expenses, transfers };
-  };
-
   const exportToCSV = () => {
     const filteredTrans = getFilteredTransactions();
     const headers = ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
@@ -872,129 +858,12 @@ export default function AccountingSystem() {
     a.click();
   };
 
-  // Get category-wise breakdown
-  const getCategoryBreakdown = (transList: Transaction[], category: TransactionCategory) => {
-    type BreakdownRow = { sub: string; total: number; count: number };
-    return transList
-      .filter((t: Transaction) => t.category === category)
-      .reduce<BreakdownRow[]>((acc, t) => {
-        // For Reimbursement, use 'Reimbursement' as the subcategory label since it has no subcategory
-        const subKey = t.subcategory || 'Reimbursement';
-        const existing = acc.find((x) => x.sub === subKey);
-        if (existing) {
-          existing.total += (Number(t.amount) || 0);
-          existing.count += 1;
-        } else {
-          acc.push({ sub: subKey, total: (Number(t.amount) || 0), count: 1 });
-        }
-        return acc;
-      }, [])
-      .sort((a, b) => b.total - a.total);
-  };
-
-  // Get total transfers
-  const getTransferTotal = (transList: Transaction[]) => {
-    return transList
-      .filter(t => t.category === 'Transfer')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  };
-
-  // Get trustee-wise ledger (proper per-trustee fund tracking)
-  const getTrusteeLedger = (transList: Transaction[]) => {
-    const ledger = new Map<string, { incomeCollected: number; expensesPaid: number; transfersIn: number; transfersOut: number }>();
-
-    const ensureTrustee = (name: string) => {
-      if (!ledger.has(name)) {
-        ledger.set(name, { incomeCollected: 0, expensesPaid: 0, transfersIn: 0, transfersOut: 0 });
-      }
-    };
-
-    transList.forEach((t) => {
-      const custodian = t.custodian || 'Unassigned';
-      ensureTrustee(custodian);
-      const entry = ledger.get(custodian)!;
-
-      if (t.category === 'Income') entry.incomeCollected += (Number(t.amount) || 0);
-      if (t.category === 'Expense') entry.expensesPaid += (Number(t.amount) || 0);
-      if (t.category === 'Transfer') {
-        entry.transfersOut += (Number(t.amount) || 0);
-        // Also credit the destination trustee
-        const dest = t.counterparty || 'Unassigned';
-        ensureTrustee(dest);
-        ledger.get(dest)!.transfersIn += (Number(t.amount) || 0);
-      }
-    });
-
-    return Array.from(ledger.entries()).map(([trustee, data]) => ({
-      trustee,
-      ...data,
-      netPosition: data.incomeCollected - data.expensesPaid + data.transfersIn - data.transfersOut,
-    }));
-  };
-
   // Memoized filtered transactions and stats for Financial Reports tab
   const filteredTransactions = useMemo(() => getFilteredTransactions(), [transactions, dateFilterMode, dateRange, trusteeFilter]);
   const stats = useMemo(() => calculateStats(filteredTransactions), [filteredTransactions]);
   const allTimeStats = useMemo(() => calculateStats(transactions), [transactions]);
   const previousPeriodStats = useMemo(() => calculateStats(getPreviousPeriodTransactions()), [transactions, dateFilterMode, dateRange]);
   const previousRange = useMemo(() => getPreviousPeriodRange(), [dateFilterMode, dateRange]);
-
-  // Enhanced table filtering, sorting, and pagination for View Transactions tab
-  // Table filtered/sorted/paginated data — now from useTableState hook
-
-  const formatCurrency = (value: number) => {
-    const n = Number(value);
-    const safe = Number.isFinite(n) ? n : 0;
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(safe);
-  };
-
-  const parseLocalDate = (dateString: string) => {
-    if (!dateString) return null;
-    // Parse YYYY-MM-DD as a local date to avoid UTC timezone shifts
-    const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
-    if (ymdMatch) {
-      const [, y, m, d] = ymdMatch;
-      return new Date(Number(y), Number(m) - 1, Number(d));
-    }
-    const fallback = new Date(dateString);
-    return Number.isNaN(fallback.getTime()) ? null : fallback;
-  };
-
-  const formatDisplayDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = parseLocalDate(dateString);
-    if (!date) return dateString;
-
-    const day = date.getDate();
-    const suffix =
-      day === 1 || day === 21 || day === 31 ? 'st' :
-        day === 2 || day === 22 ? 'nd' :
-          day === 3 || day === 23 ? 'rd' :
-            'th';
-
-    const monthYear = date.toLocaleDateString('en-IN', {
-      month: 'long',
-      year: 'numeric',
-    });
-    const weekday = date.toLocaleDateString('en-IN', { weekday: 'long' });
-
-    return `${day}${suffix} ${monthYear} (${weekday})`;
-  };
-
-  const formatDisplayDateShort = (dateString: string) => {
-    const date = parseLocalDate(dateString);
-    if (!date) return dateString || '';
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
 
   const formatPeriodLabel = () => {
     if (dateFilterMode === 'custom') {
