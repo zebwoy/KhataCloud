@@ -25,13 +25,13 @@ import type {
   Entity,
   UserTypeOption,
   Theme,
-  ColumnFilter,
 } from './types';
 import { getDefaultFormState, defaultColumnFilter } from './types';
 import LoginPage from './components/LoginPage';
 import LoadingScreen from './components/LoadingScreen';
 import Header from './components/Header';
 import FilterPopupComponent from './components/FilterPopup';
+import useTableState from './hooks/useTableState';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -80,20 +80,8 @@ export default function AccountingSystem() {
 
 
 
-  const [tableColumnFilters, setTableColumnFilters] = useState<Record<string, ColumnFilter>>({
-    date: { ...defaultColumnFilter },
-    category: { ...defaultColumnFilter },
-    subcategory: { ...defaultColumnFilter },
-    custodian: { ...defaultColumnFilter },
-    counterparty: { ...defaultColumnFilter },
-    amount: { ...defaultColumnFilter },
-    remarks: { ...defaultColumnFilter },
-  });
-  const [openFilterPopup, setOpenFilterPopup] = useState<string | null>(null);
-  const [tableSortColumn, setTableSortColumn] = useState<string>('date');
-  const [tableSortDirection, setTableSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [tableCurrentPage, setTableCurrentPage] = useState<number>(1);
-  const [tablePageSize] = useState<number>(20);
+  // Table state hook — manages column filters, sort, pagination, filter popup
+  const table = useTableState({ transactions, trusteeOptions });
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -952,192 +940,7 @@ export default function AccountingSystem() {
   const previousRange = useMemo(() => getPreviousPeriodRange(), [dateFilterMode, dateRange]);
 
   // Enhanced table filtering, sorting, and pagination for View Transactions tab
-  const getTableFilteredTransactions = (): Transaction[] => {
-    let filtered = [...transactions];
-
-    // Apply column filters
-    Object.entries(tableColumnFilters).forEach(([column, filter]) => {
-      const columnKey = column as keyof Transaction;
-      
-      // Text filter
-      if (filter.textFilter.trim()) {
-        const lowerFilter = filter.textFilter.toLowerCase();
-        filtered = filtered.filter(t => {
-          const value = String(t[columnKey] || '').toLowerCase();
-          switch (filter.textOperator) {
-            case 'equals':
-              return value === lowerFilter;
-            case 'starts':
-              return value.startsWith(lowerFilter);
-            case 'ends':
-              return value.endsWith(lowerFilter);
-            case 'contains':
-            default:
-              return value.includes(lowerFilter);
-          }
-        });
-      }
-
-      // Multi-select filter
-      if (filter.selectedValues.length > 0) {
-        filtered = filtered.filter(t => {
-          const value = String(t[columnKey] || '');
-          return filter.selectedValues.includes(value);
-        });
-      }
-
-      // Date range filter
-      if (column === 'date') {
-        if (filter.dateFrom) {
-          filtered = filtered.filter(t => t.date >= filter.dateFrom);
-        }
-        if (filter.dateTo) {
-          filtered = filtered.filter(t => t.date <= filter.dateTo);
-        }
-      }
-
-      // Amount range filter
-      if (column === 'amount') {
-        if (filter.amountMin) {
-          const min = Number(filter.amountMin);
-          if (!isNaN(min)) {
-            filtered = filtered.filter(t => Number(t.amount) >= min);
-          }
-        }
-        if (filter.amountMax) {
-          const max = Number(filter.amountMax);
-          if (!isNaN(max)) {
-            filtered = filtered.filter(t => Number(t.amount) <= max);
-          }
-        }
-      }
-    });
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aVal: any = a[tableSortColumn as keyof Transaction];
-      let bVal: any = b[tableSortColumn as keyof Transaction];
-
-      if (tableSortColumn === 'date') {
-        aVal = new Date(aVal).getTime();
-        bVal = new Date(bVal).getTime();
-      } else if (tableSortColumn === 'amount') {
-        aVal = Number(aVal) || 0;
-        bVal = Number(bVal) || 0;
-      } else {
-        aVal = String(aVal || '').toLowerCase();
-        bVal = String(bVal || '').toLowerCase();
-      }
-
-      if (tableSortDirection === 'asc') {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
-    });
-
-    return filtered;
-  };
-
-  const tableFilteredTransactions = getTableFilteredTransactions();
-  const tableTotalPages = Math.ceil(tableFilteredTransactions.length / tablePageSize);
-  const tablePaginatedTransactions = tableFilteredTransactions.slice(
-    (tableCurrentPage - 1) * tablePageSize,
-    tableCurrentPage * tablePageSize
-  );
-
-  const handleTableSort = (column: string) => {
-    if (tableSortColumn === column) {
-      setTableSortDirection(tableSortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setTableSortColumn(column);
-      setTableSortDirection('desc');
-    }
-    setTableCurrentPage(1); // Reset to first page on sort
-  };
-
-  const updateColumnFilter = (column: string, updates: Partial<ColumnFilter>) => {
-    setTableColumnFilters(prev => ({
-      ...prev,
-      [column]: { ...prev[column], ...updates }
-    }));
-    setTableCurrentPage(1);
-  };
-
-  const clearTableFilters = () => {
-    setTableColumnFilters({
-      date: { ...defaultColumnFilter },
-      category: { ...defaultColumnFilter },
-      subcategory: { ...defaultColumnFilter },
-      custodian: { ...defaultColumnFilter },
-      counterparty: { ...defaultColumnFilter },
-      amount: { ...defaultColumnFilter },
-      remarks: { ...defaultColumnFilter },
-    });
-    setTableCurrentPage(1);
-  };
-
-  const hasActiveFilters = () => {
-    return Object.values(tableColumnFilters).some(filter => 
-      filter.textFilter.trim() !== '' ||
-      filter.selectedValues.length > 0 ||
-      filter.dateFrom !== '' ||
-      filter.dateTo !== '' ||
-      filter.amountMin !== '' ||
-      filter.amountMax !== ''
-    );
-  };
-
-  const handleFilterPopupToggle = (column: string, event?: React.MouseEvent<HTMLButtonElement>) => {
-    if (event) {
-      event.stopPropagation();
-    }
-    if (openFilterPopup === column) {
-      setOpenFilterPopup(null);
-    } else {
-      setOpenFilterPopup(column);
-    }
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (openFilterPopup && !(event.target as Element).closest('.filter-popup, .filter-button')) {
-        setOpenFilterPopup(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openFilterPopup]);
-
-  // Get unique values for a column (for multi-select filters)
-  const getUniqueColumnValues = (column: keyof Transaction): string[] => {
-    // For custodian column, use trustee entities
-    if (column === 'custodian') {
-      return trusteeOptions.map(opt => opt.value).sort();
-    }
-    
-    // For other columns (including counterparty), extract unique values from transactions
-    const values = new Set<string>();
-    transactions.forEach(t => {
-      const value = String(t[column] || '').trim();
-      if (value) values.add(value);
-    });
-    return Array.from(values).sort();
-  };
-
-  // Check if a column has active filters
-  const columnHasActiveFilter = (column: string): boolean => {
-    const filter = tableColumnFilters[column];
-    if (!filter) return false;
-    return (
-      filter.textFilter.trim() !== '' ||
-      filter.selectedValues.length > 0 ||
-      filter.dateFrom !== '' ||
-      filter.dateTo !== '' ||
-      filter.amountMin !== '' ||
-      filter.amountMax !== ''
-    );
-  };
+  // Table filtered/sorted/paginated data — now from useTableState hook
 
   const formatCurrency = (value: number) => {
     const n = Number(value);
@@ -1224,34 +1027,23 @@ export default function AccountingSystem() {
     return `Same period last year: ${formatDisplayDateShort(previousRange.fromDate)} – ${formatDisplayDateShort(previousRange.toDate)}`;
   };
 
-  // Excel-style Filter Popup Component
-  // FilterPopup bridge — maps parent state to component props
+  // FilterPopup bridge — maps hook state to component props
   const FilterPopup = ({ column, label }: { column: string; label: string }) => {
-    if (openFilterPopup !== column) return null;
+    if (table.openFilterPopup !== column) return null;
     return (
       <FilterPopupComponent
         column={column}
         label={label}
-        filter={tableColumnFilters[column]}
-        uniqueValues={getUniqueColumnValues(column as keyof Transaction)}
-        sortColumn={tableSortColumn}
-        sortDirection={tableSortDirection}
-        hasActiveFilter={columnHasActiveFilter(column)}
-        onClose={() => setOpenFilterPopup(null)}
-        onUpdateFilter={updateColumnFilter}
-        onSort={(col) => {
-          handleTableSort(col);
-        }}
-        onSortDescending={(col) => {
-          if (tableSortColumn === col) {
-            setTableSortDirection('desc');
-          } else {
-            setTableSortColumn(col);
-            setTableSortDirection('desc');
-          }
-          setTableCurrentPage(1);
-        }}
-        onClearFilter={(col) => updateColumnFilter(col, defaultColumnFilter)}
+        filter={table.columnFilters[column]}
+        uniqueValues={table.getUniqueColumnValues(column as keyof Transaction)}
+        sortColumn={table.sortColumn}
+        sortDirection={table.sortDirection}
+        hasActiveFilter={table.columnHasActiveFilter(column)}
+        onClose={table.closeFilterPopup}
+        onUpdateFilter={table.updateFilter}
+        onSort={table.handleSort}
+        onSortDescending={table.handleSortDescending}
+        onClearFilter={(col) => table.updateFilter(col, defaultColumnFilter)}
       />
     );
   };
@@ -1867,13 +1659,13 @@ export default function AccountingSystem() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Transaction History</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Showing {tableFilteredTransactions.length} of {transactions.length} transaction{tableFilteredTransactions.length !== 1 ? 's' : ''}
+                  Showing {table.filteredTransactions.length} of {transactions.length} transaction{table.filteredTransactions.length !== 1 ? 's' : ''}
                 </p>
               </div>
               <div className="flex gap-2">
-                {hasActiveFilters() && (
+                {table.hasActiveFilters() && (
                   <button
-                    onClick={clearTableFilters}
+                    onClick={table.clearAllFilters}
                     className="bg-gray-500 dark:bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-600 dark:hover:bg-gray-700 text-sm"
                   >
                     <X size={16} /> Clear Filters
@@ -1893,7 +1685,7 @@ export default function AccountingSystem() {
 
             {isLoadingData ? (
               <p className="text-gray-500 text-center py-8">Loading transactions...</p>
-            ) : tableFilteredTransactions.length === 0 ? (
+            ) : table.filteredTransactions.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No transactions found</p>
             ) : (
               <>
@@ -1905,24 +1697,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('date')}
+                              onClick={() => table.handleSort('date')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Date
-                              {tableSortColumn === 'date' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'date' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('date', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('date') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('date', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('date') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Date"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'date' && (
+                          {table.openFilterPopup === 'date' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="date" label="Date" />
                             </div>
@@ -1932,24 +1724,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('category')}
+                              onClick={() => table.handleSort('category')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Category
-                              {tableSortColumn === 'category' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'category' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('category', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('category') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('category', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('category') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Category"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'category' && (
+                          {table.openFilterPopup === 'category' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="category" label="Category" />
                             </div>
@@ -1959,24 +1751,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('subcategory')}
+                              onClick={() => table.handleSort('subcategory')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Subcategory
-                              {tableSortColumn === 'subcategory' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'subcategory' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('subcategory', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('subcategory') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('subcategory', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('subcategory') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Subcategory"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'subcategory' && (
+                          {table.openFilterPopup === 'subcategory' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="subcategory" label="Subcategory" />
                             </div>
@@ -1986,24 +1778,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('custodian')}
+                              onClick={() => table.handleSort('custodian')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Custodian
-                              {tableSortColumn === 'custodian' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'custodian' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('custodian', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('custodian') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('custodian', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('custodian') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Custodian"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'custodian' && (
+                          {table.openFilterPopup === 'custodian' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="custodian" label="Custodian" />
                             </div>
@@ -2013,24 +1805,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-left relative">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => handleTableSort('counterparty')}
+                              onClick={() => table.handleSort('counterparty')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Counterparty
-                              {tableSortColumn === 'counterparty' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'counterparty' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('counterparty', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('counterparty') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('counterparty', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('counterparty') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Counterparty"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'counterparty' && (
+                          {table.openFilterPopup === 'counterparty' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="counterparty" label="Counterparty" />
                             </div>
@@ -2040,24 +1832,24 @@ export default function AccountingSystem() {
                         <th className="px-4 py-3 text-right relative">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleTableSort('amount')}
+                              onClick={() => table.handleSort('amount')}
                               className="text-sm font-semibold hover:text-indigo-600 flex items-center gap-1"
                             >
                               Amount
-                              {tableSortColumn === 'amount' ? (
-                                tableSortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
+                              {table.sortColumn === 'amount' ? (
+                                table.sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                               ) : null}
                             </button>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('amount', e)}
-                              className={`filter-button p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('amount') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('amount', e)}
+                              className={`filter-button p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('amount') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Amount"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'amount' && (
+                          {table.openFilterPopup === 'amount' && (
                             <div className="absolute right-0 md:right-0 left-0 md:left-auto top-full mt-1">
                               <FilterPopup column="amount" label="Amount" />
                             </div>
@@ -2068,15 +1860,15 @@ export default function AccountingSystem() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold">Remarks</span>
                             <button
-                              onClick={(e) => handleFilterPopupToggle('remarks', e)}
-                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${columnHasActiveFilter('remarks') ? 'text-indigo-600' : 'text-gray-400'}`}
+                              onClick={(e) => table.toggleFilterPopup('remarks', e)}
+                              className={`filter-button ml-auto p-1.5 md:p-1 rounded hover:bg-gray-200 active:bg-gray-300 touch-manipulation ${table.columnHasActiveFilter('remarks') ? 'text-indigo-600' : 'text-gray-400'}`}
                               title="Filter"
                               aria-label="Filter by Remarks"
                             >
                               <Filter size={16} className="md:w-3.5 md:h-3.5" />
                             </button>
                           </div>
-                          {openFilterPopup === 'remarks' && (
+                          {table.openFilterPopup === 'remarks' && (
                             <div className="absolute left-0 md:left-0 right-0 md:right-auto top-full mt-1">
                               <FilterPopup column="remarks" label="Remarks" />
                             </div>
@@ -2089,7 +1881,7 @@ export default function AccountingSystem() {
                       </tr>
                     </thead>
                     <tbody>
-                      {tablePaginatedTransactions.map(t => (
+                      {table.paginatedTransactions.map(t => (
                         <tr key={t.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatDisplayDate(t.date)}</td>
                           <td className="px-4 py-3 text-sm">
@@ -2146,16 +1938,16 @@ export default function AccountingSystem() {
                 </div>
 
                 {/* Pagination */}
-                {tableTotalPages > 1 && (
+                {table.totalPages > 1 && (
                   <div className="flex items-center justify-between border-t pt-4">
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Page {tableCurrentPage} of {tableTotalPages} ({tableFilteredTransactions.length} transactions)
+                      Page {table.currentPage} of {table.totalPages} ({table.filteredTransactions.length} transactions)
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setTableCurrentPage(prev => Math.max(1, prev - 1))}
-                        disabled={tableCurrentPage === 1}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${tableCurrentPage === 1
+                        onClick={() => table.setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={table.currentPage === 1}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${table.currentPage === 1
                             ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                             : 'bg-indigo-600 dark:bg-indigo-700 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600'
                           }`}
@@ -2163,9 +1955,9 @@ export default function AccountingSystem() {
                         Previous
                       </button>
                       <button
-                        onClick={() => setTableCurrentPage(prev => Math.min(tableTotalPages, prev + 1))}
-                        disabled={tableCurrentPage === tableTotalPages}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${tableCurrentPage === tableTotalPages
+                        onClick={() => table.setCurrentPage(prev => Math.min(table.totalPages, prev + 1))}
+                        disabled={table.currentPage === table.totalPages}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${table.currentPage === table.totalPages
                             ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                             : 'bg-indigo-600 dark:bg-indigo-700 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600'
                           }`}
