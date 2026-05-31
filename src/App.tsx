@@ -16,7 +16,6 @@ import Select, { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
 import type {
-  TransactionCategory,
   Transaction,
   FormState,
   CategoryOption,
@@ -34,6 +33,11 @@ import FilterPopupComponent from './components/FilterPopup';
 import useTableState from './hooks/useTableState';
 import { formatCurrency, formatDisplayDate, formatDisplayDateShort } from './utils/formatters';
 import { calculateStats, getCategoryBreakdown, getTransferTotal, getTrusteeLedger } from './utils/calculations';
+import {
+  categoryOptions, getSubcategoryOptions, getFieldLabels, remarkLabels,
+  getDateRangeForMode,
+  type DateFilterMode,
+} from './utils/constants';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -78,7 +82,7 @@ export default function AccountingSystem() {
     fromDate: '',
     toDate: ''
   });
-  const [dateFilterMode, setDateFilterMode] = useState<'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom'>('allTime'); // 'custom', 'thisMonth', 'thisQuarter', 'thisFiscalYear', 'allTime'
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>('allTime');
 
 
 
@@ -138,59 +142,8 @@ export default function AccountingSystem() {
     return paletteMap[theme.palette] + ' text-white';
   };
 
-  // ---- MASTER DATA ----
-
-  const incomeSubcategories = ['Donations', 'Student Fees', 'Grants', 'Other Income'];
-  const expenseSubcategories = ['Salaries', 'Utilities', 'Books & Materials', 'Infrastructure', 'Other Expenses'];
-  const remarkLabels = ['Deposit', 'Rent', 'Legality', 'Bathroom', 'Classroom', 'Library', 'Painting', 'Fabrication', 'Cleaning', 'Plumbing'];
-
-  const categoryOptions: CategoryOption[] = [
-    { value: 'Income', label: 'Income' },
-    { value: 'Expense', label: 'Expense' },
-    { value: 'Transfer', label: 'Transfer' },
-  ];
-
-  const getSubcategoryOptions = (): SubcategoryOption[] => {
-    if (formData.category === 'Transfer') return [];
-    const list = formData.category === 'Income' ? incomeSubcategories : expenseSubcategories;
-    return list.map((sub) => ({ value: sub, label: sub }));
-  };
-  const subcategoryOptions = getSubcategoryOptions();
-
-  // Dynamic labels based on category for sender/receiver fields
-  const getFieldLabels = (category: TransactionCategory) => {
-    switch (category) {
-      case 'Income':
-        return {
-          custodianLabel: 'Received by',
-          custodianPlaceholder: 'Trust member who received',
-          counterpartyLabel: 'Donor',
-          counterpartyPlaceholder: 'Name of donor',
-        };
-      case 'Expense':
-        return {
-          custodianLabel: 'Paid by',
-          custodianPlaceholder: 'Trust member who paid',
-          counterpartyLabel: 'Vendor / Payee',
-          counterpartyPlaceholder: 'Vendor or shop name',
-        };
-      case 'Transfer':
-        return {
-          custodianLabel: 'From Trustee',
-          custodianPlaceholder: 'Source trustee',
-          counterpartyLabel: 'To Trustee',
-          counterpartyPlaceholder: 'Destination trustee',
-        };
-      default:
-        return {
-          custodianLabel: 'Custodian',
-          custodianPlaceholder: 'Trust member',
-          counterpartyLabel: 'Counterparty',
-          counterpartyPlaceholder: 'Other party',
-        };
-    }
-  };
-
+  // Derived values from imported utilities
+  const subcategoryOptions = getSubcategoryOptions(formData.category);
   const fieldLabels = getFieldLabels(formData.category);
 
 
@@ -318,47 +271,6 @@ export default function AccountingSystem() {
     }
   }, [isLoggedIn, userType, fetchTransactions, fetchEntities]);
 
-  // Helper function to get date range based on filter mode
-  const getDateRangeForMode = (mode: 'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom') => {
-    const today = new Date();
-    
-    switch (mode) {
-      case 'thisMonth': {
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        return {
-          fromDate: firstDay.toISOString().split('T')[0],
-          toDate: lastDay.toISOString().split('T')[0]
-        };
-      }
-      case 'thisQuarter': {
-        const quarter = Math.floor(today.getMonth() / 3);
-        const firstDay = new Date(today.getFullYear(), quarter * 3, 1);
-        const lastDay = new Date(today.getFullYear(), (quarter + 1) * 3, 0);
-        return {
-          fromDate: firstDay.toISOString().split('T')[0],
-          toDate: lastDay.toISOString().split('T')[0]
-        };
-      }
-      case 'thisFiscalYear': {
-        // India fiscal year: April 1 to March 31
-        const fiscalYearStart = today.getMonth() >= 3 
-          ? new Date(today.getFullYear(), 3, 1)  // April 1 of current year
-          : new Date(today.getFullYear() - 1, 3, 1);  // April 1 of previous year
-        const fiscalYearEnd = today.getMonth() >= 3
-          ? new Date(today.getFullYear() + 1, 2, 31)  // March 31 of next year
-          : new Date(today.getFullYear(), 2, 31);  // March 31 of current year
-        return {
-          fromDate: fiscalYearStart.toISOString().split('T')[0],
-          toDate: fiscalYearEnd.toISOString().split('T')[0]
-        };
-      }
-      case 'allTime':
-        return { fromDate: '', toDate: '' };
-      default:
-        return dateRange;
-    }
-  };
 
   // Helper function to filter transactions by date range
   const getFilteredTransactions = (): Transaction[] => {
@@ -424,7 +336,7 @@ export default function AccountingSystem() {
   };
 
   // Handle quick filter button clicks
-  const handleQuickFilter = (mode: 'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom') => {
+  const handleQuickFilter = (mode: DateFilterMode) => {
     setDateFilterMode(mode);
     if (mode !== 'custom' && mode !== 'allTime') {
       const range = getDateRangeForMode(mode);
