@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Plus,
   Download,
-  Eye,
-  EyeOff,
-  LogOut,
   Calendar,
   TrendingUp,
   TrendingDown,
@@ -13,89 +10,28 @@ import {
   ChevronDown,
   X,
   Filter,
-  Check,
-  Moon,
-  Sun,
-  Palette,
 } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import Select, { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
-type TransactionCategory = 'Income' | 'Expense' | 'Transfer';
-
-interface Transaction {
-  id: number;
-  date: string;
-  category: TransactionCategory;
-  subcategory: string;
-  sender: string;
-  receiver: string;
-  custodian: string;
-  counterparty: string;
-  remarks: string;
-  amount: number;
-  created_at?: string;
-  modifieddate?: string;
-}
-
-interface FormState {
-  date: string;
-  category: TransactionCategory;
-  subcategory: string;
-  amount: string;
-  custodian: string;
-  counterparty: string;
-  remarks: string;
-}
-
-const getDefaultFormState = (): FormState => ({
-    date: new Date().toISOString().split('T')[0],
-    category: 'Income',
-    subcategory: 'Donations',
-    amount: '',
-  custodian: '',
-  counterparty: '',
-  remarks: '',
-});
-
-interface CategoryOption {
-  value: TransactionCategory;
-  label: string;
-}
-
-interface SubcategoryOption {
-  value: string;
-  label: string;
-}
-
-interface TrusteeOption {
-  value: string;
-  label: string;
-}
-
-interface Entity {
-  id: number;
-  entity_name: string;
-  entity_type: 'trustee' | 'donor' | 'vendor' | 'other';
-  IsDeleted: string;
-  ModifiedDate: string | null;
-  IsTrial: string;
-  created_at: string;
-}
-
-interface UserTypeOption {
-  value: 'admin' | 'trial';
-  label: string;
-}
-
-type ColorPalette = 'indigo' | 'blue' | 'purple' | 'emerald' | 'rose';
-type ThemeMode = 'light' | 'dark';
-
-interface Theme {
-  mode: ThemeMode;
-  palette: ColorPalette;
-}
+import type {
+  TransactionCategory,
+  Transaction,
+  FormState,
+  CategoryOption,
+  SubcategoryOption,
+  TrusteeOption,
+  Entity,
+  UserTypeOption,
+  Theme,
+  ColumnFilter,
+} from './types';
+import { getDefaultFormState, defaultColumnFilter } from './types';
+import LoginPage from './components/LoginPage';
+import LoadingScreen from './components/LoadingScreen';
+import Header from './components/Header';
+import FilterPopupComponent from './components/FilterPopup';
 
 export default function AccountingSystem() {
   // Initialize login state from sessionStorage to persist across refreshes
@@ -110,13 +46,11 @@ export default function AccountingSystem() {
     return savedUserType === 'trial' ? 'Trial account for Demo Purpose' : 'Millat Quran Learning Centre';
   });
   const [isTitleAnimating, setIsTitleAnimating] = useState(false);
-  const [loginPassword, setLoginPassword] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [authError, setAuthError] = useState('');
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
-  const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('add');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -144,26 +78,7 @@ export default function AccountingSystem() {
   });
   const [dateFilterMode, setDateFilterMode] = useState<'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom'>('allTime'); // 'custom', 'thisMonth', 'thisQuarter', 'thisFiscalYear', 'allTime'
 
-  // Enhanced table state for View Transactions tab
-  interface ColumnFilter {
-    textFilter: string;
-    textOperator: 'contains' | 'equals' | 'starts' | 'ends';
-    selectedValues: string[];
-    dateFrom: string;
-    dateTo: string;
-    amountMin: string;
-    amountMax: string;
-  }
 
-  const defaultColumnFilter: ColumnFilter = {
-    textFilter: '',
-    textOperator: 'contains',
-    selectedValues: [],
-    dateFrom: '',
-    dateTo: '',
-    amountMin: '',
-    amountMax: '',
-  };
 
   const [tableColumnFilters, setTableColumnFilters] = useState<Record<string, ColumnFilter>>({
     date: { ...defaultColumnFilter },
@@ -192,7 +107,7 @@ export default function AccountingSystem() {
     }
     return { mode: 'light', palette: 'indigo' };
   });
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
+
 
   // Apply theme to document
   useEffect(() => {
@@ -288,10 +203,7 @@ export default function AccountingSystem() {
 
   const fieldLabels = getFieldLabels(formData.category);
 
-  const userTypeOptions: UserTypeOption[] = [
-    { value: 'admin', label: 'Admin' },
-    { value: 'trial', label: 'Trial' },
-  ];
+
 
   // Handle user type change with animated title transition (countdown timer-like effect)
   const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
@@ -658,9 +570,9 @@ export default function AccountingSystem() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleLogin = async () => {
+  const handleLogin = async (password: string) => {
     // For admin mode, require password
-    if (userType === 'admin' && !loginPassword.trim()) {
+    if (userType === 'admin' && !password.trim()) {
       setAuthError('Enter the password');
       return;
     }
@@ -672,7 +584,7 @@ export default function AccountingSystem() {
       const response = await fetch('/.netlify/functions/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: loginPassword, userType: userType }),
+        body: JSON.stringify({ password, userType: userType }),
       });
 
       if (response.ok) {
@@ -682,7 +594,6 @@ export default function AccountingSystem() {
         setDataError('');
         
         setIsLoggedIn(true);
-        setLoginPassword('');
         sessionStorage.setItem('madrasah_logged_in', 'true');
         sessionStorage.setItem('madrasah_user_type', userType);
         // Update displayTitle based on userType
@@ -713,7 +624,6 @@ export default function AccountingSystem() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setLoginPassword('');
     // Clear session on logout but maintain userType
     sessionStorage.removeItem('madrasah_logged_in');
     // Keep madrasah_user_type in sessionStorage to maintain userType selection
@@ -1315,334 +1225,55 @@ export default function AccountingSystem() {
   };
 
   // Excel-style Filter Popup Component
+  // FilterPopup bridge — maps parent state to component props
   const FilterPopup = ({ column, label }: { column: string; label: string }) => {
     if (openFilterPopup !== column) return null;
-    
-    const filter = tableColumnFilters[column];
-    const uniqueValues = getUniqueColumnValues(column as keyof Transaction);
-    const isDateColumn = column === 'date';
-    const isAmountColumn = column === 'amount';
-    const isTextColumn = !isDateColumn && !isAmountColumn;
-
     return (
-      <>
-        {/* Mobile overlay backdrop */}
-        <div 
-          className="fixed inset-0 bg-black/20 z-40 md:hidden"
-          onClick={() => setOpenFilterPopup(null)}
-        />
-        <div className="filter-popup fixed md:absolute z-50 bg-white dark:bg-gray-950 border border-gray-300 dark:border-gray-700 rounded-lg shadow-xl dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] w-[calc(100vw-2rem)] max-w-sm md:w-80 md:max-w-none max-h-[80vh] md:max-h-96 overflow-y-auto top-1/2 md:top-full left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 md:translate-y-0 -translate-y-1/2 md:mt-1">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Filter by {label}</h3>
-            <button
-              onClick={() => setOpenFilterPopup(null)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {/* Sort Options */}
-          <div className="border-b border-gray-200 dark:border-gray-700 pb-3">
-            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Sort</p>
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  handleTableSort(column);
-                  setOpenFilterPopup(null);
-                }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center justify-between text-gray-900 dark:text-gray-100"
-              >
-                <span>Sort A to Z</span>
-                {tableSortColumn === column && tableSortDirection === 'asc' && (
-                  <Check size={14} className="text-indigo-600" />
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  if (tableSortColumn === column) {
-                    setTableSortDirection('desc');
-                  } else {
-                    setTableSortColumn(column);
-                    setTableSortDirection('desc');
-                  }
-                  setTableCurrentPage(1);
-                  setOpenFilterPopup(null);
-                }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 rounded flex items-center justify-between text-gray-900 dark:text-gray-100"
-              >
-                <span>Sort Z to A</span>
-                {tableSortColumn === column && tableSortDirection === 'desc' && (
-                  <Check size={14} className="text-indigo-600" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Text Filter */}
-          {isTextColumn && (
-            <>
-              <div>
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Text Filters</p>
-                <Select
-                  value={{ value: filter.textOperator, label: filter.textOperator.charAt(0).toUpperCase() + filter.textOperator.slice(1) }}
-                  onChange={(option) => updateColumnFilter(column, { textOperator: (option?.value || 'contains') as any })}
-                  options={[
-                    { value: 'contains', label: 'Contains' },
-                    { value: 'equals', label: 'Equals' },
-                    { value: 'starts', label: 'Starts with' },
-                    { value: 'ends', label: 'Ends with' },
-                  ]}
-                  className="text-xs mb-2"
-                  classNamePrefix="hk-select"
-                />
-                <input
-                  type="text"
-                  placeholder={`Filter ${label.toLowerCase()}...`}
-                  value={filter.textFilter}
-                  onChange={(e) => updateColumnFilter(column, { textFilter: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-
-              {/* Multi-select for unique values */}
-              {uniqueValues.length > 0 && uniqueValues.length <= 50 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Select values</p>
-                  <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded p-2 space-y-1">
-                    {uniqueValues.map((value) => (
-                      <label
-                        key={value}
-                        className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={filter.selectedValues.includes(value)}
-                          onChange={(e) => {
-                            const newValues = e.target.checked
-                              ? [...filter.selectedValues, value]
-                              : filter.selectedValues.filter(v => v !== value);
-                            updateColumnFilter(column, { selectedValues: newValues });
-                          }}
-                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Date Range Filter */}
-          {isDateColumn && (
-            <div>
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Date Range</p>
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">From</label>
-                  <input
-                    type="date"
-                    value={filter.dateFrom}
-                    onChange={(e) => updateColumnFilter(column, { dateFrom: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">To</label>
-                  <input
-                    type="date"
-                    value={filter.dateTo}
-                    onChange={(e) => updateColumnFilter(column, { dateTo: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Amount Range Filter */}
-          {isAmountColumn && (
-            <div>
-              <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Amount Range</p>
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Minimum</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={filter.amountMin}
-                    onChange={(e) => updateColumnFilter(column, { amountMin: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Maximum</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={filter.amountMax}
-                    onChange={(e) => updateColumnFilter(column, { amountMax: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Clear Filter Button */}
-          {(columnHasActiveFilter(column)) && (
-            <button
-              onClick={() => {
-                updateColumnFilter(column, defaultColumnFilter);
-              }}
-              className="w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg font-semibold"
-            >
-              Clear Filter
-            </button>
-          )}
-        </div>
-      </div>
-      </>
+      <FilterPopupComponent
+        column={column}
+        label={label}
+        filter={tableColumnFilters[column]}
+        uniqueValues={getUniqueColumnValues(column as keyof Transaction)}
+        sortColumn={tableSortColumn}
+        sortDirection={tableSortDirection}
+        hasActiveFilter={columnHasActiveFilter(column)}
+        onClose={() => setOpenFilterPopup(null)}
+        onUpdateFilter={updateColumnFilter}
+        onSort={(col) => {
+          handleTableSort(col);
+        }}
+        onSortDescending={(col) => {
+          if (tableSortColumn === col) {
+            setTableSortDirection('desc');
+          } else {
+            setTableSortColumn(col);
+            setTableSortDirection('desc');
+          }
+          setTableCurrentPage(1);
+        }}
+        onClearFilter={(col) => updateColumnFilter(col, defaultColumnFilter)}
+      />
     );
   };
 
   // Login Screen
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white/5 backdrop-blur-lg border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
-          <div className="hidden md:flex flex-col justify-between bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 text-white p-10">
-            <div>
-              <p className={`text-sm font-medium text-white/80 transition-all duration-200 ease-in-out ${isTitleAnimating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-                {displayTitle}
-              </p>
-              <h1 className="text-3xl font-bold mt-2 leading-tight">Accounting & Reporting</h1>
-              <p className="mt-4 text-white/80 text-sm leading-relaxed">
-                Secure access to your finance workspace. All data stays protected;
-                passwords are validated on the server and never stored in the browser.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-white/80">
-              <span className="h-2 w-2 rounded-full bg-emerald-300"></span>
-              Encrypted connection • Server-side auth
-            </div>
-          </div>
-
-          <div className="bg-white text-slate-900 p-8 md:p-10">
-            <div className="mb-8">
-              <p className="text-sm font-semibold text-indigo-600 mb-2">Welcome back</p>
-              <h2 className="text-2xl font-bold text-slate-900">Sign in to continue</h2>
-              <p className="text-sm text-slate-500 mt-1">Use the admin password provided.</p>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLogin();
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">User</label>
-                <Select<UserTypeOption>
-                  options={userTypeOptions}
-                  value={userTypeOptions.find((opt) => opt.value === userType)}
-                  onChange={handleUserTypeChange}
-                  classNamePrefix="hk-select"
-                  className="text-sm"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderRadius: 12,
-                      borderColor: '#cbd5e1',
-                      minHeight: '44px',
-                      boxShadow: 'none',
-                      '&:hover': {
-                        borderColor: '#cbd5e1',
-                      },
-                    }),
-                    placeholder: (base) => ({
-                      ...base,
-                      color: '#64748b',
-                    }),
-                  }}
-                />
-                {userType === 'trial' && (
-                  <p className="mt-1 text-xs text-slate-500">Trial mode shows sample data. No password required.</p>
-                )}
-              </div>
-              {userType === 'admin' && (
-                <div className="relative">
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Password</label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-white"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-9 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                  </button>
-                </div>
-              )}
-
-              {authError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">
-                  {authError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isAuthenticating}
-                className={`w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-semibold shadow hover:bg-indigo-700 transition ${isAuthenticating ? 'opacity-80 cursor-not-allowed' : ''
-                  }`}
-              >
-                {isAuthenticating ? 'Signing in...' : 'Sign in'}
-              </button>
-
-              {userType === 'admin' && (
-                <p className="text-xs text-slate-500 text-center">
-                  Password is verified securely on the server and never stored in the browser.
-                </p>
-              )}
-            </form>
-            </div>
-        </div>
-      </div>
+      <LoginPage
+        userType={userType}
+        displayTitle={displayTitle}
+        isTitleAnimating={isTitleAnimating}
+        onUserTypeChange={handleUserTypeChange}
+        onLogin={handleLogin}
+        isAuthenticating={isAuthenticating}
+        authError={authError}
+      />
     );
   }
 
   // Show loader while initializing after login or userType change
   if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-blue-600 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative inline-block mb-6">
-            <div className="h-20 w-20 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-12 w-12 bg-white/20 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">₹</span>
-              </div>
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Loading your data</h2>
-          <p className="text-white/80 text-sm">Please wait while we fetch your transactions...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -1663,141 +1294,13 @@ export default function AccountingSystem() {
         </div>
       )}
 
-      {/* Header */}
-      <div className={`${
-        theme.mode === 'dark' 
-          ? 'bg-black border-b border-gray-900' 
-          : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-             theme.palette === 'blue' ? 'bg-blue-600' :
-             theme.palette === 'purple' ? 'bg-purple-600' :
-             theme.palette === 'emerald' ? 'bg-emerald-600' :
-             'bg-rose-600')
-      } text-white shadow-lg`}>
-        <div className="max-w-6xl mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold">{displayTitle}</h1>
-              {userType === 'trial' && (
-                <span className="px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded-full animate-pulse">
-                  TRIAL MODE
-                </span>
-              )}
-            </div>
-            <p className={`text-xs md:text-sm ${theme.mode === 'dark' ? 'text-gray-300' : 'opacity-90'}`}>Accounts | Reporting | Reconciliation</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Theme Toggle Button */}
-            <div className="relative">
-              <button
-                onClick={() => setShowThemeMenu(!showThemeMenu)}
-                  className="w-full md:w-auto justify-center bg-white/20 hover:bg-white/30 dark:bg-gray-900 dark:hover:bg-gray-800 px-4 py-2 rounded-lg flex items-center gap-2 text-sm md:text-base transition-colors"
-                title="Theme Settings"
-              >
-                {theme.mode === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
-                <Palette size={16} />
-              </button>
-              
-              {/* Theme Menu */}
-              {showThemeMenu && (
-                <>
-                  {/* Mobile overlay backdrop */}
-                  <div 
-                    className="fixed inset-0 z-40 bg-black/20 md:bg-transparent" 
-                    onClick={() => setShowThemeMenu(false)}
-                  />
-                  {/* Theme Menu Dialog - Responsive positioning */}
-                  <div className="fixed md:absolute bottom-0 md:bottom-auto left-0 md:left-auto right-0 md:right-0 top-auto md:top-full mt-0 md:mt-2 w-full md:w-64 max-w-md md:max-w-none mx-auto md:mx-0 bg-white dark:bg-black dark:border dark:border-gray-900 rounded-t-2xl md:rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-gray-200 z-50 p-4 md:p-4 max-h-[80vh] md:max-h-none overflow-y-auto md:overflow-y-visible">
-                    {/* Close button for mobile */}
-                    <div className="flex items-center justify-between mb-4 md:hidden">
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">Theme Settings</p>
-                      <button
-                        onClick={() => setShowThemeMenu(false)}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-lg transition-colors"
-                        aria-label="Close theme menu"
-                      >
-                        <X size={20} className="text-gray-600 dark:text-gray-400" />
-                      </button>
-                    </div>
-                    
-                    {/* Mode Toggle */}
-                    <div className="mb-4">
-                      <p className="text-sm md:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Mode</p>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Sun size={18} className={theme.mode === 'light' ? 'text-yellow-500' : 'text-gray-400'} />
-                          <span className={`text-sm font-medium ${theme.mode === 'light' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>Light</span>
-                        </div>
-                        <button
-                          onClick={() => setTheme({ ...theme, mode: theme.mode === 'light' ? 'dark' : 'light' })}
-                          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                            theme.mode === 'dark'
-                              ? 'bg-gray-900 focus:ring-gray-800'
-                              : (theme.palette === 'indigo' ? 'bg-indigo-600 focus:ring-indigo-500' :
-                                 theme.palette === 'blue' ? 'bg-blue-600 focus:ring-blue-500' :
-                                 theme.palette === 'purple' ? 'bg-purple-600 focus:ring-purple-500' :
-                                 theme.palette === 'emerald' ? 'bg-emerald-600 focus:ring-emerald-500' :
-                                 'bg-rose-600 focus:ring-rose-500')
-                          }`}
-                          role="switch"
-                          aria-checked={theme.mode === 'dark'}
-                        >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                              theme.mode === 'dark' ? 'translate-x-8' : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <Moon size={18} className={theme.mode === 'dark' ? 'text-blue-400' : 'text-gray-400'} />
-                          <span className={`text-sm font-medium ${theme.mode === 'dark' ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>Dark</span>
-                        </div>
-                      </div>
-                    </div>
-                        
-                    {/* Color Palette - Only show in light mode */}
-                    {theme.mode === 'light' && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color Palette</p>
-                      <div className="grid grid-cols-5 gap-2">
-                            {(['indigo', 'blue', 'purple', 'emerald', 'rose'] as ColorPalette[]).map((palette) => {
-                              const isSelected = theme.palette === palette;
-                              const baseClasses = isSelected 
-                                ? 'ring-2 ring-offset-2 scale-110' 
-                                : 'hover:scale-105 active:scale-95';
-                              const colorClasses = {
-                                indigo: isSelected ? 'bg-indigo-600 ring-indigo-600' : 'bg-indigo-500 hover:bg-indigo-600',
-                                blue: isSelected ? 'bg-blue-600 ring-blue-600' : 'bg-blue-500 hover:bg-blue-600',
-                                purple: isSelected ? 'bg-purple-600 ring-purple-600' : 'bg-purple-500 hover:bg-purple-600',
-                                emerald: isSelected ? 'bg-emerald-600 ring-emerald-600' : 'bg-emerald-500 hover:bg-emerald-600',
-                                rose: isSelected ? 'bg-rose-600 ring-rose-600' : 'bg-rose-500 hover:bg-rose-600',
-                              };
-                              return (
-                                <button
-                                  key={palette}
-                                  onClick={() => setTheme({ ...theme, palette })}
-                                  className={`w-full h-10 md:h-10 rounded-lg transition-all touch-manipulation ${baseClasses} ${colorClasses[palette]}`}
-                                  title={palette.charAt(0).toUpperCase() + palette.slice(1)}
-                                  aria-label={`Select ${palette} color palette`}
-                                />
-                              );
-                            })}
-                          </div>
-                        </div>
-                    )}
-                  </div>
-                    </>
-                  )}
-                </div>
-                
-          <button
-            onClick={handleLogout}
-                  className="w-full md:w-auto justify-center bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm md:text-base"
-          >
-            <LogOut size={18} /> Logout
-          </button>
-              </div>
-        </div>
-      </div>
+      <Header
+        displayTitle={displayTitle}
+        userType={userType}
+        theme={theme}
+        onThemeChange={setTheme}
+        onLogout={handleLogout}
+      />
 
       <div className="max-w-6xl mx-auto p-4">
         {/* Dashboard Stats - All Time */}
