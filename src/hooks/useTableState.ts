@@ -253,6 +253,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     // State
     columnFilters,
     openFilterPopup,
+    setOpenFilterPopup,
     sortColumn,
     sortDirection,
     currentPage,

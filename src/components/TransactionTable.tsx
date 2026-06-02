@@ -16,6 +16,28 @@ interface TransactionTableProps {
   onExportCSV: () => void;
 }
 
+const getFilterSummary = (column: string, filter: any) => {
+  if (column === 'date') {
+    if (filter.dateFrom || filter.dateTo) {
+      const from = filter.dateFrom ? formatDisplayDate(filter.dateFrom) : '*';
+      const to = filter.dateTo ? formatDisplayDate(filter.dateTo) : '*';
+      return `${from} to ${to}`;
+    }
+  } else if (column === 'amount') {
+    if (filter.amountMin || filter.amountMax) {
+      return `₹${filter.amountMin || '0'} - ₹${filter.amountMax || '∞'}`;
+    }
+  } else {
+    if (filter.selectedValues && filter.selectedValues.length > 0) {
+      return filter.selectedValues.join(', ');
+    }
+    if (filter.textFilter) {
+      return filter.textFilter;
+    }
+  }
+  return '';
+};
+
 export default function TransactionTable({
   transactions,
   trusteeOptions,
@@ -41,6 +63,37 @@ export default function TransactionTable({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Mobile FilterPopup bridge
+  const MobileFilterPopupBridge = () => {
+    if (!table.openFilterPopup) return null;
+    const col = table.openFilterPopup;
+    const labels: Record<string, string> = {
+      date: 'Date',
+      category: 'Category',
+      subcategory: 'Subcategory',
+      custodian: 'Custodian',
+      counterparty: 'Counterparty',
+      amount: 'Amount',
+      remarks: 'Remarks',
+    };
+    return (
+      <FilterPopupComponent
+        column={col}
+        label={labels[col] || col}
+        filter={table.columnFilters[col]}
+        uniqueValues={table.getUniqueColumnValues(col as keyof Transaction)}
+        sortColumn={table.sortColumn}
+        sortDirection={table.sortDirection}
+        hasActiveFilter={table.columnHasActiveFilter(col)}
+        onClose={table.closeFilterPopup}
+        onUpdateFilter={table.updateFilter}
+        onSort={table.handleSort}
+        onSortDescending={table.handleSortDescending}
+        onClearFilter={(columnName) => table.updateFilter(columnName, defaultColumnFilter)}
+      />
+    );
+  };
 
   // FilterPopup bridge � maps hook state to FilterPopupComponent props
   const FilterPopup = ({ column, label }: { column: string; label: string }) => {
@@ -115,6 +168,69 @@ export default function TransactionTable({
 
       {/* Date Filter for View Tab */}
 
+      {/* Mobile/Desktop Active & Quick Filter Chips */}
+      <div className="flex flex-wrap items-center gap-2 mb-6 bg-gray-50/50 dark:bg-gray-900/30 p-3 rounded-xl border border-gray-100 dark:border-gray-900/80">
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold mr-1 flex items-center gap-1">
+          <Filter size={12} /> Filters:
+        </span>
+        
+        {[
+          { key: 'date', label: 'Date' },
+          { key: 'category', label: 'Category' },
+          { key: 'subcategory', label: 'Subcategory' },
+          { key: 'custodian', label: 'Custodian' },
+          { key: 'counterparty', label: 'Counterparty' },
+          { key: 'amount', label: 'Amount' },
+          { key: 'remarks', label: 'Remarks' },
+        ].map(({ key, label }) => {
+          const hasFilter = table.columnHasActiveFilter(key);
+          const filterState = table.columnFilters[key];
+          const summary = getFilterSummary(key, filterState);
+          
+          return (
+            <div key={key} className="flex items-center gap-1">
+              <button
+                onClick={() => table.setOpenFilterPopup(key)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
+                  hasFilter
+                    ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-semibold'
+                    : 'bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'
+                }`}
+              >
+                <span>{label}</span>
+                {hasFilter && (
+                  <span className="text-[10px] bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 px-1.5 py-0.5 rounded-full max-w-[120px] truncate">
+                    {summary}
+                  </span>
+                )}
+              </button>
+              {hasFilter && (
+                <button
+                  onClick={() => table.updateFilter(key, defaultColumnFilter)}
+                  className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1"
+                  title={`Clear ${label} filter`}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {table.hasActiveFilters() && (
+          <button
+            onClick={table.clearAllFilters}
+            className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold px-2.5 py-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-950/20 transition-all ml-auto md:ml-0"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Floating Filter Popup for Mobile */}
+      <div className="md:hidden">
+        <MobileFilterPopupBridge />
+      </div>
 
       {!isLoadingData && table.filteredTransactions.length === 0 ? (
         <p className="text-gray-500 text-center py-8">No transactions found</p>
