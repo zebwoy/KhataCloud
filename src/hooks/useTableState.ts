@@ -22,6 +22,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize] = useState<number>(20);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Close filter popup on outside click
   useEffect(() => {
@@ -34,9 +35,30 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openFilterPopup]);
 
-  // Apply column filters + sorting to transactions
+  // Reset page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Apply column filters + sorting + global search to transactions
   const getFilteredTransactions = useCallback((): Transaction[] => {
     let filtered = [...transactions];
+
+    // Apply global search query
+    if (searchQuery.trim()) {
+      const lowerQuery = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t => {
+        return (
+          String(t.date || '').toLowerCase().includes(lowerQuery) ||
+          String(t.category || '').toLowerCase().includes(lowerQuery) ||
+          String(t.subcategory || '').toLowerCase().includes(lowerQuery) ||
+          String(t.custodian || '').toLowerCase().includes(lowerQuery) ||
+          String(t.counterparty || '').toLowerCase().includes(lowerQuery) ||
+          String(t.remarks || '').toLowerCase().includes(lowerQuery) ||
+          String(t.amount || '').toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
 
     // Apply column filters
     Object.entries(columnFilters).forEach(([column, filter]) => {
@@ -120,7 +142,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     });
 
     return filtered;
-  }, [transactions, columnFilters, sortColumn, sortDirection]);
+  }, [transactions, columnFilters, sortColumn, sortDirection, searchQuery]);
 
   const filteredTransactions = getFilteredTransactions();
   const totalPages = Math.ceil(filteredTransactions.length / pageSize);
@@ -171,11 +193,12 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
       amount: { ...defaultColumnFilter },
       remarks: { ...defaultColumnFilter },
     });
+    setSearchQuery('');
     setCurrentPage(1);
   }, []);
 
   const hasActiveFilters = useCallback(() => {
-    return Object.values(columnFilters).some(filter => 
+    return searchQuery.trim() !== '' || Object.values(columnFilters).some(filter => 
       filter.textFilter.trim() !== '' ||
       filter.selectedValues.length > 0 ||
       filter.dateFrom !== '' ||
@@ -183,7 +206,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
       filter.amountMin !== '' ||
       filter.amountMax !== ''
     );
-  }, [columnFilters]);
+  }, [columnFilters, searchQuery]);
 
   const toggleFilterPopup = useCallback((column: string, event?: React.MouseEvent<HTMLButtonElement>) => {
     if (event) {
@@ -234,6 +257,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     sortDirection,
     currentPage,
     pageSize,
+    searchQuery,
     
     // Computed
     filteredTransactions,
@@ -253,5 +277,6 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     setCurrentPage,
     setSortColumn,
     setSortDirection,
+    setSearchQuery,
   };
 }

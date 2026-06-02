@@ -1,4 +1,4 @@
-import { Download, Edit, ChevronUp, ChevronDown, X, Filter } from 'lucide-react';
+import { Download, Edit, ChevronUp, ChevronDown, X, Filter, Search } from 'lucide-react';
 import type { Transaction, TrusteeOption } from '../types';
 import { defaultColumnFilter } from '../types';
 import FilterPopupComponent from './FilterPopup';
@@ -26,7 +26,7 @@ export default function TransactionTable({
 }: TransactionTableProps) {
   const table = useTableState({ transactions, trusteeOptions });
 
-  // FilterPopup bridge — maps hook state to FilterPopupComponent props
+  // FilterPopup bridge ï¿½ maps hook state to FilterPopupComponent props
   const FilterPopup = ({ column, label }: { column: string; label: string }) => {
     if (table.openFilterPopup !== column) return null;
     return (
@@ -56,21 +56,43 @@ export default function TransactionTable({
             Showing {table.filteredTransactions.length} of {transactions.length} transaction{table.filteredTransactions.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex gap-2">
-          {table.hasActiveFilters() && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
+              <Search size={18} />
+            </span>
+            <input
+              type="text"
+              placeholder="Search transactions..."
+              value={table.searchQuery}
+              onChange={(e) => table.setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all shadow-sm"
+            />
+            {table.searchQuery && (
+              <button
+                onClick={() => table.setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {table.hasActiveFilters() && (
+              <button
+                onClick={table.clearAllFilters}
+                className="bg-gray-500 dark:bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-600 dark:hover:bg-gray-700 text-sm"
+              >
+                <X size={16} /> Clear Filters
+              </button>
+            )}
             <button
-              onClick={table.clearAllFilters}
-              className="bg-gray-500 dark:bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-600 dark:hover:bg-gray-700 text-sm"
+              onClick={onExportCSV}
+              className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600 text-sm"
             >
-              <X size={16} /> Clear Filters
+              <Download size={18} /> Export CSV
             </button>
-          )}
-          <button
-            onClick={onExportCSV}
-            className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600 text-sm"
-          >
-            <Download size={18} /> Export CSV
-          </button>
+          </div>
         </div>
       </div>
 
