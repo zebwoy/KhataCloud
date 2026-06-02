@@ -93,23 +93,7 @@ export default function FinancialReports({
     });
   };
 
-  const getTopCounterparties = (category: 'Income' | 'Expense') => {
-    const groups: Record<string, { name: string; total: number; count: number }> = {};
-    
-    filteredTransactions.forEach((t) => {
-      if (t.category !== category || !t.counterparty) return;
-      const name = t.counterparty;
-      if (!groups[name]) {
-        groups[name] = { name, total: 0, count: 0 };
-      }
-      groups[name].total += t.amount;
-      groups[name].count += 1;
-    });
-    
-    return Object.values(groups)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-  };
+
 
   return (
     <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
@@ -630,63 +614,6 @@ export default function FinancialReports({
             </div>
           ) : (
               <p className="text-gray-600 dark:text-gray-400 text-center py-4">No expense transactions in selected period</p>
-          )}
-        </div>
-      </div>
-
-      {/* Top Counterparties Leaderboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-        {/* Top Donors (Income) */}
-        <div>
-          <h3 className="text-lg font-bold mb-4 text-green-600 dark:text-green-400 flex items-center gap-2">
-            🏆 Top Contributors (Inflow)
-          </h3>
-          {getTopCounterparties('Income').length > 0 ? (
-            <div className="space-y-2">
-              {getTopCounterparties('Income').map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-xl p-3 shadow-md">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center justify-center h-6 w-6 rounded-full bg-green-100 dark:bg-green-950/40 text-xs font-bold text-green-700 dark:text-green-400">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.name}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400">{item.count} transaction{item.count !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-sm text-green-600 dark:text-green-400">{formatCurrency(item.total)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-600 dark:text-gray-400 text-center py-4">No contributor data for this period</p>
-          )}
-        </div>
-
-        {/* Top Vendors (Expense) */}
-        <div>
-          <h3 className="text-lg font-bold mb-4 text-red-600 dark:text-red-400 flex items-center gap-2">
-            💸 Top Recipients (Outflow)
-          </h3>
-          {getTopCounterparties('Expense').length > 0 ? (
-            <div className="space-y-2">
-              {getTopCounterparties('Expense').map((item, idx) => (
-                <div key={item.name} className="flex items-center justify-between bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-xl p-3 shadow-md">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center justify-center h-6 w-6 rounded-full bg-red-100 dark:bg-red-950/40 text-xs font-bold text-red-700 dark:text-red-400">
-                      {idx + 1}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.name}</p>
-                      <p className="text-[10px] text-gray-500 dark:text-gray-400">{item.count} transaction{item.count !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-sm text-red-600 dark:text-red-400">{formatCurrency(item.total)}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-600 dark:text-gray-400 text-center py-4">No recipient data for this period</p>
           )}
         </div>
       </div>
