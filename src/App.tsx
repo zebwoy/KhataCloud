@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -62,6 +62,20 @@ export default function AccountingSystem() {
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
+  
+  interface ToastMessage {
+    id: string;
+    type: 'success' | 'error' | 'info';
+    message: string;
+  }
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, type, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
   const [playSoundOnSuccess, setPlaySoundOnSuccess] = useState(true);
   const [trusteeOptions, setTrusteeOptions] = useState<TrusteeOption[]>([]);
   const [isInitializing, setIsInitializing] = useState(() => {
@@ -107,7 +121,9 @@ export default function AccountingSystem() {
       const data: Transaction[] = await response.json();
       setTransactions(data);
     } catch (error) {
-      setDataError((error as Error).message || 'Unable to load transactions.');
+      const errMsg = (error as Error).message || 'Unable to load transactions.';
+      setDataError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsLoadingData(false);
     }
@@ -482,8 +498,11 @@ export default function AccountingSystem() {
       setFormData(getDefaultFormState());
       setFormErrors({});
       triggerSuccessAck();
+      showToast('Transaction saved successfully!', 'success');
     } catch (error) {
-      setDataError((error as Error).message || 'Unable to save the transaction.');
+      const errMsg = (error as Error).message || 'Unable to save the transaction.';
+      setDataError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -507,8 +526,11 @@ export default function AccountingSystem() {
       }
 
       setTransactions((prev) => prev.filter((t) => t.id !== id));
+      showToast('Transaction deleted successfully!', 'success');
     } catch (error) {
-      setDataError((error as Error).message || 'Unable to delete the transaction.');
+      const errMsg = (error as Error).message || 'Unable to delete the transaction.';
+      setDataError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -588,8 +610,11 @@ export default function AccountingSystem() {
       setEditingTransactionId(null);
       setFormData(getDefaultFormState());
       setFormErrors({});
+      showToast('Transaction updated successfully!', 'success');
     } catch (error) {
-      setDataError((error as Error).message || 'Unable to update the transaction.');
+      const errMsg = (error as Error).message || 'Unable to update the transaction.';
+      setDataError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsSyncing(false);
     }
@@ -896,6 +921,35 @@ export default function AccountingSystem() {
             exportToCSV={exportToCSV}
           />
         )}
+      </div>
+
+      {/* Toast Notification Container */}
+      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full px-4 sm:px-0">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto flex items-center justify-between p-4 rounded-xl shadow-lg border backdrop-blur-md transition-all duration-300 animate-slide-in ${
+              toast.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-400'
+                : toast.type === 'error'
+                ? 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-400'
+                : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-800 dark:text-indigo-400'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {toast.type === 'success' && <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+              {toast.type === 'error' && <div className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
+              {toast.type === 'info' && <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />}
+              <span className="text-sm font-medium">{toast.message}</span>
+            </div>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-4"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
