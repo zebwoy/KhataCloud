@@ -11,7 +11,6 @@ import type {
   TrusteeOption,
   Entity,
   UserTypeOption,
-  Theme,
 } from './types';
 import { getDefaultFormState } from './types';
 import LoginPage from './components/LoginPage';
@@ -20,6 +19,7 @@ import Header from './components/Header';
 import FinancialReports from './components/FinancialReports';
 import TransactionTable from './components/TransactionTable';
 import TransactionForm from './components/TransactionForm';
+import useTheme from './hooks/useTheme';
 import { formatCurrency, formatDisplayDateShort } from './utils/formatters';
 import { calculateStats } from './utils/calculations';
 import {
@@ -76,58 +76,8 @@ export default function AccountingSystem() {
 
 
 
-  // Theme state
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('madrasah_theme');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return { mode: 'light', palette: 'indigo' };
-      }
-    }
-    return { mode: 'light', palette: 'indigo' };
-  });
-
-
-  // Apply theme to document
-  useEffect(() => {
-    localStorage.setItem('madrasah_theme', JSON.stringify(theme));
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme.mode === 'dark');
-    root.setAttribute('data-theme', theme.palette);
-    
-    // Set CSS variable for DatePicker selected color in light mode
-    if (theme.mode === 'light') {
-      const paletteColors = {
-        indigo: '#4f46e5',
-        blue: '#2563eb',
-        purple: '#9333ea',
-        emerald: '#059669',
-        rose: '#e11d48',
-      };
-      root.style.setProperty('--selected-color', paletteColors[theme.palette]);
-    } else {
-      root.style.setProperty('--selected-color', '#1f2937');
-    }
-  }, [theme]);
-
-  // Helper function to get primary button classes based on theme
-  const getPrimaryButtonClasses = (isActive = true) => {
-    if (!isActive) return 'bg-gray-100 dark:bg-gray-900 dark:border-gray-800 text-gray-700 dark:text-gray-300 border dark:border-gray-900';
-    if (theme.mode === 'dark') {
-      return 'bg-gray-900 hover:bg-gray-800 border border-gray-800 text-white';
-    }
-    // Light mode - use palette
-    const paletteMap = {
-      indigo: 'bg-indigo-600 hover:bg-indigo-700',
-      blue: 'bg-blue-600 hover:bg-blue-700',
-      purple: 'bg-purple-600 hover:bg-purple-700',
-      emerald: 'bg-emerald-600 hover:bg-emerald-700',
-      rose: 'bg-rose-600 hover:bg-rose-700',
-    };
-    return paletteMap[theme.palette] + ' text-white';
-  };
+  // Theme state + CSS effects + button class helper
+  const { theme, setTheme, getPrimaryButtonClasses } = useTheme();
 
   // Derived values from imported utilities
   const subcategoryOptions = getSubcategoryOptions(formData.category);
