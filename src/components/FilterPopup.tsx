@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { X, Check } from 'lucide-react';
 import Select from 'react-select';
 import type { ColumnFilter } from '../types';
@@ -34,6 +35,16 @@ export default function FilterPopup({
   const isDateColumn = column === 'date';
   const isAmountColumn = column === 'amount';
   const isTextColumn = !isDateColumn && !isAmountColumn;
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <>

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Download, Edit, ChevronUp, ChevronDown, X, Filter, Search } from 'lucide-react';
 import type { Transaction, TrusteeOption } from '../types';
 import { defaultColumnFilter } from '../types';
@@ -25,6 +26,21 @@ export default function TransactionTable({
   onExportCSV,
 }: TransactionTableProps) {
   const table = useTableState({ transactions, trusteeOptions });
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === '/' || (e.ctrlKey && e.key === 'k')) && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        searchInputRef.current?.blur();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // FilterPopup bridge � maps hook state to FilterPopupComponent props
   const FilterPopup = ({ column, label }: { column: string; label: string }) => {
@@ -62,8 +78,9 @@ export default function TransactionTable({
               <Search size={18} />
             </span>
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search transactions..."
+              placeholder="Search transactions... (Press /)"
               value={table.searchQuery}
               onChange={(e) => table.setSearchQuery(e.target.value)}
               className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm transition-all shadow-sm"
