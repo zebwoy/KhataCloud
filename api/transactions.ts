@@ -1,5 +1,5 @@
 import { Handler } from '@netlify/functions';
-import { Client } from 'pg';
+import { Client, QueryResultRow } from 'pg';
 import { getAuthContext } from './utils/authHelper.js';
 import { vercelWrapper } from './utils/vercelWrapper.js';
 
@@ -9,7 +9,7 @@ const getConnectionString = () =>
   process.env.NETLIFY_DATABASE_URL ||
   '';
 
-const runQuery = async <T>(query: string, params: unknown[] = []) => {
+const runQuery = async <T extends QueryResultRow>(query: string, params: unknown[] = []) => {
   const connectionString = getConnectionString();
   if (!connectionString) {
     throw new Error('Database connection string is not configured.');
