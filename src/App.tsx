@@ -10,7 +10,6 @@ import type {
   SubcategoryOption,
   TrusteeOption,
   Entity,
-  UserTypeOption,
 } from './types';
 import { getDefaultFormState } from './types';
 import LoginPage from './components/LoginPage';
@@ -20,6 +19,7 @@ import FinancialReports from './components/FinancialReports';
 import TransactionTable from './components/TransactionTable';
 import TransactionForm from './components/TransactionForm';
 import useTheme from './hooks/useTheme';
+import useAuth from './hooks/useAuth';
 import { formatCurrency, formatDisplayDateShort } from './utils/formatters';
 import { calculateStats } from './utils/calculations';
 import {
@@ -29,22 +29,21 @@ import {
 } from './utils/constants';
 
 export default function AccountingSystem() {
-  // Initialize login state from sessionStorage to persist across refreshes
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return sessionStorage.getItem('madrasah_logged_in') === 'true';
-  });
-  const [userType, setUserType] = useState<'admin' | 'trial'>(() => {
-    return (sessionStorage.getItem('madrasah_user_type') as 'admin' | 'trial') || 'trial';
-  });
-  const [displayTitle, setDisplayTitle] = useState<string>(() => {
-    const savedUserType = (sessionStorage.getItem('madrasah_user_type') as 'admin' | 'trial') || 'trial';
-    return savedUserType === 'trial' ? 'Trial account for Demo Purpose' : 'Millat Quran Learning Centre';
-  });
-  const [isTitleAnimating, setIsTitleAnimating] = useState(false);
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  // Auth state + handlers (login, logout, user type selection)
+  const {
+    isLoggedIn,
+    userType,
+    displayTitle,
+    isTitleAnimating,
+    isAuthenticating,
+    authError,
+    handleUserTypeChange,
+    handleLogin,
+    handleLogout,
+  } = useAuth();
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [authError, setAuthError] = useState('');
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
   const [activeTab, setActiveTab] = useState('add');
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -85,27 +84,7 @@ export default function AccountingSystem() {
 
 
 
-  // Handle user type change with animated title transition (countdown timer-like effect)
-  const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
-    const newUserType = option?.value ?? 'admin';
-    if (newUserType !== userType) {
-      setIsTitleAnimating(true);
-      // Countdown-like animation: fade out, change text, fade in
-      setTimeout(() => {
-        const newTitle = newUserType === 'trial' 
-          ? 'Trial account for Demo Purpose' 
-          : 'Millat Quran Learning Centre';
-        setDisplayTitle(newTitle);
-        setUserType(newUserType);
-        // Fade in new title with smooth transition
-        setTimeout(() => {
-          setIsTitleAnimating(false);
-        }, 200);
-      }, 200);
-    } else {
-      setUserType(newUserType);
-    }
-  };
+
 
   const fetchTransactions = useCallback(async () => {
     setIsLoadingData(true);
@@ -143,19 +122,6 @@ export default function AccountingSystem() {
   }, []);
 
   useEffect(() => {
-    const savedUserType = sessionStorage.getItem('madrasah_user_type') as 'admin' | 'trial' | null;
-    if (sessionStorage.getItem('madrasah_logged_in') === 'true') {
-      setIsLoggedIn(true);
-      if (savedUserType) {
-        setUserType(savedUserType);
-        // Update displayTitle based on saved userType
-        const title = savedUserType === 'trial' 
-          ? 'Trial account for Demo Purpose' 
-          : 'Millat Quran Learning Centre';
-        setDisplayTitle(title);
-      }
-    }
-
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -409,64 +375,6 @@ export default function AccountingSystem() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleLogin = async (password: string) => {
-    // For admin mode, require password
-    if (userType === 'admin' && !password.trim()) {
-      setAuthError('Enter the password');
-      return;
-    }
-
-    setIsAuthenticating(true);
-    setAuthError('');
-
-    try {
-      const response = await fetch('/.netlify/functions/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, userType: userType }),
-      });
-
-      if (response.ok) {
-        // Clear old data immediately to prevent showing previous user's data
-        setTransactions([]);
-        setTrusteeOptions([]);
-        setDataError('');
-        
-        setIsLoggedIn(true);
-        sessionStorage.setItem('madrasah_logged_in', 'true');
-        sessionStorage.setItem('madrasah_user_type', userType);
-        // Update displayTitle based on userType
-        const title = userType === 'trial' 
-          ? 'Trial account for Demo Purpose' 
-          : 'Millat Quran Learning Centre';
-        setDisplayTitle(title);
-        
-        // Show loader while fetching new data
-        setIsInitializing(true);
-        
-        // Fetch transactions and entities after login
-        try {
-          await Promise.all([fetchTransactions(), fetchEntities()]);
-        } finally {
-          setIsInitializing(false);
-        }
-      } else {
-        const data = await response.json().catch(() => null);
-        setAuthError(data?.message || 'Incorrect password. Please try again.');
-      }
-    } catch (error) {
-      setAuthError('Unable to login right now. Please try again.');
-    } finally {
-      setIsAuthenticating(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    // Clear session on logout but maintain userType
-    sessionStorage.removeItem('madrasah_logged_in');
-    // Keep madrasah_user_type in sessionStorage to maintain userType selection
-  };
 
 
   // Ka-ching cash register sound for transaction acknowledgment
@@ -754,7 +662,19 @@ export default function AccountingSystem() {
         displayTitle={displayTitle}
         isTitleAnimating={isTitleAnimating}
         onUserTypeChange={handleUserTypeChange}
-        onLogin={handleLogin}
+        onLogin={async (password) => {
+          setTransactions([]);
+          setTrusteeOptions([]);
+          setDataError('');
+          setIsInitializing(true);
+          await handleLogin(password, async () => {
+            try {
+              await Promise.all([fetchTransactions(), fetchEntities()]);
+            } finally {
+              setIsInitializing(false);
+            }
+          });
+        }}
         isAuthenticating={isAuthenticating}
         authError={authError}
       />
