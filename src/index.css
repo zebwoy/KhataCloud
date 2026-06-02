@@ -81,3 +81,42 @@ body {
   color: #f3f4f6 !important;
 }
 
+/* Toast slide-in animation */
+@keyframes slideIn {
+  from {
+    transform: translateY(1rem) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Print-friendly styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, nav, button, .no-print, input, select, .react-datepicker-wrapper, .react-datepicker, .react-datepicker__header {
+    display: none !important;
+  }
+  .max-w-6xl, .bg-white, .dark\:bg-black, .bg-gray-50, .shadow-xl, .shadow-2xl, .p-6, .p-4 {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+  h1, h2, h3, h4, p, span, td, th {
+    color: black !important;
+  }
+}
+

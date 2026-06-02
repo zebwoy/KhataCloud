@@ -1,4 +1,4 @@
-import { Download, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { Download, Calendar, TrendingUp, TrendingDown, Printer } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import type { Transaction, TrusteeOption, Theme } from '../types';
@@ -48,6 +48,69 @@ export default function FinancialReports({
   handleQuickFilter,
   exportToCSV,
 }: FinancialReportsProps) {
+
+  const getTrendData = () => {
+    const groups: Record<string, { interval: string; income: number; expense: number }> = {};
+    
+    let isDaily = false;
+    if (dateFilterMode === 'thisMonth') {
+      isDaily = true;
+    } else if (dateFilterMode === 'custom' && dateRange.fromDate && dateRange.toDate) {
+      const start = new Date(dateRange.fromDate);
+      const end = new Date(dateRange.toDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays <= 31) {
+        isDaily = true;
+      }
+    }
+
+    filteredTransactions.forEach((t) => {
+      const d = new Date(t.date);
+      if (isNaN(d.getTime())) return;
+      
+      let key = '';
+      if (isDaily) {
+        key = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+      } else {
+        key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+      }
+      
+      if (!groups[key]) {
+        groups[key] = { interval: key, income: 0, expense: 0 };
+      }
+      if (t.category === 'Income') {
+        groups[key].income += t.amount;
+      } else if (t.category === 'Expense') {
+        groups[key].expense += t.amount;
+      }
+    });
+
+    return Object.values(groups).sort((a, b) => {
+      const dateA = new Date(a.interval + (isDaily ? '' : ' 01'));
+      const dateB = new Date(b.interval + (isDaily ? '' : ' 01'));
+      return dateA.getTime() - dateB.getTime();
+    });
+  };
+
+  const getTopCounterparties = (category: 'Income' | 'Expense') => {
+    const groups: Record<string, { name: string; total: number; count: number }> = {};
+    
+    filteredTransactions.forEach((t) => {
+      if (t.category !== category || !t.counterparty) return;
+      const name = t.counterparty;
+      if (!groups[name]) {
+        groups[name] = { name, total: 0, count: 0 };
+      }
+      groups[name].total += t.amount;
+      groups[name].count += 1;
+    });
+    
+    return Object.values(groups)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5);
+  };
+
   return (
     <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -58,12 +121,20 @@ export default function FinancialReports({
             {dateFilterMode !== 'allTime' ? ' for selected period' : ' (all time)'}
           </p>
         </div>
-        <button
-          onClick={exportToCSV}
-          className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600"
-        >
-          <Download size={18} /> Export Report
-        </button>
+        <div className="flex gap-2 no-print">
+          <button
+            onClick={() => window.print()}
+            className="bg-indigo-600 dark:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
+          >
+            <Printer size={18} /> Print Report
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
+          >
+            <Download size={18} /> Export Report
+          </button>
+        </div>
       </div>
       {isLoadingData && (
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Refreshing data from the server...</p>
@@ -311,6 +382,126 @@ export default function FinancialReports({
         </div>
       </div>
 
+      {/* Visual Analytics Chart */}
+      {filteredTransactions.length > 0 && (
+        <div className="mb-6 p-6 bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-xl dark:shadow-[0_10px_25px_rgba(0,0,0,0.8)]">
+          <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-200">Income & Expense Trends</h3>
+          
+          <div className="flex gap-4 mb-4 text-xs font-semibold">
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-green-500" />
+              <span className="text-gray-600 dark:text-gray-400">Total Income</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-red-500" />
+              <span className="text-gray-600 dark:text-gray-400">Total Expense</span>
+            </div>
+          </div>
+
+          {(() => {
+            const trendData = getTrendData();
+            if (trendData.length === 0) {
+              return <p className="text-xs text-gray-500 text-center py-8">No transaction data available for trend chart.</p>;
+            }
+            
+            const maxVal = Math.max(...trendData.map(d => Math.max(d.income, d.expense)), 1000);
+            
+            const svgWidth = 600;
+            const svgHeight = 200;
+            const paddingLeft = 50;
+            const paddingRight = 20;
+            const paddingTop = 10;
+            const paddingBottom = 30;
+            
+            const chartWidth = svgWidth - paddingLeft - paddingRight;
+            const chartHeight = svgHeight - paddingTop - paddingBottom;
+            const colWidth = chartWidth / trendData.length;
+            const barWidth = Math.max(colWidth * 0.35, 6);
+            const gap = colWidth * 0.08;
+            
+            const gridLines = [0, 0.25, 0.5, 0.75, 1];
+
+            return (
+              <div className="relative w-full overflow-x-auto">
+                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full min-w-[500px] h-[200px]">
+                  {gridLines.map((ratio, idx) => {
+                    const y = paddingTop + chartHeight * (1 - ratio);
+                    const val = Math.round(maxVal * ratio);
+                    return (
+                      <g key={idx} className="opacity-40 dark:opacity-20">
+                        <line 
+                          x1={paddingLeft} 
+                          y1={y} 
+                          x2={svgWidth - paddingRight} 
+                          y2={y} 
+                          stroke="currentColor" 
+                          strokeWidth="1" 
+                          strokeDasharray="4 4"
+                          className="text-gray-400"
+                        />
+                        <text 
+                          x={paddingLeft - 8} 
+                          y={y + 4} 
+                          textAnchor="end" 
+                          className="text-[9px] fill-gray-500 dark:fill-gray-400 font-medium"
+                        >
+                          {val >= 1000 ? `₹${(val / 1000).toFixed(0)}k` : `₹${val}`}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {trendData.map((item, idx) => {
+                    const xPos = paddingLeft + idx * colWidth;
+                    const incomeHeight = (item.income / maxVal) * chartHeight;
+                    const expenseHeight = (item.expense / maxVal) * chartHeight;
+                    
+                    return (
+                      <g key={idx}>
+                        {item.income > 0 && (
+                          <rect 
+                            x={xPos + gap} 
+                            y={paddingTop + chartHeight - incomeHeight} 
+                            width={barWidth} 
+                            height={incomeHeight} 
+                            fill="#22c55e" 
+                            rx="2"
+                            className="transition-all duration-300 hover:fill-green-400"
+                          >
+                            <title>{`${item.interval} - Income: ₹${item.income.toLocaleString()}`}</title>
+                          </rect>
+                        )}
+                        {item.expense > 0 && (
+                          <rect 
+                            x={xPos + gap + barWidth + gap} 
+                            y={paddingTop + chartHeight - expenseHeight} 
+                            width={barWidth} 
+                            height={expenseHeight} 
+                            fill="#ef4444" 
+                            rx="2"
+                            className="transition-all duration-300 hover:fill-red-400"
+                          >
+                            <title>{`${item.interval} - Expense: ₹${item.expense.toLocaleString()}`}</title>
+                          </rect>
+                        )}
+                        <text 
+                          x={xPos + colWidth / 2} 
+                          y={paddingTop + chartHeight + 16} 
+                          textAnchor="middle" 
+                          className="text-[9px] fill-gray-500 dark:fill-gray-400 font-semibold"
+                        >
+                          {item.interval}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Period Comparison */}
       {previousRange && (
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 shadow-lg dark:shadow-[0_10px_25px_rgba(37,99,235,0.2)]">
@@ -439,6 +630,63 @@ export default function FinancialReports({
             </div>
           ) : (
               <p className="text-gray-600 dark:text-gray-400 text-center py-4">No expense transactions in selected period</p>
+          )}
+        </div>
+      </div>
+
+      {/* Top Counterparties Leaderboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        {/* Top Donors (Income) */}
+        <div>
+          <h3 className="text-lg font-bold mb-4 text-green-600 dark:text-green-400 flex items-center gap-2">
+            🏆 Top Contributors (Inflow)
+          </h3>
+          {getTopCounterparties('Income').length > 0 ? (
+            <div className="space-y-2">
+              {getTopCounterparties('Income').map((item, idx) => (
+                <div key={item.name} className="flex items-center justify-between bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center justify-center h-6 w-6 rounded-full bg-green-100 dark:bg-green-950/40 text-xs font-bold text-green-700 dark:text-green-400">
+                      {idx + 1}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.name}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">{item.count} transaction{item.count !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <span className="font-bold text-sm text-green-600 dark:text-green-400">{formatCurrency(item.total)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-400 text-center py-4">No contributor data for this period</p>
+          )}
+        </div>
+
+        {/* Top Vendors (Expense) */}
+        <div>
+          <h3 className="text-lg font-bold mb-4 text-red-600 dark:text-red-400 flex items-center gap-2">
+            💸 Top Recipients (Outflow)
+          </h3>
+          {getTopCounterparties('Expense').length > 0 ? (
+            <div className="space-y-2">
+              {getTopCounterparties('Expense').map((item, idx) => (
+                <div key={item.name} className="flex items-center justify-between bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center justify-center h-6 w-6 rounded-full bg-red-100 dark:bg-red-950/40 text-xs font-bold text-red-700 dark:text-red-400">
+                      {idx + 1}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{item.name}</p>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400">{item.count} transaction{item.count !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <span className="font-bold text-sm text-red-600 dark:text-red-400">{formatCurrency(item.total)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-400 text-center py-4">No recipient data for this period</p>
           )}
         </div>
       </div>
