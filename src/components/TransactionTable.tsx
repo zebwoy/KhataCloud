@@ -99,9 +99,7 @@ export default function TransactionTable({
       {/* Date Filter for View Tab */}
 
 
-      {isLoadingData ? (
-        <p className="text-gray-500 text-center py-8">Loading transactions...</p>
-      ) : table.filteredTransactions.length === 0 ? (
+      {!isLoadingData && table.filteredTransactions.length === 0 ? (
         <p className="text-gray-500 text-center py-8">No transactions found</p>
       ) : (
         <>
@@ -297,8 +295,22 @@ export default function TransactionTable({
                 </tr>
               </thead>
               <tbody>
-                {table.paginatedTransactions.map(t => (
-                  <tr key={t.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                {isLoadingData ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-t animate-pulse bg-white dark:bg-black">
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20" /></td>
+                      <td className="px-4 py-4"><div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-16" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-28" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-28" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-16 ml-auto" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-32" /></td>
+                      <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20 mx-auto" /></td>
+                    </tr>
+                  ))
+                ) : (
+                  table.paginatedTransactions.map(t => (
+                    <tr key={t.id} className="border-t hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{formatDisplayDate(t.date)}</td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -348,7 +360,8 @@ export default function TransactionTable({
                       </div>
                     </td>
                   </tr>
-                ))}
+                ))
+                )}
               </tbody>
             </table>
           </div>
