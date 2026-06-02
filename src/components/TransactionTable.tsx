@@ -103,7 +103,8 @@ export default function TransactionTable({
         <p className="text-gray-500 text-center py-8">No transactions found</p>
       ) : (
         <>
-          <div className="overflow-x-auto mb-4 -mx-6 md:mx-0 px-4 md:px-0">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto mb-4 -mx-6 md:mx-0 px-4 md:px-0">
             <table className="w-full min-w-[800px] md:min-w-0">
               <thead className="bg-gray-100">
                 <tr>
@@ -364,6 +365,107 @@ export default function TransactionTable({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card List View */}
+          <div className="block md:hidden space-y-4 mb-4">
+            {isLoadingData ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl p-4 animate-pulse space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24" />
+                    <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-16" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div className="space-y-1">
+                      <div className="h-3 bg-gray-100 dark:bg-gray-900 rounded w-12" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20" />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="h-3 bg-gray-100 dark:bg-gray-900 rounded w-12" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20" />
+                    </div>
+                  </div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-32 pt-1" />
+                  <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-900">
+                    <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-16" />
+                    <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-16" />
+                  </div>
+                </div>
+              ))
+            ) : (
+              table.paginatedTransactions.map(t => (
+                <div key={t.id} className="bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 block">{formatDisplayDate(t.date)}</span>
+                      <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold ${
+                        t.category === 'Income' 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' 
+                          : t.category === 'Transfer'
+                          ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400'
+                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
+                        }`}>
+                        {t.category}
+                      </span>
+                    </div>
+                    <span className={`text-base font-bold ${
+                      t.category === 'Income' 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : t.category === 'Transfer'
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {t.category === 'Income' ? '+' : t.category === 'Transfer' ? '⇄' : '-'}{formatCurrency(Number(t.amount))}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-xs py-2 border-t border-b border-gray-100 dark:border-gray-900 my-2">
+                    {t.subcategory && (
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block">Subcategory</span>
+                        <span className="text-gray-800 dark:text-gray-200 font-medium">{t.subcategory}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">Custodian</span>
+                      <span className="text-gray-800 dark:text-gray-200 font-medium">{t.custodian}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400 block">Counterparty</span>
+                      <span className="text-gray-800 dark:text-gray-200 font-medium">{t.counterparty}</span>
+                    </div>
+                  </div>
+
+                  {t.remarks && (
+                    <div className="text-xs mb-3">
+                      <span className="text-gray-500 dark:text-gray-400 block mb-0.5">Remarks</span>
+                      <span className="text-gray-700 dark:text-gray-300 italic">{t.remarks}</span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-4 pt-2 border-t border-gray-100 dark:border-gray-900">
+                    <button
+                      onClick={() => onEditTransaction(t)}
+                      disabled={isSyncing}
+                      className={`text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold text-xs flex items-center gap-1 transition-colors ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="Edit transaction"
+                    >
+                      <Edit size={14} />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onDeleteTransaction(t.id)}
+                      disabled={isSyncing}
+                      className={`text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-semibold text-xs transition-colors ${isSyncing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title="Delete transaction"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Pagination */}
