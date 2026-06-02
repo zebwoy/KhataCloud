@@ -93,6 +93,7 @@ export default function FilterPopup({
             <div>
               <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Text Filters</p>
               <Select
+                unstyled
                 value={{ value: filter.textOperator, label: filter.textOperator.charAt(0).toUpperCase() + filter.textOperator.slice(1) }}
                 onChange={(option) => onUpdateFilter(column, { textOperator: (option?.value || 'contains') as any })}
                 options={[
@@ -102,7 +103,24 @@ export default function FilterPopup({
                   { value: 'ends', label: 'Ends with' },
                 ]}
                 className="text-xs mb-2"
-                classNamePrefix="hk-select"
+                classNames={{
+                  control: ({ isFocused }) =>
+                    `flex items-center justify-between px-3 py-1.5 bg-white dark:bg-gray-900 border ${
+                      isFocused ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-700'
+                    } rounded-lg text-xs text-gray-900 dark:text-gray-100 transition-all cursor-pointer`,
+                  menu: () => 'bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg mt-1 overflow-hidden z-50 text-xs',
+                  option: ({ isFocused, isSelected }) =>
+                    `px-3 py-1.5 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white font-semibold'
+                        : isFocused
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`,
+                  singleValue: () => 'text-gray-900 dark:text-gray-100',
+                  indicatorsContainer: () => 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300',
+                  dropdownIndicator: () => 'p-0 ml-1',
+                }}
               />
               <input
                 type="text"
@@ -132,7 +150,7 @@ export default function FilterPopup({
                             : filter.selectedValues.filter(v => v !== value);
                           onUpdateFilter(column, { selectedValues: newValues });
                         }}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        className="h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-700 dark:bg-gray-900 rounded focus:ring-indigo-500 dark:focus:ring-indigo-600"
                       />
                       <span className="text-sm text-gray-700 dark:text-gray-300">{value}</span>
                     </label>
