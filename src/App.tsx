@@ -28,6 +28,15 @@ import {
   type DateFilterMode,
 } from './utils/constants';
 
+const apiFetch = async (url: string, options: RequestInit = {}) => {
+  const token = sessionStorage.getItem('madrasah_auth_token');
+  const headers = {
+    ...options.headers,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+  return fetch(url, { ...options, headers });
+};
+
 export default function AccountingSystem() {
   // Auth state + handlers (login, logout, user type selection)
   const {
@@ -91,7 +100,7 @@ export default function AccountingSystem() {
     setDataError('');
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await fetch(`/.netlify/functions/transactions?userType=${currentUserType}`);
+      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`);
       if (!response.ok) {
         throw new Error('Unable to load transactions from the server.');
       }
@@ -109,7 +118,7 @@ export default function AccountingSystem() {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
       
       // Fetch trustees for custodian dropdown
-      const trusteesResponse = await fetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=trustee`);
+      const trusteesResponse = await apiFetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=trustee`);
 
       if (trusteesResponse.ok) {
         const trustees: Entity[] = await trusteesResponse.json();
@@ -135,7 +144,7 @@ export default function AccountingSystem() {
   // Fetch saved senders from server
   const fetchSavedCounterparties = useCallback(async () => {
     try {
-      const response = await fetch('/.netlify/functions/saved-senders');
+      const response = await apiFetch('/.netlify/functions/saved-senders');
       if (!response.ok) {
         throw new Error('Unable to load saved counterparties from the server.');
       }
@@ -306,7 +315,7 @@ export default function AccountingSystem() {
     setSavedCounterparties(newSavedCounterparties);
     
     try {
-      const response = await fetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
+      const response = await apiFetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
         method: 'DELETE',
       });
       
@@ -432,7 +441,7 @@ export default function AccountingSystem() {
 
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await fetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -451,7 +460,7 @@ export default function AccountingSystem() {
       const trimmedCounterparty = formData.counterparty.trim();
       if (trimmedCounterparty && !savedCounterparties.includes(trimmedCounterparty) && formData.category !== 'Transfer') {
         try {
-          const cpResponse = await fetch('/.netlify/functions/saved-senders', {
+          const cpResponse = await apiFetch('/.netlify/functions/saved-senders', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -489,7 +498,7 @@ export default function AccountingSystem() {
     setDataError('');
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await fetch(`/.netlify/functions/transactions?id=${id}&userType=${currentUserType}`, {
+      const response = await apiFetch(`/.netlify/functions/transactions?id=${id}&userType=${currentUserType}`, {
         method: 'DELETE',
       });
 
@@ -558,7 +567,7 @@ export default function AccountingSystem() {
 
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await fetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

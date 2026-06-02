@@ -1,5 +1,6 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import type { Handler } from '@netlify/functions';
+import { signJwt } from './utils/jwt';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,12 +32,13 @@ export const handler: Handler = async (event) => {
     const password: string | undefined = body.password;
     const userType: string | undefined = body.userType || 'admin';
 
-    // For trial mode, allow login without password check
+    // For trial mode, allow login without password check, but issue JWT
     if (userType === 'trial') {
+      const token = signJwt({ userType: 'trial' });
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ ok: true, userType: 'trial' }),
+        body: JSON.stringify({ ok: true, token, userType: 'trial' }),
       };
     }
 
@@ -69,10 +71,11 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    const token = signJwt({ userType: 'admin' });
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ ok: true, userType: 'admin' }),
+      body: JSON.stringify({ ok: true, token, userType: 'admin' }),
     };
   } catch (error) {
     return {

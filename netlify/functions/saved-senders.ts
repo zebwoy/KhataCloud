@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { Client } from 'pg';
+import { getAuthContext } from './utils/authHelper';
 
 const getConnectionString = () =>
   process.env.NEON_CONNECTION_STRING ||
@@ -20,7 +21,7 @@ const runQuery = async <T>(query: string, params: unknown[] = []): Promise<{ row
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
 };
 
@@ -35,12 +36,24 @@ const handler: Handler = async (event) => {
       };
     }
 
+    // Authenticate user from JWT token
+    const auth = getAuthContext(event);
+    if (!auth) {
+      return {
+        statusCode: 401,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      };
+    }
+
+    const userType = auth.userType;
+    const tableName = userType === 'trial' ? 'trial_saved_senders' : 'saved_senders';
+
     // GET - Fetch all saved senders
     if (event.httpMethod === 'GET') {
       try {
-        // Try to get from saved_senders table
         const result = await runQuery<{ sender: string }>(
-          'SELECT DISTINCT sender FROM saved_senders ORDER BY sender ASC'
+          `SELECT DISTINCT sender FROM ${tableName} ORDER BY sender ASC`
         );
         
         const senders = result.rows.map(row => row.sender);
@@ -86,7 +99,7 @@ const handler: Handler = async (event) => {
       try {
         // Create table if it doesn't exist
         await runQuery(`
-          CREATE TABLE IF NOT EXISTS saved_senders (
+          CREATE TABLE IF NOT EXISTS ${tableName} (
             id SERIAL PRIMARY KEY,
             sender VARCHAR(255) UNIQUE NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -95,7 +108,7 @@ const handler: Handler = async (event) => {
 
         // Try to insert the sender (will fail if already exists due to UNIQUE constraint)
         await runQuery(
-          'INSERT INTO saved_senders (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING',
+          `INSERT INTO ${tableName} (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING`,
           [trimmedSender]
         );
 
@@ -130,7 +143,7 @@ const handler: Handler = async (event) => {
       }
 
       try {
-        await runQuery('DELETE FROM saved_senders WHERE sender = $1', [sender.trim()]);
+        await runQuery(`DELETE FROM ${tableName} WHERE sender = $1`, [sender.trim()]);
         
         return {
           statusCode: 200,
@@ -162,4 +175,3 @@ const handler: Handler = async (event) => {
 };
 
 export { handler };
-

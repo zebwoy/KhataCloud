@@ -22,9 +22,11 @@ const runQuery = async <T>(query: string, params: unknown[] = []) => {
   }
 };
 
+import { getAuthContext } from './utils/authHelper';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
@@ -48,8 +50,17 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Get userType from query parameter or default to 'admin'
-    const userType = event.queryStringParameters?.userType || 'admin';
+    // Authenticate user from JWT token
+    const auth = getAuthContext(event);
+    if (!auth) {
+      return {
+        statusCode: 401,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Unauthorized' }),
+      };
+    }
+
+    const userType = auth.userType;
     const isTrial = userType === 'trial' ? 'Y' : 'N';
 
     // Get entity type filter from query parameter (optional)

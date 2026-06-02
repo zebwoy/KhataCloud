@@ -29,7 +29,7 @@ export interface UseAuthReturn extends AuthState {
 
 export default function useAuth(): UseAuthReturn {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return sessionStorage.getItem('madrasah_logged_in') === 'true';
+    return !!sessionStorage.getItem('madrasah_auth_token');
   });
 
   const [userType, setUserType] = useState<UserType>(() => {
@@ -83,9 +83,10 @@ export default function useAuth(): UseAuthReturn {
       });
 
       if (response.ok) {
-        setIsLoggedIn(true);
-        sessionStorage.setItem('madrasah_logged_in', 'true');
+        const data = await response.json();
+        sessionStorage.setItem('madrasah_auth_token', data.token);
         sessionStorage.setItem('madrasah_user_type', userType);
+        setIsLoggedIn(true);
         const title =
           userType === 'trial'
             ? 'Trial account for Demo Purpose'
@@ -105,6 +106,7 @@ export default function useAuth(): UseAuthReturn {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    sessionStorage.removeItem('madrasah_auth_token');
     sessionStorage.removeItem('madrasah_logged_in');
     // Keep madrasah_user_type in sessionStorage to maintain userType selection
   };
