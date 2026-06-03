@@ -200,14 +200,20 @@ export default function FilterPopup({
               <div className="w-full flex justify-center mb-3 react-datepicker-inline-container bg-gray-50 dark:bg-black/40 border border-gray-150 dark:border-gray-800/80 rounded-xl p-2">
                 <DatePicker
                   selectsRange={true}
-                  startDate={localFilter.dateFrom ? new Date(localFilter.dateFrom) : null}
-                  endDate={localFilter.dateTo ? new Date(localFilter.dateTo) : null}
+                  startDate={localFilter.dateFrom ? new Date(localFilter.dateFrom + 'T00:00:00') : null}
+                  endDate={localFilter.dateTo ? new Date(localFilter.dateTo + 'T00:00:00') : null}
                   onChange={(update: [Date | null, Date | null]) => {
                     const [start, end] = update;
+                    const toLocalDateStr = (d: Date) => {
+                      const y = d.getFullYear();
+                      const m = String(d.getMonth() + 1).padStart(2, '0');
+                      const day = String(d.getDate()).padStart(2, '0');
+                      return `${y}-${m}-${day}`;
+                    };
                     setLocalFilter({
                       ...localFilter,
-                      dateFrom: start ? start.toISOString().split('T')[0] : '',
-                      dateTo: end ? end.toISOString().split('T')[0] : '',
+                      dateFrom: start ? toLocalDateStr(start) : '',
+                      dateTo: end ? toLocalDateStr(end) : '',
                     });
                   }}
                   inline
