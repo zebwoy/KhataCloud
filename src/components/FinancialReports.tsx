@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Download, Calendar, TrendingUp, TrendingDown, Printer } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -48,6 +49,19 @@ export default function FinancialReports({
   handleQuickFilter,
   exportToCSV,
 }: FinancialReportsProps) {
+  // Local state for draft date range selection
+  const [localRange, setLocalRange] = useState<{ fromDate: string; toDate: string }>({
+    fromDate: dateRange.fromDate,
+    toDate: dateRange.toDate,
+  });
+
+  // Keep draft state in sync if global filters change from outside (e.g. quick filters)
+  useEffect(() => {
+    setLocalRange({
+      fromDate: dateRange.fromDate,
+      toDate: dateRange.toDate,
+    });
+  }, [dateRange]);
 
   const getTrendData = () => {
     const groups: Record<string, { interval: string; sortKey: string; income: number; expense: number }> = {};
@@ -253,52 +267,72 @@ export default function FinancialReports({
 
         {/* Custom Date Range Inputs */}
         {dateFilterMode === 'custom' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">From Date</label>
-              <DatePicker
-                selected={dateRange.fromDate ? new Date(dateRange.fromDate) : null}
-                onChange={(date: Date | null) => {
-                  setDateRange({
-                    ...dateRange,
-                    fromDate: date ? date.toISOString().split('T')[0] : '',
-                  });
-                }}
-                dateFormat="yyyy-MM-dd"
-                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                  theme.mode === 'dark' 
-                    ? 'focus:ring-gray-700' 
-                    : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                       theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                       theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                       theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                       'focus:ring-rose-500')
-                } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
-                placeholderText="Select from date"
-              />
+          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-900 rounded-xl bg-gray-50/50 dark:bg-black/20 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="flex-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                Select Date Range
+              </label>
+              <div className="relative">
+                <DatePicker
+                  selectsRange={true}
+                  startDate={localRange.fromDate ? new Date(localRange.fromDate) : null}
+                  endDate={localRange.toDate ? new Date(localRange.toDate) : null}
+                  onChange={(update: [Date | null, Date | null]) => {
+                    const [start, end] = update;
+                    setLocalRange({
+                      fromDate: start ? start.toISOString().split('T')[0] : '',
+                      toDate: end ? end.toISOString().split('T')[0] : '',
+                    });
+                  }}
+                  isClearable={true}
+                  dateFormat="yyyy-MM-dd"
+                  className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-black ${
+                    theme.mode === 'dark' 
+                      ? 'focus:ring-gray-700' 
+                      : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
+                         theme.palette === 'blue' ? 'focus:ring-blue-500' :
+                         theme.palette === 'purple' ? 'focus:ring-purple-500' :
+                         theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
+                         'focus:ring-rose-500')
+                  } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100 transition-all shadow-sm`}
+                  placeholderText="Click to select start and end dates"
+                />
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-600">
+                  <Calendar size={16} />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">To Date</label>
-              <DatePicker
-                selected={dateRange.toDate ? new Date(dateRange.toDate) : null}
-                onChange={(date: Date | null) => {
-                  setDateRange({
-                    ...dateRange,
-                    toDate: date ? date.toISOString().split('T')[0] : '',
-                  });
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (localRange.fromDate && localRange.toDate) {
+                    setDateRange(localRange);
+                  }
                 }}
-                dateFormat="yyyy-MM-dd"
-                className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                  theme.mode === 'dark' 
-                    ? 'focus:ring-gray-700' 
-                    : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                       theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                       theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                       theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                       'focus:ring-rose-500')
-                } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
-                placeholderText="Select to date"
-              />
+                disabled={!localRange.fromDate || !localRange.toDate}
+                className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
+                  localRange.fromDate && localRange.toDate
+                    ? (theme.mode === 'dark'
+                        ? 'bg-white hover:bg-gray-100 text-black shadow-md'
+                        : getPrimaryButtonClasses() + ' text-white hover:shadow-lg')
+                    : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Apply Range
+              </button>
+              {(localRange.fromDate || localRange.toDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocalRange({ fromDate: '', toDate: '' });
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 transition-all"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
         )}
