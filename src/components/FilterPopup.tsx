@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Calendar } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -194,9 +194,10 @@ export default function FilterPopup({
 
           {/* Date Range Filter */}
           {isDateColumn && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 font-semibold">Date Range</p>
-              <div className="relative">
+            <div className="flex flex-col items-center">
+              <p className="w-full text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 font-semibold">Date Range</p>
+              
+              <div className="w-full flex justify-center mb-3 react-datepicker-inline-container bg-gray-50 dark:bg-black/40 border border-gray-150 dark:border-gray-800/80 rounded-xl p-2">
                 <DatePicker
                   selectsRange={true}
                   startDate={localFilter.dateFrom ? new Date(localFilter.dateFrom) : null}
@@ -209,15 +210,16 @@ export default function FilterPopup({
                       dateTo: end ? end.toISOString().split('T')[0] : '',
                     });
                   }}
-                  isClearable={true}
+                  inline
                   dateFormat="yyyy-MM-dd"
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-all shadow-inner"
-                  placeholderText="Select start and end dates"
                 />
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
-                  <Calendar size={14} />
-                </div>
               </div>
+
+              {localFilter.dateFrom && (
+                <div className="w-full px-3 py-2 bg-gray-50 dark:bg-black border border-gray-150 dark:border-gray-800 rounded-lg text-xs text-center text-gray-700 dark:text-gray-300 font-semibold mb-1">
+                  {localFilter.dateFrom} {localFilter.dateTo ? ` to ${localFilter.dateTo}` : ' (select end date)'}
+                </div>
+              )}
             </div>
           )}
 

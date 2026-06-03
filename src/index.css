@@ -97,6 +97,35 @@ body {
   animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Center and beautify inline react-datepicker */
+.react-datepicker-inline-container .react-datepicker {
+  border: none !important;
+  font-family: inherit !important;
+  background-color: transparent !important;
+}
+.react-datepicker-inline-container .react-datepicker__header {
+  background-color: transparent !important;
+  border-bottom: none !important;
+  padding-top: 0 !important;
+}
+.react-datepicker-inline-container .react-datepicker__day-name,
+.react-datepicker-inline-container .react-datepicker__day {
+  width: 2.25rem !important;
+  line-height: 2.25rem !important;
+  margin: 0.1rem !important;
+}
+.react-datepicker-inline-container .react-datepicker__navigation {
+  top: 2px !important;
+}
+.dark .react-datepicker-inline-container .react-datepicker__navigation-icon::before {
+  border-color: #9ca3af !important;
+}
+.react-datepicker-inline-container .react-datepicker__current-month {
+  font-size: 0.875rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.5rem !important;
+}
+
 /* Print-friendly styles */
 @media print {
   body {
