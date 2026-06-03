@@ -82,10 +82,12 @@ export default function FinancialReports({
       if (!groups[key]) {
         groups[key] = { interval: key, sortKey, income: 0, expense: 0 };
       }
+      
+      const amt = Number(t.amount) || 0;
       if (t.category === 'Income') {
-        groups[key].income += t.amount;
+        groups[key].income += amt;
       } else if (t.category === 'Expense') {
-        groups[key].expense += t.amount;
+        groups[key].expense += amt;
       }
     });
 
