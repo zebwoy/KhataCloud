@@ -50,7 +50,7 @@ export default function FinancialReports({
 }: FinancialReportsProps) {
 
   const getTrendData = () => {
-    const groups: Record<string, { interval: string; income: number; expense: number }> = {};
+    const groups: Record<string, { interval: string; sortKey: string; income: number; expense: number }> = {};
     
     let isDaily = false;
     if (dateFilterMode === 'thisMonth') {
@@ -70,14 +70,17 @@ export default function FinancialReports({
       if (isNaN(d.getTime())) return;
       
       let key = '';
+      let sortKey = '';
       if (isDaily) {
         key = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+        sortKey = t.date;
       } else {
         key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
+        sortKey = t.date.substring(0, 7);
       }
       
       if (!groups[key]) {
-        groups[key] = { interval: key, income: 0, expense: 0 };
+        groups[key] = { interval: key, sortKey, income: 0, expense: 0 };
       }
       if (t.category === 'Income') {
         groups[key].income += t.amount;
@@ -86,11 +89,7 @@ export default function FinancialReports({
       }
     });
 
-    return Object.values(groups).sort((a, b) => {
-      const dateA = new Date(a.interval + (isDaily ? '' : ' 01'));
-      const dateB = new Date(b.interval + (isDaily ? '' : ' 01'));
-      return dateA.getTime() - dateB.getTime();
-    });
+    return Object.values(groups).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   };
 
 
