@@ -18,6 +18,7 @@ import Header from './components/Header';
 import FinancialReports from './components/FinancialReports';
 import TransactionTable from './components/TransactionTable';
 import TransactionForm from './components/TransactionForm';
+import SuperAdminDashboard from './components/SuperAdmin/SuperAdminDashboard';
 import useTheme from './hooks/useTheme';
 import useAuth from './hooks/useAuth';
 import { formatCurrency, formatDisplayDateShort } from './utils/formatters';
@@ -851,6 +852,21 @@ export default function AccountingSystem() {
           >
             Financial Reports
           </button>
+          {/* Super-admin tab — only visible to super_admin users */}
+          {userType === 'super_admin' && (
+            <button
+              onClick={() => { handleCancelEdit(); setActiveTab('superadmin'); }}
+              className={`px-4 py-2 rounded-lg font-semibold ${
+                activeTab === 'superadmin'
+                  ? (theme.mode === 'dark'
+                      ? 'bg-gray-900 border border-gray-800 text-white'
+                      : 'bg-indigo-600 text-white')
+                  : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900'
+              }`}
+            >
+              ⚙️ Super Admin
+            </button>
+          )}
         </div>
 
 
@@ -920,6 +936,11 @@ export default function AccountingSystem() {
             handleQuickFilter={handleQuickFilter}
             exportToCSV={exportToCSV}
           />
+        )}
+
+        {/* Super-Admin Tab */}
+        {activeTab === 'superadmin' && userType === 'super_admin' && (
+          <SuperAdminDashboard />
         )}
       </div>
 

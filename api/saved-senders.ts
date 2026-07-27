@@ -4,6 +4,8 @@ import { getAuthContext } from './utils/authHelper.js';
 import { vercelWrapper } from './utils/vercelWrapper.js';
 
 const getConnectionString = () =>
+  // Prefer pooled connection (PgBouncer) for serverless — avoids max_connections exhaustion
+  process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
   process.env.NETLIFY_DB_URL ||
   process.env.NETLIFY_DATABASE_URL ||
@@ -37,8 +39,8 @@ const handler: Handler = async (event) => {
       };
     }
 
-    // Authenticate user from JWT token
-    const auth = getAuthContext(event);
+    // Authenticate — supports old JWT (admin/trial) and new Better Auth sessions (org_member)
+    const auth = await getAuthContext(event);
     if (!auth) {
       return {
         statusCode: 401,
@@ -48,7 +50,12 @@ const handler: Handler = async (event) => {
     }
 
     const userType = auth.userType;
-    const tableName = userType === 'trial' ? 'trial_saved_senders' : 'saved_senders';
+    // Route: trial → trial_saved_senders, org_member → org schema, admin → saved_senders
+    const tableName = userType === 'trial'
+      ? 'trial_saved_senders'
+      : userType === 'org_member' && auth.orgSlug
+        ? `org_${auth.orgSlug.replace(/-/g, '_')}.saved_senders`
+        : 'saved_senders';
 
     // GET - Fetch all saved senders
     if (event.httpMethod === 'GET') {

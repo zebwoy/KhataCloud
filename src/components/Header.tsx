@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { LogOut, Moon, Sun, Palette, X } from 'lucide-react';
 import type { Theme, ColorPalette } from '../types';
 import { getPrimaryBg } from '../theme';
+import type { UserType } from '../hooks/useAuth';
 
 interface HeaderProps {
   displayTitle: string;
-  userType: 'admin' | 'trial';
+  userType: UserType;
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
   onLogout: () => void;

@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { SingleValue } from 'react-select';
 import type { UserTypeOption } from '../types';
 
-export type UserType = 'admin' | 'trial';
+export type UserType = 'admin' | 'trial' | 'org_member' | 'super_admin';
 
 export interface AuthState {
   isLoggedIn: boolean;

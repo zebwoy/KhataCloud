@@ -4,6 +4,8 @@ import { getAuthContext } from './utils/authHelper.js';
 import { vercelWrapper } from './utils/vercelWrapper.js';
 
 const getConnectionString = () =>
+  // Prefer pooled connection (PgBouncer) for serverless — avoids max_connections exhaustion
+  process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
   process.env.NETLIFY_DB_URL ||
   process.env.NETLIFY_DATABASE_URL ||
@@ -50,8 +52,8 @@ const handler: Handler = async (event) => {
   }
 
   try {
-    // Authenticate user from JWT token
-    const auth = getAuthContext(event);
+    // Authenticate — supports old JWT (admin/trial) and new Better Auth sessions (org_member)
+    const auth = await getAuthContext(event);
     if (!auth) {
       return {
         statusCode: 401,
@@ -61,7 +63,12 @@ const handler: Handler = async (event) => {
     }
 
     const userType = auth.userType;
+    // IsTrial flag for entities: trial users read trial entities, org members read their org's entities
     const isTrial = userType === 'trial' ? 'Y' : 'N';
+    // For org_member queries, scope to the org's own schema
+    const entityTable = userType === 'org_member' && auth.orgSlug
+      ? `org_${auth.orgSlug.replace(/-/g, '_')}.entities`
+      : 'entities';
 
     // Get entity type filter from query parameter (optional)
     // Supports: 'trustee', 'donor', 'vendor', 'other', 'counterparty' (all non-trustee)
@@ -71,7 +78,7 @@ const handler: Handler = async (event) => {
     if (event.httpMethod === 'GET') {
       let query = `
         SELECT id, entity_name, entity_type, IsDeleted, ModifiedDate, IsTrial, created_at
-        FROM entities
+        FROM ${entityTable}
         WHERE IsDeleted = 'N' AND IsTrial = $1
       `;
       const params: unknown[] = [isTrial];

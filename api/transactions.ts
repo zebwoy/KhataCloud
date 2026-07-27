@@ -4,6 +4,8 @@ import { getAuthContext } from './utils/authHelper.js';
 import { vercelWrapper } from './utils/vercelWrapper.js';
 
 const getConnectionString = () =>
+  // Prefer pooled connection (PgBouncer) for serverless — avoids max_connections exhaustion
+  process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
   process.env.NETLIFY_DB_URL ||
   process.env.NETLIFY_DATABASE_URL ||
@@ -42,8 +44,8 @@ const handler: Handler = async (event) => {
       };
     }
 
-    // Authenticate user from JWT token
-    const auth = getAuthContext(event);
+    // Authenticate — supports old JWT (admin/trial) and new Better Auth sessions (org_member)
+    const auth = await getAuthContext(event);
     if (!auth) {
       return {
         statusCode: 401,
@@ -53,7 +55,19 @@ const handler: Handler = async (event) => {
     }
 
     const userType = auth.userType;
-    const tableName = userType === 'trial' ? 'trial_transactions' : 'transactions';
+    // Route to the correct table/schema based on user type:
+    //   trial       → public.trial_transactions  (shared sandbox, unchanged)
+    //   admin       → public.transactions         (legacy admin, unchanged)
+    //   org_member  → org_{slug}.transactions     (per-org isolated schema)
+    //   super_admin → public.transactions         (full visibility — read-only by convention)
+    const getTableName = (): string => {
+      if (userType === 'trial') return 'trial_transactions';
+      if (userType === 'org_member' && auth.orgSlug) {
+        return `org_${auth.orgSlug.replace(/-/g, '_')}.transactions`;
+      }
+      return 'transactions'; // admin + super_admin → public schema
+    };
+    const tableName = getTableName();
 
     // Ensure trial_transactions table exists with updated schema
     if (userType === 'trial') {

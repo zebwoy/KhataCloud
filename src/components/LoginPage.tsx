@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import Select, { SingleValue } from 'react-select';
 import type { UserTypeOption } from '../types';
+import type { UserType } from '../hooks/useAuth';
 
 interface LoginPageProps {
-  userType: 'admin' | 'trial';
+  userType: UserType;
   displayTitle: string;
   isTitleAnimating: boolean;
   onUserTypeChange: (option: SingleValue<UserTypeOption>) => void;
