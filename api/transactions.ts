@@ -1,7 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { Client, QueryResultRow } from 'pg';
-import { getAuthContext } from './utils/authHelper.js';
-import { vercelWrapper } from './utils/vercelWrapper.js';
+import { getAuthContext } from './_utils/authHelper.js';
+import { vercelWrapper } from './_utils/vercelWrapper.js';
 
 const getConnectionString = () =>
   // Prefer pooled connection (PgBouncer) for serverless — avoids max_connections exhaustion

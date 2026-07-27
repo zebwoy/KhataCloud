@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import type { Handler } from '@netlify/functions';
-import { signJwt } from './utils/jwt.js';
-import { vercelWrapper } from './utils/vercelWrapper.js';
+import { signJwt } from './_utils/jwt.js';
+import { vercelWrapper } from './_utils/vercelWrapper.js';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

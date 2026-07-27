@@ -54,7 +54,7 @@ export default function SAOrgs() {
     setLoading(true);
     setError('');
     try {
-      const res = await saFetch('/orgs');
+      const res = await saFetch('/admin?action=orgs');
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       setOrgs(await res.json());
     } catch (e: any) {
@@ -70,7 +70,7 @@ export default function SAOrgs() {
     if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} "${org.name}"?`)) return;
     setActionLoading(org.id);
     try {
-      const res = await saFetch('/orgs', {
+      const res = await saFetch('/admin?action=orgs', {
         method: 'PUT',
         body: JSON.stringify({ id: org.id, action, notes: noteInputs[org.id] }),
       });

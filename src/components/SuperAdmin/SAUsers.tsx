@@ -49,8 +49,8 @@ export default function SAUsers() {
     try {
       // Fetch orgs (for dropdown) and members (from org_members)
       const [orgsRes, statsRes] = await Promise.all([
-        saFetch('/orgs'),
-        saFetch('/super-admin-stats'),
+        saFetch('/admin?action=orgs'),
+        saFetch('/admin?action=stats'),
       ]);
 
       if (!orgsRes.ok) throw new Error('Failed to load orgs');
@@ -81,7 +81,7 @@ export default function SAUsers() {
     setFormSuccess('');
 
     try {
-      const res = await saFetch('/provision-user', {
+      const res = await saFetch('/admin?action=provision', {
         method: 'POST',
         body: JSON.stringify(form),
       });

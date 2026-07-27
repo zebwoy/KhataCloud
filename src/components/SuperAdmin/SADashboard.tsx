@@ -53,7 +53,7 @@ export default function SADashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await saFetch('/super-admin-stats');
+      const res = await saFetch('/admin?action=stats');
       if (!res.ok) throw new Error(`Status ${res.status}`);
       setStats(await res.json());
     } catch (e: any) {
@@ -69,7 +69,7 @@ export default function SADashboard() {
     if (!window.confirm(`${action === 'approve' ? 'Approve' : 'Reject'} this organisation?`)) return;
     setActionLoading(id);
     try {
-      const res = await saFetch('/orgs', {
+      const res = await saFetch('/admin?action=orgs', {
         method: 'PUT',
         body: JSON.stringify({ id, action }),
       });

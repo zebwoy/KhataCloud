@@ -12,7 +12,7 @@
  * This does NOT touch or replace api/auth.ts (old admin SHA-256 login).
  * Both handlers run in parallel during the transition period.
  */
-import { auth } from './utils/betterAuth.js';
+import { auth } from './_utils/betterAuth.js';
 
 // Vercel API handler — Better Auth handles routing internally
 export default async function handler(req: any, res: any) {
