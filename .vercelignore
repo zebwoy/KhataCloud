@@ -1,0 +1,18 @@
+# Hide all non-function files inside api/ so Vercel doesn't count them
+# against the 12 Serverless Function limit (Hobby plan).
+#
+# Active functions (6 total, well under the 12 limit):
+#   api/auth.ts, api/auth-better.ts, api/admin.ts,
+#   api/transactions.ts, api/entities.ts, api/saved-senders.ts
+#
+# Utilities live in lib/ (root level) — not in api/, never counted.
+
+# Dead stub files — merged into api/admin.ts
+api/orgs.ts
+api/super-admin-stats.ts
+api/provision-user.ts
+api/register-org.ts
+
+# Old utility directories — real code moved to lib/
+api/utils/
+api/_utils/

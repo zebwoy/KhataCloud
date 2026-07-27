@@ -18,9 +18,9 @@
  */
 import { Handler } from '@netlify/functions';
 import { Client } from 'pg';
-import { getAuthContext } from './_utils/authHelper.js';
-import { auth } from './_utils/betterAuth.js';
-import { vercelWrapper } from './_utils/vercelWrapper.js';
+import { getAuthContext } from '../lib/authHelper.js';
+import { auth } from '../lib/betterAuth.js';
+import { vercelWrapper } from '../lib/vercelWrapper.js';
 
 const getCS = () =>
   process.env.NEON_POOLED_CONNECTION_STRING ||
