@@ -2,9 +2,22 @@ import { betterAuth } from 'better-auth';
 import { Pool } from 'pg';
 import { organization } from 'better-auth/plugins';
 
+// Active env vars on Vercel (as of current setup):
+// NEON_CONNECTION_STRING        = direct/unpooled  (add this for Better Auth)
+// NEON_POOLED_CONNECTION_STRING = pooled via PgBouncer (currently set)
+const connectionString =
+  process.env.NEON_CONNECTION_STRING ||           // preferred for Better Auth (direct)
+  process.env.NEON_POOLED_CONNECTION_STRING ||    // fallback (currently the only one set)
+  '';
+
+if (!connectionString) {
+  console.error('[betterAuth] No DB connection string found. Set NEON_CONNECTION_STRING in Vercel env vars.');
+}
+
 const authPool = new Pool({
-  connectionString: process.env.NEON_CONNECTION_STRING || process.env.NETLIFY_DB_URL || '',
+  connectionString,
   max: 3,
+  ssl: connectionString.includes('neon.tech') ? { rejectUnauthorized: false } : false,
 });
 
 export const auth = betterAuth({
