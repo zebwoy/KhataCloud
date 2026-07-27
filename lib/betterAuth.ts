@@ -8,12 +8,20 @@ const authPool = new Pool({
 });
 
 export const auth = betterAuth({
+  // Correct operator precedence: parens around the ternary
   baseURL: process.env.BETTER_AUTH_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:5173'),
 
+  // Must match the API route file name so Better Auth can recognise
+  // incoming requests at /api/auth-better/* (default would be /api/auth)
+  basePath: '/api/auth-better',
+
   secret: process.env.BETTER_AUTH_SECRET || 'dev-secret-change-in-production-32chars',
 
-  database: { type: 'pg', pool: authPool },
+  database: {
+    type: 'pg',
+    pool: authPool,
+  },
 
   emailAndPassword: { enabled: true, requireEmailVerification: false },
 
