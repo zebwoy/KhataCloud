@@ -95,7 +95,6 @@ export async function getAuthContext(event: HandlerEvent): Promise<AuthContext |
     // Extract the Better Auth session token from cookie string
     const match = cookieHeader.match(/better-auth\.session_token=([^;]+)/);
     if (match) {
-      const sessionToken = decodeURIComponent(match[1]);
       try {
         // Dynamically import to avoid loading Better Auth on every cold start
         // when the request uses the old JWT path (which is more common currently)
