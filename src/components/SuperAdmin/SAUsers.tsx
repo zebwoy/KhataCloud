@@ -7,6 +7,7 @@ import {
   UserPlus, RefreshCw, Eye, EyeOff,
   CheckCircle, AlertCircle, Search, X,
 } from 'lucide-react';
+import { useSaFetch } from '../../lib/useSaFetch';
 
 
 interface OrgOption {
@@ -15,12 +16,6 @@ interface OrgOption {
   slug: string;
 }
 
-const saFetch = (path: string, options: RequestInit = {}) =>
-  fetch(`/.netlify/functions${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-  });
 
 
 const ROLE_BADGE: Record<string, string> = {
@@ -30,6 +25,7 @@ const ROLE_BADGE: Record<string, string> = {
 };
 
 export default function SAUsers() {
+  const saFetch = useSaFetch();
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -189,7 +185,7 @@ export default function SAUsers() {
             <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
               <div>
                 <p className="text-base font-bold text-white">Provision User</p>
-                <p className="text-xs text-slate-500 mt-0.5">Create a Better Auth account for an existing user</p>
+                <p className="text-xs text-slate-500 mt-0.5">Create a Clerk account for an existing user</p>
               </div>
               <button onClick={() => setPanelOpen(false)} className="text-slate-500 hover:text-white transition">
                 <X size={20} />

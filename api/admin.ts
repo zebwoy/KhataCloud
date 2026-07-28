@@ -18,8 +18,8 @@
  */
 import { Handler } from '@netlify/functions';
 import { Client } from 'pg';
+import { createClerkClient } from '@clerk/backend';
 import { getAuthContext } from '../lib/authHelper.js';
-import { auth } from '../lib/betterAuth.js';
 import { vercelWrapper } from '../lib/vercelWrapper.js';
 
 const getCS = () =>
@@ -29,8 +29,8 @@ const getCS = () =>
   '';
 
 const cors = {
-  'Access-Control-Allow-Origin': process.env.BETTER_AUTH_URL || '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, Cookie',
+  'Access-Control-Allow-Origin': process.env.VITE_CLERK_PUBLISHABLE_KEY ? '*' : '*',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
   'Access-Control-Allow-Credentials': 'true',
 };
@@ -200,19 +200,25 @@ async function handleProvision(authCtx: any, event: any, client: Client) {
   }
   const orgId = orgResult.rows[0].id;
 
+  // Create user in Clerk via admin API
+  const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY || '' });
   let userId: string;
   try {
-    const result = await auth.api.signUpEmail({
-      body: { name: name.trim(), email: email.trim().toLowerCase(), password },
-      asResponse: false,
+    const nameParts = name.trim().split(' ');
+    const clerkUser = await clerk.users.createUser({
+      emailAddress: [email.trim().toLowerCase()],
+      password,
+      firstName: nameParts[0],
+      lastName: nameParts.slice(1).join(' ') || undefined,
+      skipPasswordChecks: false,
     });
-    userId = (result as any)?.user?.id;
-    if (!userId) throw new Error('No user ID returned from Better Auth');
-  } catch (signUpErr: any) {
-    if (/already exists|duplicate|unique/i.test(String(signUpErr?.message ?? signUpErr))) {
-      return { statusCode: 409, headers: cors, body: JSON.stringify({ error: `User '${email}' already exists` }) };
+    userId = clerkUser.id;
+  } catch (err: any) {
+    const msg = String(err?.errors?.[0]?.message ?? err?.message ?? err);
+    if (/already exists|duplicate|form_identifier_exists/i.test(msg)) {
+      return { statusCode: 409, headers: cors, body: JSON.stringify({ error: `User '${email}' already exists in Clerk` }) };
     }
-    throw signUpErr;
+    throw err;
   }
 
   await client.query(
@@ -224,7 +230,7 @@ async function handleProvision(authCtx: any, event: any, client: Client) {
   return {
     statusCode: 201, headers: cors,
     body: JSON.stringify({ success: true, userId, email, name, orgSlug, role,
-      message: `User '${name}' provisioned and linked to '${orgSlug}'. They can sign in immediately.` }),
+      message: `User '${name}' provisioned in Clerk and linked to '${orgSlug}'.` }),
   };
 }
 

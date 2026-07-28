@@ -5,10 +5,6 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/api/auth-better/:path*",
-      "destination": "/api/auth-better"
-    },
-    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

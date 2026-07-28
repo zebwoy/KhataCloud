@@ -7,6 +7,7 @@ import {
   CheckCircle, XCircle, PauseCircle, RefreshCw,
   ChevronDown, ChevronUp, Users, Search,
 } from 'lucide-react';
+import { useSaFetch } from '../../lib/useSaFetch';
 
 interface Org {
   id: string;
@@ -23,8 +24,6 @@ interface Org {
   member_count: number;
 }
 
-const saFetch = (path: string, options: RequestInit = {}) =>
-  fetch(`/.netlify/functions${path}`, { ...options, credentials: 'include', headers: { 'Content-Type': 'application/json', ...options.headers } });
 
 function formatDate(iso: string | null) {
   if (!iso) return '—';
@@ -41,6 +40,7 @@ const STATUS: Record<string, { label: string; dot: string; badge: string }> = {
 const TABS = ['all', 'pending', 'approved', 'rejected', 'suspended'];
 
 export default function SAOrgs() {
+  const saFetch = useSaFetch();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);

@@ -1,72 +1,57 @@
 /**
  * SuperAdminApp.tsx — Root component for the /superadmin SPA
  *
- * State machine:
- *   loading → check Better Auth session
- *     → no session          → SALogin
- *     → session, not SA     → "Access denied"
- *     → session, is SA      → SALayout + page content
+ * Auth state machine (Clerk-powered):
+ *   isLoaded=false          → loading spinner
+ *   isLoaded, !isSignedIn   → Clerk <SignIn /> embedded
+ *   isSignedIn, checking    → loading spinner (verifying super_admin row)
+ *   isSignedIn, not SA      → "Access denied" screen
+ *   isSignedIn, is SA       → SALayout + page content
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth, useUser, SignIn } from '@clerk/react';
 import { Shield, Loader2, Lock } from 'lucide-react';
-import { authClient } from './lib/authClient';
-import SALogin from './components/SuperAdmin/SALogin';
 import SALayout, { type SAPage } from './components/SuperAdmin/SALayout';
 import SADashboard from './components/SuperAdmin/SADashboard';
 import SAOrgs from './components/SuperAdmin/SAOrgs';
 import SAUsers from './components/SuperAdmin/SAUsers';
 
-type AppState = 'loading' | 'unauthenticated' | 'not_super_admin' | 'ready';
-
-interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-const saFetch = (path: string) =>
-  fetch(`/.netlify/functions${path}`, { credentials: 'include' });
+type CheckState = 'pending' | 'not_super_admin' | 'ready';
 
 export default function SuperAdminApp() {
-  const [state, setState] = useState<AppState>('loading');
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
+  const { user } = useUser();
+  const [checkState, setCheckState] = useState<CheckState>('pending');
   const [page, setPage] = useState<SAPage>('dashboard');
 
-  const checkSession = useCallback(async () => {
-    setState('loading');
-    try {
-      // 1. Check Better Auth session
-      const { data: sessionData } = await authClient.getSession();
+  // Clerk-authenticated fetch for the super admin API
+  const saFetch = useCallback(
+    async (path: string, options: RequestInit = {}) => {
+      const token = await getToken();
+      return fetch(`/.netlify/functions${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...options.headers,
+        },
+      });
+    },
+    [getToken]
+  );
 
-      if (!sessionData?.user?.id) {
-        setState('unauthenticated');
-        return;
-      }
+  // After sign-in, verify the user is in platform.super_admins
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    setCheckState('pending');
+    saFetch('/admin?action=stats').then(res => {
+      if (res.ok) setCheckState('ready');
+      else setCheckState('not_super_admin');
+    }).catch(() => setCheckState('not_super_admin'));
+  }, [isLoaded, isSignedIn, saFetch]);
 
-      // 2. Verify super_admin status by calling a super-admin-only endpoint
-      const statsRes = await saFetch('/super-admin-stats');
-      if (statsRes.status === 403) {
-        setState('not_super_admin');
-        setUser(sessionData.user as SessionUser);
-        return;
-      }
-      if (!statsRes.ok) {
-        // Network error or 5xx — treat as unauthenticated
-        setState('unauthenticated');
-        return;
-      }
-
-      setUser(sessionData.user as SessionUser);
-      setState('ready');
-    } catch {
-      setState('unauthenticated');
-    }
-  }, []);
-
-  useEffect(() => { checkSession(); }, [checkSession]);
-
-  // ── Loading ──────────────────────────────────────────────────────────────
-  if (state === 'loading') {
+  // ── Clerk not yet initialised ─────────────────────────────────────────────
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -79,13 +64,60 @@ export default function SuperAdminApp() {
     );
   }
 
-  // ── Not logged in → Login page ───────────────────────────────────────────
-  if (state === 'unauthenticated') {
-    return <SALogin onLogin={checkSession} />;
+  // ── Not signed in → Clerk embedded sign-in ───────────────────────────────
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+        <div
+          className="pointer-events-none fixed inset-0"
+          style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 70%)' }}
+        />
+        <div className="relative w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-900/40 mb-4">
+              <Shield size={28} className="text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">KhataCloud</h1>
+            <p className="text-sm text-slate-400 mt-1">Super Admin Control Panel</p>
+          </div>
+          <SignIn
+            routing="hash"
+            appearance={{
+              variables: {
+                colorPrimary: '#6366f1',
+                colorBackground: '#0f172a',
+                colorForeground: '#f1f5f9',
+                colorMutedForeground: '#94a3b8',
+                colorInput: '#1e293b',
+                colorInputForeground: '#f1f5f9',
+                colorDanger: '#f87171',
+                colorBorder: '#334155',
+                borderRadius: '0.75rem',
+                fontFamily: 'Inter, system-ui, sans-serif',
+              },
+              elements: {
+                card: 'shadow-2xl shadow-black/50',
+                socialButtonsBlockButton: 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200',
+                footerActionLink: 'text-indigo-400',
+              },
+            }}
+          />
+        </div>
+      </div>
+    );
   }
 
-  // ── Logged in but not a super admin ─────────────────────────────────────
-  if (state === 'not_super_admin') {
+  // ── Verifying super admin status ─────────────────────────────────────────
+  if (checkState === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-slate-600" />
+      </div>
+    );
+  }
+
+  // ── Signed in but not a super admin ──────────────────────────────────────
+  if (checkState === 'not_super_admin') {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
@@ -94,17 +126,17 @@ export default function SuperAdminApp() {
           </div>
           <h1 className="text-xl font-bold text-white">Access Denied</h1>
           <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-            Your account (<span className="text-slate-400">{user?.email}</span>) is not registered as a super admin.
+            Your account (<span className="text-slate-400">{user?.primaryEmailAddress?.emailAddress}</span>) is not registered as a super admin.
           </p>
           <p className="text-xs text-slate-600 mt-3 leading-relaxed">
             Run{' '}
             <code className="text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
               INSERT INTO platform.super_admins (user_id, email)
             </code>{' '}
-            in Neon with your user ID to grant access.
+            in Neon with your Clerk user ID to grant access.
           </p>
           <button
-            onClick={() => authClient.signOut().then(checkSession)}
+            onClick={() => signOut()}
             className="mt-6 text-sm text-slate-500 hover:text-red-400 transition"
           >
             Sign out and try a different account
@@ -114,13 +146,13 @@ export default function SuperAdminApp() {
     );
   }
 
-  // ── Super admin dashboard ────────────────────────────────────────────────
+  // ── Super admin dashboard ─────────────────────────────────────────────────
   return (
     <SALayout
       page={page}
       setPage={setPage}
-      userName={user?.name ?? 'Super Admin'}
-      userEmail={user?.email ?? ''}
+      userName={user?.firstName ?? user?.primaryEmailAddress?.emailAddress ?? 'Super Admin'}
+      userEmail={user?.primaryEmailAddress?.emailAddress ?? ''}
     >
       {page === 'dashboard' && <SADashboard />}
       {page === 'orgs'      && <SAOrgs />}

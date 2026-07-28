@@ -7,6 +7,7 @@ import {
   Building2, Users, Clock, CheckCircle, XCircle,
   RefreshCw, TrendingUp, AlertTriangle,
 } from 'lucide-react';
+import { useSaFetch } from '../../lib/useSaFetch';
 
 interface Stats {
   orgs: { total: number; pending: number; approved: number; rejected: number; suspended: number };
@@ -16,8 +17,6 @@ interface Stats {
   pendingOrgs: any[];
 }
 
-const saFetch = (path: string, options: RequestInit = {}) =>
-  fetch(`/.netlify/functions${path}`, { ...options, credentials: 'include', headers: { 'Content-Type': 'application/json', ...options.headers } });
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -44,6 +43,7 @@ function StatCard({
 }
 
 export default function SADashboard() {
+  const saFetch = useSaFetch();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
