@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser, SignIn } from '@clerk/react';
-import { Shield, Loader2, Lock } from 'lucide-react';
+import { Shield, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import SALayout, { type SAPage } from './components/SuperAdmin/SALayout';
 import SADashboard from './components/SuperAdmin/SADashboard';
 import SAOrgs from './components/SuperAdmin/SAOrgs';
@@ -23,6 +23,14 @@ export default function SuperAdminApp() {
   const { user } = useUser();
   const [checkState, setCheckState] = useState<CheckState>('pending');
   const [page, setPage] = useState<SAPage>('dashboard');
+  const [clerkTimedOut, setClerkTimedOut] = useState(false);
+
+  // Bail out if Clerk never loads (missing publishable key, network error, etc.)
+  useEffect(() => {
+    const t = setTimeout(() => setClerkTimedOut(true), 8000);
+    if (isLoaded) clearTimeout(t);
+    return () => clearTimeout(t);
+  }, [isLoaded]);
 
   // Clerk-authenticated fetch for the super admin API
   const saFetch = useCallback(
@@ -52,6 +60,29 @@ export default function SuperAdminApp() {
 
   // ── Clerk not yet initialised ─────────────────────────────────────────────
   if (!isLoaded) {
+    if (clerkTimedOut) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+          <div className="text-center max-w-sm">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-900/30 border border-amber-800/50 mb-5">
+              <AlertTriangle size={24} className="text-amber-400" />
+            </div>
+            <h1 className="text-xl font-bold text-white">Clerk Failed to Load</h1>
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+              Could not connect to Clerk. Check that{' '}
+              <code className="text-slate-400 bg-slate-800 px-1 rounded">VITE_CLERK_PUBLISHABLE_KEY</code>
+              {' '}is set in Vercel and a fresh deployment was triggered.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-5 text-sm text-indigo-400 hover:text-indigo-300 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
