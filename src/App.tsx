@@ -167,9 +167,7 @@ export default function AccountingSystem() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -683,10 +681,11 @@ export default function AccountingSystem() {
   };
 
 
-  // Not logged in → redirect to /auth (Clerk login)
-  // Exception: /trial route — the auto-login useEffect in useAuth.ts is
-  // fetching a trial JWT asynchronously. Show a spinner instead of redirecting
-  // so the effect has time to complete and write the token to sessionStorage.
+  // Not logged in → redirect to /auth
+  // Exception: /trial — show a spinner while the auto-trial JWT fetch is in
+  // progress. Once the token lands, isLoggedIn flips to true and the dashboard
+  // renders. After a logout, handleLogout() itself navigates to /auth so this
+  // branch is never reached post-logout.
   if (!isLoggedIn) {
     if (window.location.pathname === '/trial') {
       return <LoadingScreen />;

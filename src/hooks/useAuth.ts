@@ -139,10 +139,12 @@ export default function useAuth(): UseAuthReturn {
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
     sessionStorage.removeItem('madrasah_auth_token');
     sessionStorage.removeItem('madrasah_logged_in');
-    // Keep madrasah_user_type to restore the last selection
+    // Navigate first — state update becomes irrelevant once the page changes.
+    // This also prevents the /trial infinite-spinner (the LoadingScreen guard
+    // in App.tsx is only for initial JWT fetch, not post-logout).
+    window.location.replace('/auth');
   };
 
   return {
