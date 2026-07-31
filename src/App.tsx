@@ -74,8 +74,15 @@ export default function AccountingSystem() {
   const [playSoundOnSuccess, setPlaySoundOnSuccess] = useState(true);
   const [trusteeOptions, setTrusteeOptions] = useState<TrusteeOption[]>([]);
   const [isInitializing, setIsInitializing] = useState(() => {
-    // Initialize as true if user is already logged in (prevents showing old data on refresh)
-    return sessionStorage.getItem('madrasah_logged_in') === 'true';
+    // Start as initializing if:
+    // a) Already logged in (prevents showing stale data on page refresh), OR
+    // b) On /trial without a token — auto-trial is about to fire. Starting as
+    //    true means when isLoggedIn flips to true the data-load spinner starts
+    //    immediately, preventing a one-frame flash of the empty dashboard.
+    const isTrialPending =
+      window.location.pathname === '/trial' &&
+      !sessionStorage.getItem('madrasah_auth_token');
+    return isTrialPending || sessionStorage.getItem('madrasah_logged_in') === 'true';
   });
 
   
@@ -688,16 +695,15 @@ export default function AccountingSystem() {
   // branch is never reached post-logout.
   if (!isLoggedIn) {
     if (window.location.pathname === '/trial') {
-      return <LoadingScreen />;
+      return <LoadingScreen label="Preparing demo account…" />;
     }
     window.location.replace('/auth');
     return null;
   }
 
-  // Show loader while initializing after login or userType change
-  if (isInitializing) {
-    return <LoadingScreen />;
-  }
+  if (isInitializing) return <LoadingScreen label="Loading your data…" />;
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
