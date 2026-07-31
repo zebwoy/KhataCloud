@@ -170,7 +170,7 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   if (route === 'admin') {
     if (!isSignedIn) {
       window.location.replace('/auth');
-      return <PageSpinner label="Redirecting to login…" />;
+      return null;
     }
     if (roleState === 'checking') return <PageSpinner label="Verifying access…" />;
     if (roleState === 'super_admin') return <SuperAdminApp />;
@@ -189,7 +189,7 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   // ═══════════════════════════════════════════════════════════════════════════
   if (!isSignedIn) {
     window.location.replace('/auth');
-    return <PageSpinner label="Redirecting to login…" />;
+    return null;
   }
   if (roleState === 'checking') return <PageSpinner label="Loading your account…" />;
 

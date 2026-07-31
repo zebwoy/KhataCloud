@@ -121,6 +121,12 @@ export default function LoginScreen() {
                 rootBox:           'w-full max-w-sm',
                 socialButtonsBlockButton: 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200',
                 footerActionLink:  'text-violet-400',
+                // Fix: "Email code to …" option text was invisible (dark on dark)
+                alternativeMethodsBlockButton: 'bg-slate-800 border-slate-700 hover:bg-slate-700',
+                alternativeMethodsBlockButtonText: 'text-slate-200',
+                alternativeMethodsBlockButtonArrow: 'text-slate-400',
+                identityPreviewText: 'text-slate-300',
+                identityPreviewEditButton: 'text-violet-400',
               },
             }}
           />
