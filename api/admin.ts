@@ -302,6 +302,23 @@ async function handleRegister(authCtx: any, event: any, client: Client) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Whoami — returns caller's role (for RootApp role-based routing)
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleWhoami(authCtx: any) {
+  if (!authCtx) {
+    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthenticated' }) };
+  }
+  return {
+    statusCode: 200, headers: cors,
+    body: JSON.stringify({
+      userType:  authCtx.userType,
+      orgSlug:   authCtx.orgSlug ?? null,
+      userId:    authCtx.userId  ?? null,
+    }),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
 const handler: Handler = async (event) => {
@@ -323,6 +340,7 @@ const handler: Handler = async (event) => {
       case 'orgs':     return await handleOrgs(authCtx, event, client);
       case 'provision': return await handleProvision(authCtx, event, client);
       case 'register': return await handleRegister(authCtx, event, client);
+      case 'whoami':   return await handleWhoami(authCtx);
       default:
         return { statusCode: 400, headers: cors, body: JSON.stringify({ error: `Unknown action '${action}'` }) };
     }

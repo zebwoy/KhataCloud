@@ -1,14 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── KhataCloud Design Tokens ──────────────────────────────────────────── */
+:root {
+  --kc-brand:        #7c3aed; /* violet-600 */
+  --kc-brand-dark:   #6d28d9; /* violet-700 */
+  --kc-brand-light:  #8b5cf6; /* violet-500 */
+  --kc-surface:      #ffffff;
+  --kc-surface-dark: #020617; /* slate-950  */
+  --kc-radius:       0.75rem;
+}
+
+/* Apply Inter globally */
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing:  antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
 }
 
 /* React DatePicker Light Mode Styling */

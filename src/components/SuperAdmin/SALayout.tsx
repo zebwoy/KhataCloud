@@ -1,48 +1,43 @@
 /**
- * SALayout.tsx — Sidebar layout shell for the super admin SPA
+ * SALayout.tsx — KhataCloud super admin sidebar shell
  */
 import { useState } from 'react';
 import {
   LayoutDashboard, Building2, Users, LogOut,
-  Menu, X, Shield, ChevronRight,
+  Menu, X, Zap, ChevronRight,
 } from 'lucide-react';
-import { authClient } from '../../lib/authClient';
 
 export type SAPage = 'dashboard' | 'orgs' | 'users';
 
 interface SALayoutProps {
-  page: SAPage;
-  setPage: (p: SAPage) => void;
-  userName: string;
+  page:      SAPage;
+  setPage:   (p: SAPage) => void;
+  userName:  string;
   userEmail: string;
-  children: React.ReactNode;
+  onSignOut: () => void;
+  children:  React.ReactNode;
 }
 
 const NAV = [
-  { id: 'dashboard' as SAPage, label: 'Dashboard',      Icon: LayoutDashboard },
-  { id: 'orgs'      as SAPage, label: 'Organisations',  Icon: Building2 },
-  { id: 'users'     as SAPage, label: 'Users',          Icon: Users },
+  { id: 'dashboard' as SAPage, label: 'Dashboard',     Icon: LayoutDashboard },
+  { id: 'orgs'      as SAPage, label: 'Organisations', Icon: Building2 },
+  { id: 'users'     as SAPage, label: 'Users',         Icon: Users },
 ];
 
-export default function SALayout({ page, setPage, userName, userEmail, children }: SALayoutProps) {
+export default function SALayout({ page, setPage, userName, userEmail, onSignOut, children }: SALayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    await authClient.signOut();
-    window.location.href = '/superadmin';
-  };
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Brand */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-900/40">
-            <Shield size={16} className="text-white" />
+          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-md shadow-violet-900/40">
+            <Zap size={16} className="text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white leading-none">HisaabKitaab</p>
-            <p className="text-xs text-indigo-400 mt-0.5">Admin Console</p>
+            <p className="text-sm font-bold text-white leading-none">KhataCloud</p>
+            <p className="text-xs text-violet-400 mt-0.5">Admin Console</p>
           </div>
         </div>
       </div>
@@ -57,13 +52,13 @@ export default function SALayout({ page, setPage, userName, userEmail, children 
               onClick={() => { setPage(id); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group ${
                 active
-                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
+                  ? 'bg-violet-600/20 text-violet-400 border border-violet-500/30'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               }`}
             >
-              <Icon size={18} className={active ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-300'} />
+              <Icon size={18} className={active ? 'text-violet-400' : 'text-slate-500 group-hover:text-slate-300'} />
               {label}
-              {active && <ChevronRight size={14} className="ml-auto text-indigo-500/60" />}
+              {active && <ChevronRight size={14} className="ml-auto text-violet-500/60" />}
             </button>
           );
         })}
@@ -76,7 +71,7 @@ export default function SALayout({ page, setPage, userName, userEmail, children 
           <p className="text-xs text-slate-500 truncate">{userEmail}</p>
         </div>
         <button
-          onClick={handleSignOut}
+          onClick={onSignOut}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-all duration-150"
         >
           <LogOut size={16} />
@@ -117,8 +112,8 @@ export default function SALayout({ page, setPage, userName, userEmail, children 
             {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2">
-            <Shield size={18} className="text-indigo-400" />
-            <span className="text-sm font-semibold text-white">Admin Console</span>
+            <Zap size={18} className="text-violet-400" />
+            <span className="text-sm font-semibold text-white">KhataCloud Admin</span>
           </div>
         </header>
 
