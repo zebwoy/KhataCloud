@@ -24,6 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       signInUrl="/auth"
       signInFallbackRedirectUrl="/admin"
       signInForceRedirectUrl="/admin"
+      afterSignOutUrl="/auth"
     >
       <RootApp />
       <Analytics />
