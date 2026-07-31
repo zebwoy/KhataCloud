@@ -684,7 +684,13 @@ export default function AccountingSystem() {
 
 
   // Not logged in → redirect to /auth (Clerk login)
+  // Exception: /trial route — the auto-login useEffect in useAuth.ts is
+  // fetching a trial JWT asynchronously. Show a spinner instead of redirecting
+  // so the effect has time to complete and write the token to sessionStorage.
   if (!isLoggedIn) {
+    if (window.location.pathname === '/trial') {
+      return <LoadingScreen />;
+    }
     window.location.replace('/auth');
     return null;
   }
