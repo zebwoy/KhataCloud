@@ -1,12 +1,4 @@
-/**
- * useAuth — manages authentication state, user type selection,
- * login/logout handlers, and animated title transitions.
- *
- * onLoginSuccess is called after a successful server response so
- * the caller can kick off data-fetching without coupling the hook
- * to data-fetch logic.
- */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SingleValue } from 'react-select';
 import type { UserTypeOption } from '../types';
 
@@ -44,6 +36,46 @@ export default function useAuth(): UseAuthReturn {
   const [isTitleAnimating, setIsTitleAnimating] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  /**
+   * Auto trial mode: fired when the user arrives via "Open Demo Account"
+   * from the KhataCloud login screen (/auth), which sets ?trial=1 in the URL.
+   *
+   * This bypasses LoginPage entirely — the user never sees it.
+   * We clean the URL param after success so a page refresh doesn't loop.
+   */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('trial') !== '1' || isLoggedIn) return;
+
+    setIsAuthenticating(true);
+    setUserType('trial');
+
+    fetch('/.netlify/functions/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: '', userType: 'trial' }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          sessionStorage.setItem('madrasah_auth_token', data.token);
+          sessionStorage.setItem('madrasah_user_type', 'trial');
+          setIsLoggedIn(true);
+          setDisplayTitle('Trial account for Demo Purpose');
+          // Remove ?trial=1 from the URL so a refresh doesn't re-trigger
+          window.history.replaceState({}, '', '/app');
+        } else {
+          setAuthError('Could not start demo. Please try again.');
+        }
+      })
+      .catch(() => {
+        setAuthError('Network error. Please try again.');
+      })
+      .finally(() => {
+        setIsAuthenticating(false);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
     const newUserType = option?.value ?? 'admin';

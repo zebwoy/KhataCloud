@@ -70,7 +70,7 @@ export default function LoginScreen() {
             <div className="h-px bg-white/15 mb-5" />
             <p className="text-xs text-violet-200/60 mb-3">Want to explore before signing up?</p>
             <button
-              onClick={() => { window.location.href = '/app'; }}
+              onClick={() => { window.location.href = '/app?trial=1'; }}
               className="group flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white transition-colors"
             >
               <span className="w-7 h-7 rounded-lg bg-white/15 group-hover:bg-white/25 flex items-center justify-center transition-colors">
@@ -128,7 +128,7 @@ export default function LoginScreen() {
           {/* Mobile demo link */}
           <div className="mt-4 text-center md:hidden">
             <button
-              onClick={() => { window.location.href = '/app'; }}
+              onClick={() => { window.location.href = '/app?trial=1'; }}
               className="text-sm text-violet-400 hover:text-violet-300 transition-colors font-medium"
             >
               Try the demo instead →
