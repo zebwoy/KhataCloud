@@ -1,3 +1,15 @@
+/**
+ * useAuth.ts — manages auth state, user type selection, login/logout,
+ * and animated title transitions for AccountingSystem.
+ *
+ * Auto-trial mode: fires when the user navigates to /trial (the demo route).
+ * Calls /api/auth with userType='trial', stores the JWT in sessionStorage,
+ * and sets isLoggedIn=true — AccountingSystem renders without user interaction.
+ *
+ * For Clerk-authenticated org members: RootApp writes the Clerk JWT to
+ * sessionStorage.madrasah_auth_token before rendering AccountingSystem,
+ * so isLoggedIn is already true on mount.
+ */
 import { useState, useEffect } from 'react';
 import { SingleValue } from 'react-select';
 import type { UserTypeOption } from '../types';
@@ -5,56 +17,55 @@ import type { UserTypeOption } from '../types';
 export type UserType = 'admin' | 'trial' | 'org_member' | 'super_admin';
 
 export interface AuthState {
-  isLoggedIn: boolean;
-  userType: UserType;
-  displayTitle: string;
+  isLoggedIn:       boolean;
+  userType:         UserType;
+  displayTitle:     string;
   isTitleAnimating: boolean;
   isAuthenticating: boolean;
-  authError: string;
+  authError:        string;
 }
 
 export interface UseAuthReturn extends AuthState {
   handleUserTypeChange: (option: SingleValue<UserTypeOption>) => void;
-  handleLogin: (password: string, onSuccess: () => Promise<void>) => Promise<void>;
+  handleLogin:  (password: string, onSuccess: () => Promise<void>) => Promise<void>;
   handleLogout: () => void;
 }
 
 export default function useAuth(): UseAuthReturn {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return !!sessionStorage.getItem('madrasah_auth_token');
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(() =>
+    !!sessionStorage.getItem('madrasah_auth_token')
+  );
 
-  const [userType, setUserType] = useState<UserType>(() => {
-    return (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial';
-  });
+  const [userType, setUserType] = useState<UserType>(() =>
+    (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial'
+  );
 
   const [displayTitle, setDisplayTitle] = useState<string>(() => {
     const saved = (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial';
-    return saved === 'trial' ? 'Trial account for Demo Purpose' : 'Millat Quran Learning Centre';
+    return saved === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud';
   });
 
   const [isTitleAnimating, setIsTitleAnimating] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const [authError, setAuthError]               = useState('');
 
   /**
-   * Auto trial mode: fired when the user arrives via "Open Demo Account"
-   * from the KhataCloud login screen (/auth), which sets ?trial=1 in the URL.
-   *
-   * This bypasses LoginPage entirely — the user never sees it.
-   * We clean the URL param after success so a page refresh doesn't loop.
+   * Auto trial mode — fires when user arrives at /trial
+   * (linked from the KhataCloud login screen's "Open Demo Account" button).
+   * Also accepts the legacy ?trial=1 param for backward compat.
    */
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('trial') !== '1' || isLoggedIn) return;
+    const isTrialRoute = window.location.pathname === '/trial';
+    const isTrialParam = new URLSearchParams(window.location.search).get('trial') === '1';
+    if ((!isTrialRoute && !isTrialParam) || isLoggedIn) return;
 
     setIsAuthenticating(true);
     setUserType('trial');
 
-    fetch('/.netlify/functions/auth', {
-      method: 'POST',
+    fetch('/api/auth', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: '', userType: 'trial' }),
+      body:    JSON.stringify({ password: '', userType: 'trial' }),
     })
       .then(async (res) => {
         if (res.ok) {
@@ -63,35 +74,28 @@ export default function useAuth(): UseAuthReturn {
           sessionStorage.setItem('madrasah_user_type', 'trial');
           setIsLoggedIn(true);
           setDisplayTitle('Trial account for Demo Purpose');
-          // Remove ?trial=1 from the URL so a refresh doesn't re-trigger
-          window.history.replaceState({}, '', '/app');
+          // Clean the URL so a refresh doesn't re-trigger
+          if (isTrialParam) window.history.replaceState({}, '', '/trial');
         } else {
           setAuthError('Could not start demo. Please try again.');
         }
       })
-      .catch(() => {
-        setAuthError('Network error. Please try again.');
-      })
-      .finally(() => {
-        setIsAuthenticating(false);
-      });
+      .catch(() => setAuthError('Network error. Please try again.'))
+      .finally(() => setIsAuthenticating(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
-    const newUserType = option?.value ?? 'admin';
-    if (newUserType !== userType) {
+    const newType = option?.value ?? 'admin';
+    if (newType !== userType) {
       setIsTitleAnimating(true);
       setTimeout(() => {
-        const newTitle =
-          newUserType === 'trial'
-            ? 'Trial account for Demo Purpose'
-            : 'Millat Quran Learning Centre';
-        setDisplayTitle(newTitle);
-        setUserType(newUserType as UserType);
+        const title = newType === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud';
+        setDisplayTitle(title);
+        setUserType(newType as UserType);
         setTimeout(() => setIsTitleAnimating(false), 200);
       }, 200);
     } else {
-      setUserType(newUserType as UserType);
+      setUserType(newType as UserType);
     }
   };
 
@@ -108,10 +112,10 @@ export default function useAuth(): UseAuthReturn {
     setAuthError('');
 
     try {
-      const response = await fetch('/.netlify/functions/auth', {
-        method: 'POST',
+      const response = await fetch('/api/auth', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, userType }),
+        body:    JSON.stringify({ password, userType }),
       });
 
       if (response.ok) {
@@ -119,11 +123,9 @@ export default function useAuth(): UseAuthReturn {
         sessionStorage.setItem('madrasah_auth_token', data.token);
         sessionStorage.setItem('madrasah_user_type', userType);
         setIsLoggedIn(true);
-        const title =
-          userType === 'trial'
-            ? 'Trial account for Demo Purpose'
-            : 'Millat Quran Learning Centre';
-        setDisplayTitle(title);
+        setDisplayTitle(
+          userType === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud'
+        );
         await onSuccess();
       } else {
         const data = await response.json().catch(() => null);
@@ -140,18 +142,12 @@ export default function useAuth(): UseAuthReturn {
     setIsLoggedIn(false);
     sessionStorage.removeItem('madrasah_auth_token');
     sessionStorage.removeItem('madrasah_logged_in');
-    // Keep madrasah_user_type in sessionStorage to maintain userType selection
+    // Keep madrasah_user_type to restore the last selection
   };
 
   return {
-    isLoggedIn,
-    userType,
-    displayTitle,
-    isTitleAnimating,
-    isAuthenticating,
-    authError,
-    handleUserTypeChange,
-    handleLogin,
-    handleLogout,
+    isLoggedIn, userType, displayTitle, isTitleAnimating,
+    isAuthenticating, authError,
+    handleUserTypeChange, handleLogin, handleLogout,
   };
 }

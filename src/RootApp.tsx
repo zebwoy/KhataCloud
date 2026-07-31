@@ -4,40 +4,43 @@
  * Route table:
  *   /                   → blank (reserved for future marketing page)
  *   /auth               → Login: show LoginScreen if unauthenticated,
- *                         redirect to /admin if already signed-in SA
- *   /admin  (+ /admin/*) → SA dashboard: requires Clerk auth + super_admin role,
- *                         redirects to /auth if not signed in
+ *                         redirect to /admin if already signed-in SA,
+ *                         redirect to /app   if already signed-in org member
+ *   /admin  (+ /admin/*) → SA dashboard: requires Clerk auth + super_admin role
  *   /sso-callback       → Clerk OAuth return handler → completes session → /admin
- *   /app    (+ /app/*)  → AccountingSystem (org users, legacy SHA-256 auth)
+ *   /trial              → AccountingSystem in demo mode (auto-authenticates, no Clerk)
+ *   /app    (+ /app/*)  → AccountingSystem for org members (requires Clerk)
  *   anything else       → redirect to /auth
  *
- * Auth state machine (AdminGate + AuthGate):
+ * Auth state machine (AuthenticatedShell):
  *   Clerk loading       → PageSpinner
  *   Clerk timed out     → error screen
- *   Not signed in       → LoginScreen  (on /auth) | redirect /auth (on /admin)
+ *   Not signed in       → LoginScreen (on /auth) | redirect /auth (on /admin)
  *   Signed in, checking → PageSpinner ("Verifying access…")
  *   super_admin         → SuperAdminApp (on /admin) | redirect /admin (on /auth)
- *   not super_admin     → Access Denied screen
+ *   org_member          → redirect /app (on /auth) | OrgAppBridge (on /app)
+ *   no role             → PendingApproval screen
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser, AuthenticateWithRedirectCallback } from '@clerk/react';
-import { Zap, Mail } from 'lucide-react';
+import { Zap, Mail, Clock, ArrowRight } from 'lucide-react';
 import AccountingSystem from './App';
 import SuperAdminApp from './SuperAdminApp';
 import LoginScreen from './LoginScreen';
 import { PageSpinner, Button } from './ui';
 
-type RoleState = 'checking' | 'super_admin' | 'unauthorized';
+type RoleState = 'checking' | 'super_admin' | 'org_member' | 'pending' | 'unauthorized';
 
 // ── Route classification ───────────────────────────────────────────────────
-type RouteType = 'home' | 'auth' | 'admin' | 'sso-callback' | 'app' | 'unknown';
+type RouteType = 'home' | 'auth' | 'admin' | 'sso-callback' | 'trial' | 'app' | 'unknown';
 
 function classifyRoute(): RouteType {
   const p = window.location.pathname;
-  if (p === '/')                          return 'home';
-  if (p === '/auth' || p.startsWith('/auth/')) return 'auth';
+  if (p === '/')                             return 'home';
+  if (p === '/auth' || p.startsWith('/auth/'))  return 'auth';
   if (p === '/admin' || p.startsWith('/admin/')) return 'admin';
-  if (p === '/sso-callback')              return 'sso-callback';
+  if (p === '/sso-callback')                 return 'sso-callback';
+  if (p === '/trial')                        return 'trial';
   if (p === '/app'  || p.startsWith('/app/'))   return 'app';
   return 'unknown';
 }
@@ -46,24 +49,14 @@ export default function RootApp() {
   const route = classifyRoute();
 
   // ── / → blank (marketing page coming soon, do not redirect) ───────────────
-  if (route === 'home') {
-    // Return null — Vite renders <html><head>…<body></body> with no visible
-    // content. The marketing team will replace this route entirely.
-    return null;
-  }
+  if (route === 'home') return null;
 
   // ── /sso-callback → OAuth return handler ──────────────────────────────────
-  // Clerk redirects here after Google / SSO completes.
-  // AuthenticateWithRedirectCallback reads the URL params, finalises the
-  // session, and then follows the forceRedirectUrl set on ClerkProvider → /admin
-  if (route === 'sso-callback') {
-    return <AuthenticateWithRedirectCallback />;
-  }
+  if (route === 'sso-callback') return <AuthenticateWithRedirectCallback />;
 
-  // ── /app → legacy product (org users with own SHA-256 auth) ───────────────
-  if (route === 'app') {
-    return <AccountingSystem />;
-  }
+  // ── /trial → AccountingSystem in demo mode (no Clerk required) ─────────────
+  // useAuth.ts auto-fires trial login when pathname === '/trial'
+  if (route === 'trial') return <AccountingSystem />;
 
   // ── unknown → soft redirect to /auth ──────────────────────────────────────
   if (route === 'unknown') {
@@ -71,12 +64,12 @@ export default function RootApp() {
     return <PageSpinner label="Redirecting…" />;
   }
 
-  // ── /auth and /admin → require Clerk (rendered by AuthenticatedShell) ─────
-  return <AuthenticatedShell route={route} />;
+  // ── /auth, /admin, /app → require Clerk ───────────────────────────────────
+  return <AuthenticatedShell route={route as 'auth' | 'admin' | 'app'} />;
 }
 
-// ── AuthenticatedShell — shared Clerk auth layer for /auth and /admin ──────
-function AuthenticatedShell({ route }: { route: 'auth' | 'admin' }) {
+// ── AuthenticatedShell — Clerk auth layer for /auth, /admin, /app ──────────
+function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
   const { user } = useUser();
   const [roleState, setRoleState] = useState<RoleState>('checking');
@@ -89,16 +82,26 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' }) {
     return () => clearTimeout(t);
   }, [isLoaded]);
 
-  // Role verification — called once Clerk confirms the user is signed in
+  /**
+   * Role verification — calls /api/admin?action=whoami to get the user's
+   * role from the database (super_admin, org_member, or none).
+   */
   const checkRole = useCallback(async () => {
     setRoleState('checking');
     try {
       const token = await getToken();
-      // Only super admins get 200 from this endpoint
-      const res = await fetch('/api/admin?action=stats', {
+      const res = await fetch('/api/admin?action=whoami', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setRoleState(res.ok ? 'super_admin' : 'unauthorized');
+      if (res.ok) {
+        const data = await res.json();
+        const type: string = data.userType;
+        if (type === 'super_admin') setRoleState('super_admin');
+        else if (type === 'org_member') setRoleState('org_member');
+        else setRoleState('pending');
+      } else {
+        setRoleState('unauthorized');
+      }
     } catch {
       setRoleState('unauthorized');
     }
@@ -106,7 +109,7 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' }) {
 
   useEffect(() => {
     if (isLoaded && isSignedIn)  checkRole();
-    if (isLoaded && !isSignedIn) setRoleState('checking'); // reset on sign-out
+    if (isLoaded && !isSignedIn) setRoleState('checking');
   }, [isLoaded, isSignedIn, checkRole]);
 
   // ── Clerk load timeout ─────────────────────────────────────────────────────
@@ -136,51 +139,168 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' }) {
     );
   }
 
-  // ── Clerk still loading ────────────────────────────────────────────────────
   if (!isLoaded) return <PageSpinner />;
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Route: /auth
   // ═══════════════════════════════════════════════════════════════════════════
   if (route === 'auth') {
-    // Not signed in → show the login screen
     if (!isSignedIn) return <LoginScreen />;
-
-    // Checking role after sign-in
     if (roleState === 'checking') return <PageSpinner label="Signing you in…" />;
 
-    // Already signed in as SA → go to dashboard
     if (roleState === 'super_admin') {
       window.location.replace('/admin');
       return <PageSpinner label="Redirecting to dashboard…" />;
     }
-
-    // Signed in but not SA → show access denied from /auth itself
-    return <AccessDenied email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+    if (roleState === 'org_member') {
+      window.location.replace('/app');
+      return <PageSpinner label="Loading your account…" />;
+    }
+    // Signed in but not in any approved org → pending approval
+    if (roleState === 'pending') {
+      return <PendingApproval email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+    }
+    // Not in any org at all → show access denied with option to register
+    return <NoOrgScreen email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Route: /admin
   // ═══════════════════════════════════════════════════════════════════════════
+  if (route === 'admin') {
+    if (!isSignedIn) {
+      window.location.replace('/auth');
+      return <PageSpinner label="Redirecting to login…" />;
+    }
+    if (roleState === 'checking') return <PageSpinner label="Verifying access…" />;
+    if (roleState === 'super_admin') return <SuperAdminApp />;
+    if (roleState === 'org_member') {
+      window.location.replace('/app');
+      return <PageSpinner label="Loading your account…" />;
+    }
+    if (roleState === 'pending') {
+      return <PendingApproval email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+    }
+    return <NoOrgScreen email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+  }
 
-  // Not signed in → send to login
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Route: /app — AccountingSystem for Clerk-authenticated org members
+  // ═══════════════════════════════════════════════════════════════════════════
   if (!isSignedIn) {
     window.location.replace('/auth');
     return <PageSpinner label="Redirecting to login…" />;
   }
+  if (roleState === 'checking') return <PageSpinner label="Loading your account…" />;
 
-  // Verifying role
-  if (roleState === 'checking') return <PageSpinner label="Verifying access…" />;
+  if (roleState === 'org_member') return <OrgAppBridge getToken={getToken} />;
 
-  // Super admin → render the dashboard
-  if (roleState === 'super_admin') return <SuperAdminApp />;
+  if (roleState === 'super_admin') {
+    // SA navigated to /app — let them in (SA can see the accounting view too)
+    return <OrgAppBridge getToken={getToken} />;
+  }
 
-  // Signed in but not SA
-  return <AccessDenied email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+  if (roleState === 'pending') {
+    return <PendingApproval email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
+  }
+  return <NoOrgScreen email={user?.primaryEmailAddress?.emailAddress} onSignOut={signOut} />;
 }
 
-// ── Access Denied screen (shared between /auth and /admin) ──────────────────
-function AccessDenied({
+// ── OrgAppBridge ─────────────────────────────────────────────────────────────
+/**
+ * Bridges Clerk authentication into AccountingSystem's sessionStorage-based
+ * auth without modifying AccountingSystem's internal auth logic.
+ *
+ * Mechanism:
+ *   1. Gets a Clerk JWT via getToken()
+ *   2. Writes it to sessionStorage.madrasah_auth_token
+ *   3. Writes 'org_member' to sessionStorage.madrasah_user_type
+ *   4. Renders AccountingSystem (which reads sessionStorage on mount → isLoggedIn=true)
+ *   5. Refreshes the token every 55 minutes (Clerk JWTs expire in 1 hour)
+ *
+ * This works because lib/authHelper.ts already supports Clerk JWT verification —
+ * the backend verifies the Bearer token as Clerk, resolves the org slug, and
+ * routes the request to the correct org schema.
+ */
+function OrgAppBridge({ getToken }: { getToken: () => Promise<string | null> }) {
+  const [bridged, setBridged] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const writeToken = async () => {
+      try {
+        const token = await getToken();
+        if (token && !cancelled) {
+          sessionStorage.setItem('madrasah_auth_token', token);
+          sessionStorage.setItem('madrasah_user_type', 'org_member');
+        }
+      } catch {
+        // Clerk token fetch failed — AccountingSystem will redirect to /auth on its own
+      } finally {
+        if (!cancelled) setBridged(true);
+      }
+    };
+
+    writeToken();
+
+    // Refresh every 55 minutes so the token stays fresh (Clerk default TTL = 1hr)
+    const interval = setInterval(async () => {
+      const fresh = await getToken().catch(() => null);
+      if (fresh) sessionStorage.setItem('madrasah_auth_token', fresh);
+    }, 55 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [getToken]);
+
+  if (!bridged) return <PageSpinner label="Loading your account…" />;
+  return <AccountingSystem />;
+}
+
+// ── PendingApproval screen ────────────────────────────────────────────────────
+function PendingApproval({
+  email,
+  onSignOut,
+}: {
+  email?: string;
+  onSignOut: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+      <div className="text-center max-w-sm">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-900/30 border border-amber-800/50 mb-5">
+          <Clock size={24} className="text-amber-400" />
+        </div>
+        <h1 className="text-xl font-bold text-white">Pending Approval</h1>
+        <p className="text-sm text-slate-400 mt-3 leading-relaxed">
+          {email && <span className="text-slate-200 font-medium">{email}</span>}
+          {email ? "'s" : 'Your'} organisation is awaiting admin approval.
+          You'll get access once a super admin approves your org.
+        </p>
+        <p className="text-xs text-slate-600 mt-3">
+          This usually takes less than 24 hours.
+        </p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Button
+            variant="outline"
+            fullWidth
+            onClick={() => window.location.href = 'mailto:support@khatacloud.com'}
+            leftIcon={<Mail size={14} />}
+          >
+            Contact Support
+          </Button>
+          <Button variant="ghost" fullWidth onClick={onSignOut}>Sign out</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── NoOrg screen (signed in but not in any org) ───────────────────────────────
+function NoOrgScreen({
   email,
   onSignOut,
 }: {
@@ -193,30 +313,30 @@ function AccessDenied({
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-violet-600/20 border border-violet-500/30 mb-5">
           <Zap size={24} className="text-violet-400" />
         </div>
-        <h1 className="text-xl font-bold text-white">Access Denied</h1>
+        <h1 className="text-xl font-bold text-white">No Organisation Found</h1>
         <p className="text-sm text-slate-500 mt-2 leading-relaxed">
           {email && <span className="text-slate-300">{email}</span>}
-          {email ? ' is' : 'Your account is'} not provisioned as a super admin.
-        </p>
-        <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-          Organisation users should go to{' '}
-          <a href="/app" className="text-violet-400 hover:underline">
-            khatacloud.com/app
-          </a>
-          {' '}to access the accounting dashboard.
+          {email ? ' is' : 'Your account is'} not linked to any organisation.
+          Either your org admin hasn't added you yet, or your org is pending approval.
         </p>
         <div className="mt-6 flex flex-col gap-2">
           <Button
+            variant="primary"
+            fullWidth
+            onClick={() => window.location.href = '/auth?register=1'}
+            rightIcon={<ArrowRight size={14} />}
+          >
+            Register an Organisation
+          </Button>
+          <Button
             variant="outline"
             fullWidth
-            onClick={() => { window.location.href = 'mailto:support@khatacloud.com'; }}
+            onClick={() => window.location.href = 'mailto:support@khatacloud.com'}
             leftIcon={<Mail size={14} />}
           >
             Contact Support
           </Button>
-          <Button variant="ghost" fullWidth onClick={onSignOut}>
-            Sign out
-          </Button>
+          <Button variant="ghost" fullWidth onClick={onSignOut}>Sign out</Button>
         </div>
       </div>
     </div>

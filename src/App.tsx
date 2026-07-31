@@ -12,7 +12,6 @@ import type {
   Entity,
 } from './types';
 import { getDefaultFormState } from './types';
-import LoginPage from './components/LoginPage';
 import LoadingScreen from './components/LoadingScreen';
 import Header from './components/Header';
 import FinancialReports from './components/FinancialReports';
@@ -44,11 +43,6 @@ export default function AccountingSystem() {
     isLoggedIn,
     userType,
     displayTitle,
-    isTitleAnimating,
-    isAuthenticating,
-    authError,
-    handleUserTypeChange,
-    handleLogin,
     handleLogout,
   } = useAuth();
 
@@ -115,7 +109,7 @@ export default function AccountingSystem() {
     setDataError('');
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`);
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`);
       if (!response.ok) {
         throw new Error('Unable to load transactions from the server.');
       }
@@ -135,7 +129,7 @@ export default function AccountingSystem() {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
       
       // Fetch trustees for custodian dropdown
-      const trusteesResponse = await apiFetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=trustee`);
+      const trusteesResponse = await apiFetch(`/api/entities?userType=${currentUserType}&entityType=trustee`);
 
       if (trusteesResponse.ok) {
         const trustees: Entity[] = await trusteesResponse.json();
@@ -161,7 +155,7 @@ export default function AccountingSystem() {
   // Fetch saved senders from server
   const fetchSavedCounterparties = useCallback(async () => {
     try {
-      const response = await apiFetch('/.netlify/functions/saved-senders');
+      const response = await apiFetch('/api/saved-senders');
       if (!response.ok) {
         throw new Error('Unable to load saved counterparties from the server.');
       }
@@ -332,7 +326,7 @@ export default function AccountingSystem() {
     setSavedCounterparties(newSavedCounterparties);
     
     try {
-      const response = await apiFetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
+      const response = await apiFetch(`/api/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
         method: 'DELETE',
       });
       
@@ -458,7 +452,7 @@ export default function AccountingSystem() {
 
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -477,7 +471,7 @@ export default function AccountingSystem() {
       const trimmedCounterparty = formData.counterparty.trim();
       if (trimmedCounterparty && !savedCounterparties.includes(trimmedCounterparty) && formData.category !== 'Transfer') {
         try {
-          const cpResponse = await apiFetch('/.netlify/functions/saved-senders', {
+          const cpResponse = await apiFetch('/api/saved-senders', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -518,7 +512,7 @@ export default function AccountingSystem() {
     setDataError('');
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?id=${id}&userType=${currentUserType}`, {
+      const response = await apiFetch(`/api/transactions?id=${id}&userType=${currentUserType}`, {
         method: 'DELETE',
       });
 
@@ -590,7 +584,7 @@ export default function AccountingSystem() {
 
     try {
       const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -689,31 +683,10 @@ export default function AccountingSystem() {
   };
 
 
-  // Login Screen
+  // Not logged in → redirect to /auth (Clerk login)
   if (!isLoggedIn) {
-    return (
-      <LoginPage
-        userType={userType}
-        displayTitle={displayTitle}
-        isTitleAnimating={isTitleAnimating}
-        onUserTypeChange={handleUserTypeChange}
-        onLogin={async (password) => {
-          setTransactions([]);
-          setTrusteeOptions([]);
-          setDataError('');
-          setIsInitializing(true);
-          await handleLogin(password, async () => {
-            try {
-              await Promise.all([fetchTransactions(), fetchEntities()]);
-            } finally {
-              setIsInitializing(false);
-            }
-          });
-        }}
-        isAuthenticating={isAuthenticating}
-        authError={authError}
-      />
-    );
+    window.location.replace('/auth');
+    return null;
   }
 
   // Show loader while initializing after login or userType change
@@ -787,7 +760,7 @@ export default function AccountingSystem() {
                  theme.palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
                  'border-rose-200 bg-rose-50 text-rose-700')
           }`}>
-            Syncing with Netlify DB...
+            Syncing...
           </div>
         )}
 

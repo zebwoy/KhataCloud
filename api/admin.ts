@@ -1,49 +1,59 @@
 /**
- * admin.ts — Single consolidated admin API endpoint
+ * api/admin.ts — Single consolidated admin API endpoint
  *
- * Replaces: api/orgs.ts, api/super-admin-stats.ts,
- *           api/provision-user.ts, api/register-org.ts
- *
- * Reason: Vercel Hobby plan allows max 12 serverless functions.
- * Consolidating 4 files → 1 keeps us well under the limit.
+ * Consolidates: orgs, super-admin-stats, provision-user, register-org, whoami
+ * (Vercel Hobby plan: max 12 serverless functions — consolidation keeps us under limit)
  *
  * Routes (via ?action= query param):
- *   GET  /api/admin?action=stats           → super admin analytics
- *   GET  /api/admin?action=orgs            → list all orgs        [super_admin]
- *   GET  /api/admin?action=orgs&id=<uuid>  → single org detail    [super_admin]
- *   PUT  /api/admin?action=orgs            → approve/reject/suspend org [super_admin]
- *   POST /api/admin?action=provision       → create Better Auth user + link to org [super_admin]
- *   GET  /api/admin?action=register&slug=x → check slug availability [any]
- *   POST /api/admin?action=register        → register new org [authenticated]
+ *   GET  /api/admin?action=whoami           → caller's role + orgSlug (used by RootApp)
+ *   GET  /api/admin?action=stats            → super admin analytics       [super_admin]
+ *   GET  /api/admin?action=orgs             → list all orgs               [super_admin]
+ *   GET  /api/admin?action=orgs&id=<uuid>   → single org detail           [super_admin]
+ *   PUT  /api/admin?action=orgs             → approve/reject/suspend org  [super_admin]
+ *   POST /api/admin?action=provision        → create Clerk user + link    [super_admin]
+ *   GET  /api/admin?action=register&slug=x  → check slug availability     [any]
+ *   POST /api/admin?action=register         → register new org            [authenticated]
  */
-import { Handler } from '@netlify/functions';
 import { Client } from 'pg';
 import { createClerkClient } from '@clerk/backend';
 import { getAuthContext } from '../lib/authHelper.js';
-import { vercelWrapper } from '../lib/vercelWrapper.js';
+import { setCors, qp } from '../lib/vercel-handler.js';
+import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
 
 const getCS = () =>
+  process.env.DATABASE_URL ||
   process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
   process.env.NETLIFY_DB_URL ||
   '';
 
-const cors = {
-  'Access-Control-Allow-Origin': process.env.VITE_CLERK_PUBLISHABLE_KEY ? '*' : '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-  'Access-Control-Allow-Credentials': 'true',
-};
-
 const SLUG_REGEX = /^[a-z0-9][a-z0-9\-]{2,48}[a-z0-9]$/;
 
+/** Internal sub-handler result type (converted to Vercel response by main handler) */
+type SubResult = { statusCode: number; body: string };
+
+const ok  = (data: unknown, code = 200): SubResult =>
+  ({ statusCode: code, body: JSON.stringify(data) });
+const err = (msg: string,  code = 400): SubResult =>
+  ({ statusCode: code, body: JSON.stringify({ error: msg }) });
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Stats handler (was super-admin-stats.ts)
+// Whoami — returns caller's role for RootApp RBAC routing
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleStats(authCtx: any, client: Client) {
-  if (!authCtx || authCtx.userType !== 'super_admin') {
-    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden' }) };
-  }
+function handleWhoami(authCtx: any): SubResult {
+  if (!authCtx) return err('Unauthenticated', 401);
+  return ok({
+    userType: authCtx.userType,
+    orgSlug:  authCtx.orgSlug  ?? null,
+    userId:   authCtx.userId   ?? null,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stats handler
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleStats(authCtx: any, client: Client): Promise<SubResult> {
+  if (!authCtx || authCtx.userType !== 'super_admin') return err('Forbidden', 403);
 
   const orgStatsResult = await client.query<{ status: string; count: string }>(
     `SELECT status, COUNT(*)::int AS count FROM platform.orgs GROUP BY status`
@@ -62,13 +72,14 @@ async function handleStats(authCtx: any, client: Client) {
     ),
   ]);
 
-  let authUserCount = 0, recentAuthUsers: any[] = [];
+  let authUserCount = 0;
+  let recentAuthUsers: any[] = [];
   try {
     const [countRes, recentRes] = await Promise.all([
       client.query<{ count: string }>(`SELECT COUNT(*)::int AS count FROM "user"`),
       client.query(`SELECT id, name, email, "createdAt" FROM "user" ORDER BY "createdAt" DESC LIMIT 5`),
     ]);
-    authUserCount = parseInt(countRes.rows[0]?.count ?? '0');
+    authUserCount  = parseInt(countRes.rows[0]?.count ?? '0');
     recentAuthUsers = recentRes.rows;
   } catch {
     authUserCount = parseInt(totalM.rows[0]?.count ?? '0');
@@ -90,29 +101,25 @@ async function handleStats(authCtx: any, client: Client) {
     `),
   ]);
 
-  return {
-    statusCode: 200, headers: cors,
-    body: JSON.stringify({
-      orgs: orgCounts,
-      members: { total: parseInt(totalM.rows[0]?.count ?? '0'), thisWeek: parseInt(weekM.rows[0]?.count ?? '0') },
-      users: { total: authUserCount },
-      recentOrgs: recentOrgs.rows,
-      pendingOrgs: pendingOrgs.rows,
-      recentAuthUsers,
-    }),
-  };
+  return ok({
+    orgs:     orgCounts,
+    members:  { total: parseInt(totalM.rows[0]?.count ?? '0'), thisWeek: parseInt(weekM.rows[0]?.count ?? '0') },
+    users:    { total: authUserCount },
+    recentOrgs:      recentOrgs.rows,
+    pendingOrgs:     pendingOrgs.rows,
+    recentAuthUsers,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Orgs handler (was orgs.ts)
+// Orgs handler — list, get, approve/reject/suspend
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleOrgs(authCtx: any, event: any, client: Client) {
-  if (!authCtx || authCtx.userType !== 'super_admin') {
-    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden — super-admin only' }) };
-  }
+async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  if (!authCtx || authCtx.userType !== 'super_admin')
+    return err('Forbidden — super-admin only', 403);
 
-  if (event.httpMethod === 'GET') {
-    const orgId = event.queryStringParameters?.id;
+  if (req.method === 'GET') {
+    const orgId = qp(req.query, 'id');
     if (orgId) {
       const r = await client.query(
         `SELECT o.*, COUNT(m.id)::int AS member_count, sa.email AS approved_by_email
@@ -122,7 +129,7 @@ async function handleOrgs(authCtx: any, event: any, client: Client) {
          WHERE o.id = $1 GROUP BY o.id, sa.email`,
         [orgId]
       );
-      return { statusCode: 200, headers: cors, body: JSON.stringify(r.rows[0] ?? null) };
+      return ok(r.rows[0] ?? null);
     }
 
     const r = await client.query(`
@@ -133,30 +140,34 @@ async function handleOrgs(authCtx: any, event: any, client: Client) {
       GROUP BY o.id
       ORDER BY CASE o.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, o.created_at DESC
     `);
-    return { statusCode: 200, headers: cors, body: JSON.stringify(r.rows) };
+    return ok(r.rows);
   }
 
-  if (event.httpMethod === 'PUT') {
-    if (!event.body) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Body required' }) };
-    const { id, action, notes } = JSON.parse(event.body) as { id: string; action: 'approve' | 'reject' | 'suspend'; notes?: string };
-    if (!id || !['approve', 'reject', 'suspend'].includes(action)) {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'id and valid action required' }) };
-    }
+  if (req.method === 'PUT') {
+    const body = req.body;
+    if (!body) return err('Body required');
+    const { id, action, notes } = body as {
+      id: string; action: 'approve' | 'reject' | 'suspend'; notes?: string;
+    };
+    if (!id || !['approve', 'reject', 'suspend'].includes(action))
+      return err('id and valid action required');
 
-    const statusMap: Record<string, string> = { approve: 'approved', reject: 'rejected', suspend: 'suspended' };
+    const statusMap: Record<string, string> = {
+      approve: 'approved', reject: 'rejected', suspend: 'suspended',
+    };
 
     await client.query('BEGIN');
     const upd = await client.query<{ slug: string; schema_provisioned: boolean }>(
       `UPDATE platform.orgs SET status=$1,
          approved_at = CASE WHEN $1='approved' THEN NOW() ELSE approved_at END,
-         approved_by = CASE WHEN $1='approved' THEN $2 ELSE approved_by END,
+         approved_by = CASE WHEN $1='approved' THEN $2  ELSE approved_by  END,
          notes = COALESCE($3, notes)
        WHERE id=$4 RETURNING slug, schema_provisioned`,
       [statusMap[action], authCtx.userId, notes ?? null, id]
     );
     if (!upd.rows.length) {
       await client.query('ROLLBACK');
-      return { statusCode: 404, headers: cors, body: JSON.stringify({ error: 'Org not found' }) };
+      return err('Org not found', 404);
     }
     if (action === 'approve' && !upd.rows[0].schema_provisioned) {
       await client.query(`SELECT platform.provision_org_schema($1)`, [upd.rows[0].slug]);
@@ -168,36 +179,35 @@ async function handleOrgs(authCtx: any, event: any, client: Client) {
        LEFT JOIN platform.org_members m ON m.org_id = o.id WHERE o.id=$1 GROUP BY o.id`,
       [id]
     );
-    return { statusCode: 200, headers: cors, body: JSON.stringify(refreshed.rows[0]) };
+    return ok(refreshed.rows[0]);
   }
 
-  return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
+  return err('Method Not Allowed', 405);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provision user handler (was provision-user.ts)
+// Provision user — create Clerk user + link to org
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleProvision(authCtx: any, event: any, client: Client) {
-  if (!authCtx || authCtx.userType !== 'super_admin') {
-    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden — super-admin only' }) };
-  }
-  if (!event.body) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Body required' }) };
+async function handleProvision(authCtx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  if (!authCtx || authCtx.userType !== 'super_admin')
+    return err('Forbidden — super-admin only', 403);
 
-  const { name, email, password, orgSlug, role = 'member' } = JSON.parse(event.body);
-  if (!name?.trim() || !email?.trim() || !password || !orgSlug) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'name, email, password, orgSlug required' }) };
-  }
-  if (password.length < 8) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Password must be ≥ 8 characters' }) };
-  }
+  const body = req.body;
+  if (!body) return err('Body required');
+
+  const { name, email, password, orgSlug, role = 'member' } = body;
+  if (!name?.trim() || !email?.trim() || !password || !orgSlug)
+    return err('name, email, password, orgSlug required');
+  if (password.length < 8)
+    return err('Password must be ≥ 8 characters');
 
   const orgResult = await client.query<{ id: string }>(
     `SELECT id FROM platform.orgs WHERE slug=$1 AND status='approved' AND schema_provisioned=TRUE LIMIT 1`,
     [orgSlug]
   );
-  if (!orgResult.rows.length) {
-    return { statusCode: 404, headers: cors, body: JSON.stringify({ error: `Org '${orgSlug}' not found or not approved` }) };
-  }
+  if (!orgResult.rows.length)
+    return err(`Org '${orgSlug}' not found or not approved`, 404);
+
   const orgId = orgResult.rows[0].id;
 
   // Create user in Clerk via admin API
@@ -208,17 +218,16 @@ async function handleProvision(authCtx: any, event: any, client: Client) {
     const clerkUser = await clerk.users.createUser({
       emailAddress: [email.trim().toLowerCase()],
       password,
-      firstName: nameParts[0],
-      lastName: nameParts.slice(1).join(' ') || undefined,
+      firstName:    nameParts[0],
+      lastName:     nameParts.slice(1).join(' ') || undefined,
       skipPasswordChecks: false,
     });
     userId = clerkUser.id;
-  } catch (err: any) {
-    const msg = String(err?.errors?.[0]?.message ?? err?.message ?? err);
-    if (/already exists|duplicate|form_identifier_exists/i.test(msg)) {
-      return { statusCode: 409, headers: cors, body: JSON.stringify({ error: `User '${email}' already exists in Clerk` }) };
-    }
-    throw err;
+  } catch (e: any) {
+    const msg = String(e?.errors?.[0]?.message ?? e?.message ?? e);
+    if (/already exists|duplicate|form_identifier_exists/i.test(msg))
+      return err(`User '${email}' already exists in Clerk`, 409);
+    throw e;
   }
 
   await client.query(
@@ -227,49 +236,49 @@ async function handleProvision(authCtx: any, event: any, client: Client) {
     [orgId, userId, role]
   );
 
-  return {
-    statusCode: 201, headers: cors,
-    body: JSON.stringify({ success: true, userId, email, name, orgSlug, role,
-      message: `User '${name}' provisioned in Clerk and linked to '${orgSlug}'.` }),
-  };
+  return ok({
+    success: true, userId, email, name, orgSlug, role,
+    message: `User '${name}' provisioned in Clerk and linked to '${orgSlug}'.`,
+  }, 201);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Register org handler (was register-org.ts)
+// Register org — slug check (public) + org registration (authenticated)
 // ─────────────────────────────────────────────────────────────────────────────
-async function handleRegister(authCtx: any, event: any, client: Client) {
-  // GET: slug availability check (public)
-  if (event.httpMethod === 'GET') {
-    const slug = event.queryStringParameters?.slug;
-    if (!slug || !SLUG_REGEX.test(slug)) {
-      return { statusCode: 400, headers: cors, body: JSON.stringify({ available: false, error: 'Invalid slug' }) };
-    }
+async function handleRegister(authCtx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  // GET: slug availability check (public — no auth required)
+  if (req.method === 'GET') {
+    const slug = qp(req.query, 'slug');
+    if (!slug || !SLUG_REGEX.test(slug))
+      return err('Invalid slug format. Use lowercase letters, numbers, and hyphens (4–50 chars).');
     const r = await client.query(`SELECT 1 FROM platform.orgs WHERE slug=$1 LIMIT 1`, [slug]);
-    return { statusCode: 200, headers: cors, body: JSON.stringify({ available: r.rowCount === 0 }) };
+    return ok({ available: r.rowCount === 0 });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, headers: cors, body: 'Method Not Allowed' };
-  }
+  if (req.method !== 'POST') return err('Method Not Allowed', 405);
 
-  if (!authCtx || authCtx.userType === 'trial') {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Sign in required' }) };
-  }
-  if (!event.body) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Body required' }) };
+  if (!authCtx || authCtx.userType === 'trial')
+    return err('Sign in required to register an organisation', 401);
 
-  const { name, slug, contactEmail } = JSON.parse(event.body) as { name: string; slug: string; contactEmail?: string };
-  if (!name?.trim() || name.trim().length < 3) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Name must be ≥ 3 characters' }) };
-  }
-  if (!slug || !SLUG_REGEX.test(slug)) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid slug format' }) };
-  }
+  const body = req.body;
+  if (!body) return err('Body required');
+
+  const { name, slug, contactEmail } = body as {
+    name: string; slug: string; contactEmail?: string;
+  };
+  if (!name?.trim() || name.trim().length < 3)
+    return err('Organisation name must be ≥ 3 characters');
+  if (!slug || !SLUG_REGEX.test(slug))
+    return err('Invalid slug format');
 
   await client.query('BEGIN');
-  const slugCheck = await client.query(`SELECT 1 FROM platform.orgs WHERE slug=$1 LIMIT 1`, [slug]);
+
+  const slugCheck = await client.query(
+    `SELECT 1 FROM platform.orgs WHERE slug=$1 LIMIT 1`, [slug]
+  );
   if (slugCheck.rowCount && slugCheck.rowCount > 0) {
     await client.query('ROLLBACK');
-    return { statusCode: 409, headers: cors, body: JSON.stringify({ error: 'Slug already taken' }) };
+    return err('Slug already taken', 409);
   }
 
   const existingOrg = await client.query(
@@ -278,9 +287,8 @@ async function handleRegister(authCtx: any, event: any, client: Client) {
   );
   if (existingOrg.rows.length > 0) {
     await client.query('ROLLBACK');
-    return { statusCode: 409, headers: cors, body: JSON.stringify({
-      error: `You already have an org (${existingOrg.rows[0].name}, status: ${existingOrg.rows[0].status})`
-    }) };
+    const { name: eName, status } = existingOrg.rows[0];
+    return err(`You already have an org (${eName}, status: ${status})`, 409);
   }
 
   const orgResult = await client.query<{ id: string }>(
@@ -289,68 +297,51 @@ async function handleRegister(authCtx: any, event: any, client: Client) {
     [name.trim(), slug, authCtx.userId, contactEmail ?? null]
   );
   await client.query(
-    `INSERT INTO platform.org_members (org_id, user_id, role) VALUES ($1,$2,'owner') ON CONFLICT DO NOTHING`,
+    `INSERT INTO platform.org_members (org_id, user_id, role)
+     VALUES ($1,$2,'owner') ON CONFLICT DO NOTHING`,
     [orgResult.rows[0].id, authCtx.userId]
   );
   await client.query('COMMIT');
 
-  return {
-    statusCode: 201, headers: cors,
-    body: JSON.stringify({ id: orgResult.rows[0].id, name: name.trim(), slug, status: 'pending',
-      message: 'Organisation registered and pending admin approval.' }),
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Whoami — returns caller's role (for RootApp role-based routing)
-// ─────────────────────────────────────────────────────────────────────────────
-async function handleWhoami(authCtx: any) {
-  if (!authCtx) {
-    return { statusCode: 401, headers: cors, body: JSON.stringify({ error: 'Unauthenticated' }) };
-  }
-  return {
-    statusCode: 200, headers: cors,
-    body: JSON.stringify({
-      userType:  authCtx.userType,
-      orgSlug:   authCtx.orgSlug ?? null,
-      userId:    authCtx.userId  ?? null,
-    }),
-  };
+  return ok({
+    id: orgResult.rows[0].id, name: name.trim(), slug, status: 'pending',
+    message: 'Organisation registered and pending admin approval.',
+  }, 201);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
-const handler: Handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors, body: '' };
+export default async function handler(req: VercelReq, res: VercelRes) {
+  setCors(res, 'GET, POST, PUT, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const action = event.queryStringParameters?.action;
-  if (!action) return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Missing ?action= parameter' }) };
+  const action = qp(req.query, 'action');
+  if (!action) return res.status(400).json({ error: 'Missing ?action= parameter' });
 
   const client = new Client({ connectionString: getCS() });
 
   try {
     await client.connect();
+    const authCtx = await getAuthContext(req);
 
-    // register and slug-check are called before auth for GET
-    const authCtx = await getAuthContext(event);
-
+    let result: SubResult;
     switch (action) {
-      case 'stats':    return await handleStats(authCtx, client);
-      case 'orgs':     return await handleOrgs(authCtx, event, client);
-      case 'provision': return await handleProvision(authCtx, event, client);
-      case 'register': return await handleRegister(authCtx, event, client);
-      case 'whoami':   return await handleWhoami(authCtx);
+      case 'whoami':   result = handleWhoami(authCtx); break;
+      case 'stats':    result = await handleStats(authCtx, client); break;
+      case 'orgs':     result = await handleOrgs(authCtx, req, client); break;
+      case 'provision':result = await handleProvision(authCtx, req, client); break;
+      case 'register': result = await handleRegister(authCtx, req, client); break;
       default:
-        return { statusCode: 400, headers: cors, body: JSON.stringify({ error: `Unknown action '${action}'` }) };
+        result = { statusCode: 400, body: JSON.stringify({ error: `Unknown action '${action}'` }) };
     }
-  } catch (error: any) {
+
+    return res.status(result.statusCode).send(result.body);
+  } catch (e: any) {
     await client.query('ROLLBACK').catch(() => {});
-    console.error('[api/admin]', error);
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ error: error.message }) };
+    console.error('[api/admin]', e);
+    return res.status(500).json({ error: e.message });
   } finally {
     await client.end();
   }
-};
-
-export default vercelWrapper(handler);
+}

@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, XCircle, PauseCircle, RefreshCw, Building2, Users, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { useSaFetch } from '../../lib/useSaFetch';
 
 interface Org {
   id: string;
@@ -21,16 +22,7 @@ interface Org {
   member_count: number;
 }
 
-const apiFetch = async (url: string, options: RequestInit = {}) => {
-  // Try Better Auth session cookie first (new users), then fall back to JWT token
-  const token = sessionStorage.getItem('madrasah_auth_token');
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-  return fetch(url, { ...options, headers, credentials: 'include' });
-};
+
 
 const STATUS_CONFIG = {
   pending:   { label: 'Pending',   color: 'text-amber-600 dark:text-amber-400',  bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
@@ -47,6 +39,7 @@ function formatDate(isoString: string | null) {
 }
 
 export default function SuperAdminDashboard() {
+  const apiFetch = useSaFetch();
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -59,7 +52,7 @@ export default function SuperAdminDashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await apiFetch('/.netlify/functions/orgs');
+      const res = await apiFetch('/admin?action=orgs');
       if (!res.ok) throw new Error(`Failed to load orgs: ${res.status}`);
       setOrgs(await res.json());
     } catch (e: any) {
@@ -75,7 +68,7 @@ export default function SuperAdminDashboard() {
     if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} "${org.name}"?`)) return;
     setActionLoading(org.id);
     try {
-      const res = await apiFetch('/.netlify/functions/orgs', {
+      const res = await apiFetch('/admin?action=orgs', {
         method: 'PUT',
         body: JSON.stringify({ id: org.id, action, notes: noteInputs[org.id] }),
       });

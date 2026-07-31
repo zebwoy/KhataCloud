@@ -1,24 +1,21 @@
 {
-  "name": "madrasah-accounting-system",
+  "name": "khatacloud",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:netlify": "netlify dev",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@clerk/backend": "^3.13.2",
     "@clerk/react": "^6.12.8",
-    "@netlify/functions": "^5.1.0",
     "@types/node": "^24.10.1",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-select": "^5.0.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/edge-config": "^1.4.3",
-    "better-auth": "^1.6.25",
     "lucide-react": "^0.294.0",
     "pg": "^8.16.3",
     "react": "^18.2.0",
@@ -32,7 +29,6 @@
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
-    "netlify-cli": "^23.12.3",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",
