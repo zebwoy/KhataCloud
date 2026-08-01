@@ -33,3 +33,6 @@ export type { ModalProps, ModalSize }       from './Modal';
 
 export { Separator }                        from './Separator';
 export type { SeparatorProps }              from './Separator';
+
+export { Select }                           from './Select';
+export type { SelectProps, SelectOption }   from './Select';

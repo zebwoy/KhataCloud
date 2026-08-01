@@ -8,6 +8,7 @@ import {
   CheckCircle, AlertCircle, Search, X,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
+import { Select } from '../../ui';
 
 
 interface OrgOption {
@@ -238,20 +239,13 @@ export default function SAUsers() {
               </div>
 
               {/* Org dropdown */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Organisation</label>
-                <select
-                  value={form.orgSlug}
-                  onChange={e => setForm(f => ({ ...f, orgSlug: e.target.value }))}
-                  required
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                >
-                  <option value="">Select organisation…</option>
-                  {orgs.map(o => (
-                    <option key={o.slug} value={o.slug}>{o.name} ({o.slug})</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="Organisation"
+                value={form.orgSlug}
+                onChange={v => setForm(f => ({ ...f, orgSlug: v }))}
+                placeholder="Select organisation…"
+                options={orgs.map(o => ({ value: o.slug, label: `${o.name} (${o.slug})` }))}
+              />
 
               {/* Role */}
               <div>

@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
+import { Select } from '../../ui';
 
 interface Org {
   id: string;
@@ -41,7 +42,12 @@ const STATUS: Record<string, { label: string; dot: string; badge: string }> = {
   suspended: { label: 'Suspended', dot: 'bg-orange-400',                badge: 'bg-orange-500/15 text-orange-400 border-orange-500/25' },
 };
 
-const PLANS = ['free', 'basic', 'pro', 'enterprise'] as const;
+const PLANS: { value: string; label: string }[] = [
+  { value: 'free',       label: 'Free' },
+  { value: 'basic',      label: 'Basic' },
+  { value: 'pro',        label: 'Pro' },
+  { value: 'enterprise', label: 'Enterprise' },
+];
 const TABS  = ['all', 'pending', 'approved', 'rejected', 'suspended'] as const;
 
 // ─── Shared field component — defined OUTSIDE to prevent re-mount on keystroke ──
@@ -73,20 +79,6 @@ function Field({
   );
 }
 
-function PlanSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Plan</label>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-      >
-        {PLANS.map(p => <option key={p} value={p} className="capitalize">{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
-      </select>
-    </div>
-  );
-}
 
 // ─── Slide-over shell ────────────────────────────────────────────────────────
 function SlideOver({ title, subtitle, onClose, children, footer }: {
@@ -456,7 +448,7 @@ export default function SAOrgs() {
             onChange={v => setCreateForm(f => ({ ...f, contactEmail: v }))}
             placeholder="admin@org.com"
           />
-          <PlanSelect value={createForm.plan} onChange={v => setCreateForm(f => ({ ...f, plan: v }))} />
+          <Select label="Plan" value={createForm.plan} onChange={v => setCreateForm(f => ({ ...f, plan: v }))} options={PLANS} />
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Notes (optional)</label>
             <textarea
@@ -517,7 +509,7 @@ export default function SAOrgs() {
             onChange={v => setEditForm(f => ({ ...f, contactEmail: v }))}
             placeholder="admin@org.com"
           />
-          <PlanSelect value={editForm.plan} onChange={v => setEditForm(f => ({ ...f, plan: v }))} />
+          <Select label="Plan" value={editForm.plan} onChange={v => setEditForm(f => ({ ...f, plan: v }))} options={PLANS} />
           <div>
             <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
             <textarea
