@@ -108,8 +108,8 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
       secretKey: process.env.CLERK_SECRET_KEY || '',
     });
     const userId        = payload.sub;
-    const clerkOrgId    = (payload as any).org_id   as string | undefined;
-    const clerkOrgRole  = (payload as any).org_role  as string | undefined;
+    let clerkOrgId      = (payload as any).org_id   as string | undefined;
+    let clerkOrgRole    = (payload as any).org_role  as string | undefined;
     // Custom claim injected by JWT template (Clerk Dashboard → Configure → Sessions):
     //   { "org_slug": "{{org.publicMetadata.slug}}" }
     const orgSlugFromToken = (payload as any).org_slug as string | undefined;
@@ -117,6 +117,28 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
     // Super admin check (always first)
     const isSA = await checkSuperAdmin(userId);
     if (isSA) return { userType: 'super_admin', userId };
+
+    // ── Fallback: if no active org in JWT, query Clerk for memberships ──────
+    // Clerk only puts org_id/org_role in the JWT when the user has an active org
+    // session. On first sign-in (e.g. via provisioned sign-in link), no org is
+    // active yet. We query the Backend API to find their membership.
+    if (!clerkOrgId) {
+      try {
+        const { createClerkClient } = await import('@clerk/backend');
+        const clerkSDK = createClerkClient({
+          secretKey: process.env.CLERK_SECRET_KEY || '',
+        });
+        const memberships = await clerkSDK.users.getOrganizationMembershipList({
+          userId,
+          limit: 5,
+        });
+        if (memberships.data.length > 0) {
+          const m = memberships.data[0];
+          clerkOrgId   = m.organization.id;
+          clerkOrgRole = m.role;
+        }
+      } catch { /* ignore — proceed as no_org */ }
+    }
 
     // User is in a Clerk org
     if (clerkOrgId && clerkOrgRole) {
