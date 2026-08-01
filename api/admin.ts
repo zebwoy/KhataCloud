@@ -126,13 +126,45 @@ async function handleStats(authCtx: any, client: Client): Promise<SubResult> {
     `),
   ]);
 
+  // Enrich recentOrgs with Clerk member counts (best-effort)
+  const clerk = clerkClient();
+  const enrichedRecent = await Promise.all(
+    recentOrgs.rows.map(async (org: any) => {
+      let member_count = 0;
+      if (org.clerk_org_id) {
+        try {
+          const res = await clerk.organizations.getOrganizationMembershipList({
+            organizationId: org.clerk_org_id,
+            limit: 1,
+          });
+          member_count = res.totalCount ?? 0;
+        } catch { /* best-effort */ }
+      }
+      return { ...org, member_count };
+    })
+  );
+
+  // Total Clerk users + members this week
+  let totalUsers = 0;
+  let totalMembers = 0;
+  let membersThisWeek = 0;
+  try {
+    totalUsers = await clerk.users.getCount();
+  } catch { /* best-effort */ }
+
+  // Sum member counts from enriched orgs as a proxy (only covers listed orgs)
+  totalMembers = enrichedRecent.reduce((s: number, o: any) => s + (o.member_count ?? 0), 0);
+
   return ok({
-    orgs:        orgCounts,
+    orgs:               orgCounts,
     pendingJoinRequests: parseInt(pendingJoinRequests.rows[0]?.count ?? '0'),
-    recentOrgs:  recentOrgs.rows,
-    pendingOrgs: pendingOrgs.rows,
+    members:            { total: totalMembers, thisWeek: membersThisWeek },
+    users:              { total: totalUsers },
+    recentOrgs:         enrichedRecent,
+    pendingOrgs:        pendingOrgs.rows,
   });
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Orgs — list, create, approve/reject, edit
