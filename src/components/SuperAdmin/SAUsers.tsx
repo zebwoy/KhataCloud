@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   UserPlus, RefreshCw, Eye, EyeOff,
-  CheckCircle, AlertCircle, Search, X,
+  CheckCircle, AlertCircle, Search, X, Copy, Link2,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
 import { Select } from '../../ui';
@@ -16,8 +16,6 @@ interface OrgOption {
   name: string;
   slug: string;
 }
-
-
 
 const ROLE_BADGE: Record<string, string> = {
   owner:  'bg-indigo-500/15 text-indigo-400 border-indigo-500/25',
@@ -63,30 +61,18 @@ export default function SAUsers() {
   const [showPw, setShowPw] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState('');
+  const [signInUrl, setSignInUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      // Fetch orgs (for dropdown) and members (from org_members)
-      const [orgsRes, statsRes] = await Promise.all([
-        saFetch('/admin?action=orgs'),
-        saFetch('/admin?action=stats'),
-      ]);
-
+      const orgsRes = await saFetch('/admin?action=orgs');
       if (!orgsRes.ok) throw new Error('Failed to load orgs');
-
       const orgsData: any[] = await orgsRes.json();
       const approvedOrgs = orgsData.filter((o: any) => o.status === 'approved');
       setOrgs(approvedOrgs.map((o: any) => ({ id: o.id, name: o.name, slug: o.slug })));
-
-      // Build member list from recentOrgs members — we need a dedicated members endpoint
-      // For now derive member data from platform.org_members via a custom query
-      // This is a simplified version; in a full impl you'd have GET /api/members
-      if (statsRes.ok) {
-        // Members list deferred — will add GET /api/members endpoint in next phase
-      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -96,22 +82,38 @@ export default function SAUsers() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const resetForm = (keepOrg = false) => {
+    setForm({ name: '', email: '', password: '', orgSlug: keepOrg ? form.orgSlug : '', role: 'member' });
+    setFormError('');
+    setSignInUrl(null);
+    setCopied(false);
+  };
+
   const handleProvision = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormLoading(true);
     setFormError('');
-    setFormSuccess('');
+    setSignInUrl(null);
 
     try {
+      const payload: Record<string, string> = {
+        name: form.name,
+        email: form.email,
+        orgSlug: form.orgSlug,
+        role: form.role,
+      };
+      // Only send password if the SA explicitly set one
+      if (form.password) payload.password = form.password;
+
       const res = await saFetch('/admin?action=provision', {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Provisioning failed');
 
-      setFormSuccess(data.message);
-      setForm({ name: '', email: '', password: '', orgSlug: form.orgSlug, role: 'member' });
+      setSignInUrl(data.signInUrl ?? null);
+      setForm(f => ({ ...f, name: '', email: '', password: '' }));
       await fetchData();
     } catch (e: any) {
       setFormError(e.message);
@@ -120,7 +122,13 @@ export default function SAUsers() {
     }
   };
 
-
+  const copyLink = () => {
+    if (!signInUrl) return;
+    navigator.clipboard.writeText(signInUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -136,7 +144,7 @@ export default function SAUsers() {
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
-            onClick={() => { setPanelOpen(true); setFormError(''); setFormSuccess(''); }}
+            onClick={() => { resetForm(); setPanelOpen(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-900/30 transition"
           >
             <UserPlus size={16} /> Provision User
@@ -148,7 +156,7 @@ export default function SAUsers() {
         <div className="rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
 
-      {/* Approved orgs overview (since we don't have a flat members endpoint yet) */}
+      {/* Approved orgs overview */}
       <div className="relative">
         <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search orgs…"
@@ -179,10 +187,9 @@ export default function SAUsers() {
                   </div>
                   <button
                     onClick={() => {
+                      resetForm();
                       setForm(f => ({ ...f, orgSlug: org.slug }));
                       setPanelOpen(true);
-                      setFormError('');
-                      setFormSuccess('');
                     }}
                     className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 hover:border-indigo-400/50 px-3 py-1.5 rounded-lg transition"
                   >
@@ -200,10 +207,10 @@ export default function SAUsers() {
           <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={() => setPanelOpen(false)} />
           <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl">
             {/* Panel header */}
-            <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-base font-bold text-white">Provision User</p>
-                <p className="text-xs text-slate-500 mt-0.5">Create a Clerk account for an existing user</p>
+                <p className="text-xs text-slate-500 mt-0.5">Create a Clerk account and link to an org</p>
               </div>
               <button onClick={() => setPanelOpen(false)} className="text-slate-500 hover:text-white transition">
                 <X size={20} />
@@ -215,16 +222,17 @@ export default function SAUsers() {
               <ProvisionInput label="Full name" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ahmad Raza" />
               <ProvisionInput label="Email" type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
 
-              {/* Password field with toggle */}
+              {/* Password field — optional */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Password <span className="normal-case font-normal text-slate-600">(optional)</span>
+                </label>
                 <div className="relative">
                   <input
                     type={showPw ? 'text' : 'password'}
                     value={form.password}
                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Min 8 characters"
-                    required
+                    placeholder="Leave blank — user gets a sign-in link"
                     minLength={8}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
                   />
@@ -234,7 +242,7 @@ export default function SAUsers() {
                   </button>
                 </div>
                 <p className="text-xs text-slate-600 mt-1">
-                  Use the same password they currently use — they can log in immediately without resetting it.
+                  If left blank, a one-time sign-in link is generated. No breach-check issues.
                 </p>
               </div>
 
@@ -266,33 +274,58 @@ export default function SAUsers() {
                 </div>
               </div>
 
-              {/* Feedback */}
+              {/* Sign-in link — shown after success */}
+              {signInUrl && (
+                <div className="rounded-xl border border-emerald-800/60 bg-emerald-900/15 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
+                    <CheckCircle size={15} /> Account created!
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Share this one-time sign-in link with the user. It expires in 7 days.
+                    They'll be signed in automatically and can set their own password.
+                  </p>
+                  <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2">
+                    <Link2 size={13} className="text-slate-500 shrink-0" />
+                    <span className="text-xs text-slate-400 truncate flex-1 font-mono">{signInUrl}</span>
+                    <button
+                      type="button"
+                      onClick={copyLink}
+                      className={`shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition ${
+                        copied
+                          ? 'bg-emerald-600/25 text-emerald-400'
+                          : 'bg-indigo-600/25 text-indigo-400 hover:bg-indigo-600/40'
+                      }`}
+                    >
+                      <Copy size={12} /> {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error */}
               {formError && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">
                   <AlertCircle size={15} className="shrink-0 mt-0.5" /> {formError}
                 </div>
               )}
-              {formSuccess && (
-                <div className="flex items-start gap-2 rounded-xl border border-emerald-800/60 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-400">
-                  <CheckCircle size={15} className="shrink-0 mt-0.5" /> {formSuccess}
-                </div>
-              )}
             </form>
 
             {/* Panel footer */}
-            <div className="px-6 py-4 border-t border-slate-800 flex gap-3">
+            <div className="px-6 py-4 border-t border-slate-800 flex gap-3 shrink-0">
               <button type="button" onClick={() => setPanelOpen(false)}
                 className="flex-1 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:text-white transition">
-                Cancel
+                {signInUrl ? 'Done' : 'Cancel'}
               </button>
-              <button
-                onClick={handleProvision}
-                disabled={formLoading || !form.name || !form.email || !form.password || !form.orgSlug}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-sm font-semibold transition"
-              >
-                {formLoading ? <RefreshCw size={15} className="animate-spin" /> : <UserPlus size={15} />}
-                {formLoading ? 'Creating…' : 'Create Account'}
-              </button>
+              {!signInUrl && (
+                <button
+                  onClick={handleProvision}
+                  disabled={formLoading || !form.name || !form.email || !form.orgSlug}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-sm font-semibold transition"
+                >
+                  {formLoading ? <RefreshCw size={15} className="animate-spin" /> : <UserPlus size={15} />}
+                  {formLoading ? 'Creating…' : 'Create Account'}
+                </button>
+              )}
             </div>
           </aside>
         </>

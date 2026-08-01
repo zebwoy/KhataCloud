@@ -258,6 +258,15 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
 // ─────────────────────────────────────────────────────────────────────────────
 // Provision user — create Clerk user + link to org
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** 20-char random password — not in any breach database (never typed by the user) */
+function randomSecurePassword(): string {
+  const pool = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+  let pw = '';
+  for (let i = 0; i < 20; i++) pw += pool[Math.floor(Math.random() * pool.length)];
+  return pw;
+}
+
 async function handleProvision(authCtx: any, req: VercelReq, client: Client): Promise<SubResult> {
   if (!authCtx || authCtx.userType !== 'super_admin')
     return err('Forbidden — super-admin only', 403);
@@ -265,11 +274,14 @@ async function handleProvision(authCtx: any, req: VercelReq, client: Client): Pr
   const body = req.body;
   if (!body) return err('Body required');
 
-  const { name, email, password, orgSlug, role = 'member' } = body;
-  if (!name?.trim() || !email?.trim() || !password || !orgSlug)
-    return err('name, email, password, orgSlug required');
-  if (password.length < 8)
-    return err('Password must be ≥ 8 characters');
+  // password is OPTIONAL. If omitted we set a random internal one that the user
+  // never types, so Clerk's breach-check at login never fires. A one-time
+  // sign-in link is returned so the user can log in and set their own password.
+  const { name, email, password: customPw, orgSlug, role = 'member' } = body;
+  if (!name?.trim() || !email?.trim() || !orgSlug)
+    return err('name, email, orgSlug required');
+  if (customPw && customPw.length < 8)
+    return err('Password must be >= 8 characters');
 
   const orgResult = await client.query<{ id: string }>(
     `SELECT id FROM platform.orgs WHERE slug=$1 AND status='approved' AND schema_provisioned=TRUE LIMIT 1`,
@@ -279,51 +291,58 @@ async function handleProvision(authCtx: any, req: VercelReq, client: Client): Pr
     return err(`Org '${orgSlug}' not found or not approved`, 404);
 
   const orgId = orgResult.rows[0].id;
-
-  // Create user in Clerk via admin API
   const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY || '' });
+
+  // Step 1: Create Clerk user
   let userId: string;
   try {
     const nameParts = name.trim().split(' ');
-    // Clerk instance requires username. Derive from email prefix, sanitised to
-    // allowed chars [a-z0-9_-], capped at 25 chars + 4-char random suffix.
-    const base = email.trim().toLowerCase()
-      .split('@')[0]
-      .replace(/[^a-z0-9_-]/g, '_')
-      .slice(0, 25);
-    const username = `${base}_${Math.random().toString(36).slice(2, 6)}`;
-
     const clerkUser = await clerk.users.createUser({
       emailAddress: [email.trim().toLowerCase()],
-      username,
-      password,
+      password:     customPw || randomSecurePassword(),
       firstName:    nameParts[0],
       lastName:     nameParts.slice(1).join(' ') || undefined,
-      // SA-provisioned accounts bypass Clerk's strength policy.
-      // The SA sets a known password; users change it after first login.
       skipPasswordChecks: true,
     });
     userId = clerkUser.id;
   } catch (e: any) {
-    // Surface Clerk's actual error message rather than the generic HTTP status text.
     const clerkMsg =
       e?.errors?.map((er: any) => er.longMessage || er.message).join('; ') ??
-      e?.message ??
-      String(e);
+      e?.message ?? String(e);
     if (/already exists|duplicate|form_identifier_exists/i.test(clerkMsg))
       return err(`User '${email}' already exists in Clerk`, 409);
     return err(`Clerk error: ${clerkMsg}`, 422);
   }
 
+  // Step 2: Link to our org DB
   await client.query(
     `INSERT INTO platform.org_members (org_id, user_id, role)
      VALUES ($1,$2,$3) ON CONFLICT (org_id, user_id) DO UPDATE SET role=EXCLUDED.role`,
     [orgId, userId, role]
   );
 
+  // Step 3: Generate a one-time sign-in link (7-day expiry)
+  // SA shares this with the user. Click = auto sign-in, no password prompt,
+  // no breach check. User then sets their own password from account settings.
+  let signInUrl: string | null = null;
+  try {
+    const token = await clerk.signInTokens.createSignInToken({
+      userId,
+      expiresInSeconds: 7 * 24 * 3600,
+    });
+    const base = process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'http://localhost:5173';
+    signInUrl = `${base}/auth#?__clerk_ticket=${token.token}`;
+  } catch {
+    // best-effort — provisioning still succeeds without the link
+  }
+
   return ok({
-    success: true, userId, email, name, orgSlug, role,
-    message: `User '${name}' provisioned in Clerk and linked to '${orgSlug}'.`,
+    success: true, userId, email, name, orgSlug, role, signInUrl,
+    message: `User '${name}' provisioned and linked to '${orgSlug}'.`,
   }, 201);
 }
 
