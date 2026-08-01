@@ -285,8 +285,17 @@ async function handleProvision(authCtx: any, req: VercelReq, client: Client): Pr
   let userId: string;
   try {
     const nameParts = name.trim().split(' ');
+    // Clerk instance requires username. Derive from email prefix, sanitised to
+    // allowed chars [a-z0-9_-], capped at 25 chars + 4-char random suffix.
+    const base = email.trim().toLowerCase()
+      .split('@')[0]
+      .replace(/[^a-z0-9_-]/g, '_')
+      .slice(0, 25);
+    const username = `${base}_${Math.random().toString(36).slice(2, 6)}`;
+
     const clerkUser = await clerk.users.createUser({
       emailAddress: [email.trim().toLowerCase()],
+      username,
       password,
       firstName:    nameParts[0],
       lastName:     nameParts.slice(1).join(' ') || undefined,
