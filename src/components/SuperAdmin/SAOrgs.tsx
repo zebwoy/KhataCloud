@@ -104,7 +104,7 @@ function SlideOver({ title, subtitle, onClose, children, footer }: {
           </div>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition"><X size={20} /></button>
         </div>
-        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6 space-y-5">
+        <div className="flex-1 overflow-y-auto min-h-0 scroll-hidden px-6 py-6 space-y-5">
           {children}
         </div>
         <div className="px-6 py-4 border-t border-slate-800 flex gap-3 shrink-0">

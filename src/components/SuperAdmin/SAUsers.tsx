@@ -210,7 +210,7 @@ export default function SAUsers() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleProvision} className="flex-1 overflow-y-auto min-h-0 px-6 py-6 space-y-5">
+            <form onSubmit={handleProvision} className="flex-1 overflow-y-auto min-h-0 scroll-hidden px-6 py-6 space-y-5">
               <ProvisionInput label="Full name" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ahmad Raza" />
               <ProvisionInput label="Email" type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
 

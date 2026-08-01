@@ -4,6 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Scrollbar utilities ───────────────────────────────────────────────── */
+/* Hide native scrollbar while keeping scroll functionality.               */
+/* Standard for premium dark UIs (Linear, Vercel, Notion, Figma).         */
+.scroll-hidden::-webkit-scrollbar { display: none; }
+.scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* ── KhataCloud Design Tokens ──────────────────────────────────────────── */
 :root {
   --kc-brand:        #7c3aed; /* violet-600 */
