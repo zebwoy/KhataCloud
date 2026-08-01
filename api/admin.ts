@@ -290,14 +290,20 @@ async function handleProvision(authCtx: any, req: VercelReq, client: Client): Pr
       password,
       firstName:    nameParts[0],
       lastName:     nameParts.slice(1).join(' ') || undefined,
-      skipPasswordChecks: false,
+      // SA-provisioned accounts bypass Clerk's strength policy.
+      // The SA sets a known password; users change it after first login.
+      skipPasswordChecks: true,
     });
     userId = clerkUser.id;
   } catch (e: any) {
-    const msg = String(e?.errors?.[0]?.message ?? e?.message ?? e);
-    if (/already exists|duplicate|form_identifier_exists/i.test(msg))
+    // Surface Clerk's actual error message rather than the generic HTTP status text.
+    const clerkMsg =
+      e?.errors?.map((er: any) => er.longMessage || er.message).join('; ') ??
+      e?.message ??
+      String(e);
+    if (/already exists|duplicate|form_identifier_exists/i.test(clerkMsg))
       return err(`User '${email}' already exists in Clerk`, 409);
-    throw e;
+    return err(`Clerk error: ${clerkMsg}`, 422);
   }
 
   await client.query(
