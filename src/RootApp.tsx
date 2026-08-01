@@ -115,6 +115,9 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   const [whoami,    setWhoami]            = useState<WhoamiData | null>(null);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
 
+  // Prevent concurrent activation attempts
+  const activatingRef = useRef(false);
+
   // Clerk load timeout (8 s)
   useEffect(() => {
     if (isLoaded) return;
@@ -150,11 +153,6 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
     }
   }, [getToken]);
 
-  // Track primitive org IDs to avoid infinite re-render loops from object identity changes
-  const activeOrgId = organization?.id;
-  const firstOrgId  = userMemberships?.data?.[0]?.organization?.id;
-  const hasAttemptedActivationRef = useRef(false);
-
   // ── Main activation + role-check effect ────────────────────────────────────
   useEffect(() => {
     // Not signed in — nothing to do
@@ -167,22 +165,33 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
     if (!isLoaded || !orgLoaded || !orgsLoaded) return;
     if (!isSignedIn) return;
 
-    // If user belongs to an org but none is active in session yet, activate first org
-    if (!activeOrgId && firstOrgId && !hasAttemptedActivationRef.current) {
-      hasAttemptedActivationRef.current = true;
-      setActive({ organization: firstOrgId })
-        .then(() => {
+    // Already activating — don't stack calls
+    if (activatingRef.current) return;
+
+    const firstOrg = userMemberships?.data?.[0]?.organization ?? null;
+
+    if (!organization && firstOrg) {
+      // User belongs to an org but none is active in this session.
+      // Activate it — Clerk will re-render the tree with the updated
+      // session, causing this effect to run again with organization set.
+      activatingRef.current = true;
+      setActive({ organization: firstOrg.id })
+        .catch(() => {
+          // Activation failed — proceed anyway; backend fallback will handle it
+          activatingRef.current = false;
           checkRole();
         })
-        .catch(() => {
-          checkRole();
+        .then(() => {
+          activatingRef.current = false;
+          // Don't call checkRole() here — let the re-render trigger it
+          // when `organization` value changes from null → org object.
         });
       return;
     }
 
-    // Org is active OR user has no orgs (SA / unassigned) OR activation was attempted
+    // Org is active OR user has no org (SA / truly unassigned user)
     checkRole();
-  }, [isLoaded, isSignedIn, orgLoaded, orgsLoaded, activeOrgId, firstOrgId, setActive, checkRole]);
+  }, [isLoaded, isSignedIn, orgLoaded, orgsLoaded, organization, userMemberships, setActive, checkRole]);
 
   // Clerk timeout screen
   if (!isLoaded && clerkTimedOut) {
