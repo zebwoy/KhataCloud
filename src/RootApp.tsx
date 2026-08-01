@@ -17,12 +17,8 @@
  *   pending      → PendingApprovalScreen (with org info + cancel option)
  *   no_org       → OrgSelectionScreen (pick org to request joining)
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  useAuth, useUser, useClerk,
-  useOrganization, useOrganizationList,
-  AuthenticateWithRedirectCallback,
-} from '@clerk/react';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth, useUser, AuthenticateWithRedirectCallback } from '@clerk/react';
 import { Zap } from 'lucide-react';
 import AccountingSystem from './App';
 import SuperAdminApp from './SuperAdminApp';
@@ -80,52 +76,19 @@ export default function RootApp() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-/**
- * AuthenticatedShell — org activation + role resolution
- *
- * Clerk only embeds org_id / org_role in the JWT when an organization is
- * ACTIVE in the user's session. On first sign-in (password, magic link,
- * SSO) the session starts with no active org even if the user is a member.
- *
- * Resolution order:
- *   1. Wait for Clerk (isLoaded), org list (orgsLoaded), and active-org
- *      hook (orgLoaded) to all be ready.
- *   2. If the user is signed in and has org memberships but no active org,
- *      call setActive() to activate their first org. Clerk re-renders the
- *      tree with the updated session; the effect fires again.
- *   3. Once an org is active (or the user has no orgs — SA / pending),
- *      call checkRole() which fetches /api/admin?action=whoami.
- *   4. The backend reads org_id / org_role straight from the JWT — no
- *      extra Clerk API call needed on the happy path.
- */
 function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
-  const { user }     = useUser();
-  const { setActive } = useClerk();
-
-  // Track the currently active org (null = none active)
-  const { organization, isLoaded: orgLoaded } = useOrganization();
-
-  // Full list of org memberships for this user
-  const { userMemberships, isLoaded: orgsLoaded } = useOrganizationList({
-    userMemberships: { pageSize: 10 },
-  });
-
-  const [roleState, setRoleState]         = useState<RoleState>('checking');
-  const [whoami,    setWhoami]            = useState<WhoamiData | null>(null);
+  const { user } = useUser();
+  const [roleState, setRoleState]     = useState<RoleState>('checking');
+  const [whoami, setWhoami]           = useState<WhoamiData | null>(null);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
 
-  // Prevent concurrent activation attempts
-  const activatingRef = useRef(false);
-
-  // Clerk load timeout (8 s)
   useEffect(() => {
     if (isLoaded) return;
     const t = setTimeout(() => setClerkTimedOut(true), 8000);
     return () => clearTimeout(t);
   }, [isLoaded]);
 
-  // ── Role check ─────────────────────────────────────────────────────────────
   const checkRole = useCallback(async () => {
     setRoleState('checking');
     try {
@@ -153,45 +116,10 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
     }
   }, [getToken]);
 
-  // ── Main activation + role-check effect ────────────────────────────────────
   useEffect(() => {
-    // Not signed in — nothing to do
-    if (isLoaded && !isSignedIn) {
-      setRoleState('checking');
-      return;
-    }
-
-    // Wait for all three Clerk hooks to be ready
-    if (!isLoaded || !orgLoaded || !orgsLoaded) return;
-    if (!isSignedIn) return;
-
-    // Already activating — don't stack calls
-    if (activatingRef.current) return;
-
-    const firstOrg = userMemberships?.data?.[0]?.organization ?? null;
-
-    if (!organization && firstOrg) {
-      // User belongs to an org but none is active in this session.
-      // Activate it — Clerk will re-render the tree with the updated
-      // session, causing this effect to run again with organization set.
-      activatingRef.current = true;
-      setActive({ organization: firstOrg.id })
-        .catch(() => {
-          // Activation failed — proceed anyway; backend fallback will handle it
-          activatingRef.current = false;
-          checkRole();
-        })
-        .then(() => {
-          activatingRef.current = false;
-          // Don't call checkRole() here — let the re-render trigger it
-          // when `organization` value changes from null → org object.
-        });
-      return;
-    }
-
-    // Org is active OR user has no org (SA / truly unassigned user)
-    checkRole();
-  }, [isLoaded, isSignedIn, orgLoaded, orgsLoaded, organization, userMemberships, setActive, checkRole]);
+    if (isLoaded && isSignedIn)  checkRole();
+    if (isLoaded && !isSignedIn) setRoleState('checking');
+  }, [isLoaded, isSignedIn, checkRole]);
 
   // Clerk timeout screen
   if (!isLoaded && clerkTimedOut) {
