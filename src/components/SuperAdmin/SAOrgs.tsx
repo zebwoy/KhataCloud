@@ -1,11 +1,11 @@
 /**
- * SAOrgs.tsx — Full organisation management table for the super admin SPA
- * Replaces the old SuperAdminDashboard.tsx placeholder.
+ * SAOrgs.tsx — Organisation management (list, create, edit, approve/reject/suspend)
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle, XCircle, PauseCircle, RefreshCw,
-  ChevronDown, ChevronUp, Users, Search,
+  ChevronDown, ChevronUp, Users, Search, Plus, Pencil, X,
+  AlertCircle,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
 
@@ -24,6 +24,10 @@ interface Org {
   member_count: number;
 }
 
+type CreateForm = { name: string; slug: string; contactEmail: string; plan: string; notes: string };
+type EditForm   = { name: string; contactEmail: string; plan: string; notes: string };
+
+const EMPTY_CREATE: CreateForm = { name: '', slug: '', contactEmail: '', plan: 'free', notes: '' };
 
 function formatDate(iso: string | null) {
   if (!iso) return '—';
@@ -37,8 +41,81 @@ const STATUS: Record<string, { label: string; dot: string; badge: string }> = {
   suspended: { label: 'Suspended', dot: 'bg-orange-400',                badge: 'bg-orange-500/15 text-orange-400 border-orange-500/25' },
 };
 
-const TABS = ['all', 'pending', 'approved', 'rejected', 'suspended'];
+const PLANS = ['free', 'basic', 'pro', 'enterprise'] as const;
+const TABS  = ['all', 'pending', 'approved', 'rejected', 'suspended'] as const;
 
+// ─── Shared field component — defined OUTSIDE to prevent re-mount on keystroke ──
+function Field({
+  label, value, onChange, placeholder, type = 'text', readOnly, hint,
+}: {
+  label: string; value: string; onChange?: (v: string) => void;
+  placeholder?: string; type?: string; readOnly?: boolean; hint?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={onChange ? e => onChange(e.target.value) : undefined}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        className={`w-full bg-slate-800 border rounded-xl px-4 py-2.5 text-sm placeholder-slate-500
+          focus:outline-none focus:ring-2 focus:ring-indigo-500 transition
+          ${readOnly
+            ? 'border-slate-700/50 text-slate-500 cursor-not-allowed'
+            : 'border-slate-700 text-white'}`}
+      />
+      {hint && <p className="text-xs text-slate-600 mt-1">{hint}</p>}
+    </div>
+  );
+}
+
+function PlanSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Plan</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+      >
+        {PLANS.map(p => <option key={p} value={p} className="capitalize">{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ─── Slide-over shell ────────────────────────────────────────────────────────
+function SlideOver({ title, subtitle, onClose, children, footer }: {
+  title: string; subtitle: string; onClose: () => void;
+  children: React.ReactNode; footer: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl">
+        <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <div>
+            <p className="text-base font-bold text-white">{title}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition"><X size={20} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6 space-y-5">
+          {children}
+        </div>
+        <div className="px-6 py-4 border-t border-slate-800 flex gap-3 shrink-0">
+          {footer}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 export default function SAOrgs() {
   const saFetch = useSaFetch();
   const [orgs, setOrgs] = useState<Org[]>([]);
@@ -49,6 +126,18 @@ export default function SAOrgs() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteInputs, setNoteInputs] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
+
+  // Create panel
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateForm>(EMPTY_CREATE);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  // Edit panel
+  const [editOrg, setEditOrg] = useState<Org | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', contactEmail: '', plan: 'free', notes: '' });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const fetchOrgs = useCallback(async () => {
     setLoading(true);
@@ -66,6 +155,7 @@ export default function SAOrgs() {
 
   useEffect(() => { fetchOrgs(); }, [fetchOrgs]);
 
+  // ── Status action (approve / reject / suspend) ────────────────────────────
   const handleAction = async (org: Org, action: 'approve' | 'reject' | 'suspend') => {
     if (!window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} "${org.name}"?`)) return;
     setActionLoading(org.id);
@@ -84,6 +174,74 @@ export default function SAOrgs() {
     }
   };
 
+  // ── Create org ────────────────────────────────────────────────────────────
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setCreateError('');
+    try {
+      const res = await saFetch('/admin?action=orgs', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: createForm.name,
+          slug: createForm.slug,
+          contactEmail: createForm.contactEmail || undefined,
+          plan: createForm.plan,
+          notes: createForm.notes || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create org');
+      setOrgs(prev => [data, ...prev]);
+      setCreateOpen(false);
+      setCreateForm(EMPTY_CREATE);
+    } catch (e: any) {
+      setCreateError(e.message);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  // ── Edit org details ──────────────────────────────────────────────────────
+  const openEdit = (org: Org) => {
+    setEditOrg(org);
+    setEditForm({
+      name: org.name,
+      contactEmail: org.contact_email ?? '',
+      plan: org.plan,
+      notes: org.notes ?? '',
+    });
+    setEditError('');
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editOrg) return;
+    setEditLoading(true);
+    setEditError('');
+    try {
+      const res = await saFetch('/admin?action=orgs', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          id: editOrg.id,
+          name: editForm.name,
+          contactEmail: editForm.contactEmail || undefined,
+          plan: editForm.plan,
+          notes: editForm.notes || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update org');
+      setOrgs(prev => prev.map(o => o.id === data.id ? data : o));
+      setEditOrg(null);
+    } catch (e: any) {
+      setEditError(e.message);
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // ── Derived data ──────────────────────────────────────────────────────────
   const q = search.toLowerCase();
   const filtered = orgs
     .filter(o => tab === 'all' || o.status === tab)
@@ -91,6 +249,10 @@ export default function SAOrgs() {
 
   const counts: Record<string, number> = { all: orgs.length };
   for (const o of orgs) counts[o.status] = (counts[o.status] ?? 0) + 1;
+
+  // ── Auto-slug from name ───────────────────────────────────────────────────
+  const autoSlug = (name: string) =>
+    name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -100,20 +262,27 @@ export default function SAOrgs() {
           <h1 className="text-2xl font-bold text-white">Organisations</h1>
           <p className="text-sm text-slate-500 mt-1">Manage org status, plans and member access</p>
         </div>
-        <button
-          onClick={fetchOrgs}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm text-slate-400 hover:text-white transition"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={fetchOrgs} disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-800 text-sm text-slate-400 hover:text-white transition"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+          <button
+            onClick={() => { setCreateOpen(true); setCreateForm(EMPTY_CREATE); setCreateError(''); }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-900/30 transition"
+          >
+            <Plus size={16} /> New Organisation
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">{error}</div>
       )}
 
-      {/* Status tab filter */}
+      {/* Status tabs */}
       <div className="flex gap-2 flex-wrap">
         {TABS.map(t => (
           <button
@@ -169,9 +338,7 @@ export default function SAOrgs() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className={`text-xs px-2.5 py-1 rounded-full border capitalize ${st.badge}`}>{st.label}</span>
-                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                      <Users size={12} /> {org.member_count}
-                    </span>
+                    <span className="flex items-center gap-1 text-xs text-slate-500"><Users size={12} /> {org.member_count}</span>
                     <span className="text-xs text-slate-600">{formatDate(org.created_at)}</span>
                     {expanded ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
                   </div>
@@ -187,18 +354,33 @@ export default function SAOrgs() {
                       <div><p className="text-xs text-slate-500 mb-1">Approved</p><p className="text-slate-300">{formatDate(org.approved_at)}</p></div>
                     </div>
 
+                    {org.notes && (
+                      <div className="rounded-xl bg-slate-800/50 border border-slate-700/50 px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-1">Notes</p>
+                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{org.notes}</p>
+                      </div>
+                    )}
+
                     <div>
-                      <label className="block text-xs text-slate-500 mb-1.5">Internal notes</label>
+                      <label className="block text-xs text-slate-500 mb-1.5">Add / update internal notes</label>
                       <textarea
                         rows={2}
-                        value={noteInputs[org.id] ?? org.notes ?? ''}
+                        value={noteInputs[org.id] ?? ''}
                         onChange={e => setNoteInputs(p => ({ ...p, [org.id]: e.target.value }))}
-                        placeholder="Add internal notes…"
+                        placeholder="Internal notes…"
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
 
                     <div className="flex flex-wrap gap-2">
+                      {/* Edit details */}
+                      <button
+                        onClick={() => openEdit(org)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-sm font-medium transition"
+                      >
+                        <Pencil size={14} /> Edit Details
+                      </button>
+
                       {org.status !== 'approved' && (
                         <button onClick={() => handleAction(org, 'approve')} disabled={acting}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium disabled:opacity-50 transition">
@@ -226,6 +408,132 @@ export default function SAOrgs() {
             );
           })}
         </div>
+      )}
+
+      {/* ── Create Org slide-over ──────────────────────────────────────────── */}
+      {createOpen && (
+        <SlideOver
+          title="New Organisation"
+          subtitle="Creates org as approved with schema provisioned immediately"
+          onClose={() => setCreateOpen(false)}
+          footer={
+            <>
+              <button type="button" onClick={() => setCreateOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:text-white transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={createLoading || !createForm.name || !createForm.slug}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-sm font-semibold transition"
+              >
+                {createLoading ? <RefreshCw size={15} className="animate-spin" /> : <Plus size={15} />}
+                {createLoading ? 'Creating…' : 'Create Org'}
+              </button>
+            </>
+          }
+        >
+          <Field
+            label="Organisation Name"
+            value={createForm.name}
+            onChange={v => setCreateForm(f => ({
+              ...f, name: v,
+              slug: f.slug === autoSlug(f.name) ? autoSlug(v) : f.slug,
+            }))}
+            placeholder="Al-Madrasah Al-Quraniyyah"
+          />
+          <Field
+            label="Slug"
+            value={createForm.slug}
+            onChange={v => setCreateForm(f => ({ ...f, slug: v.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+            placeholder="al-madrasah"
+            hint="Lowercase letters, numbers, hyphens. Cannot be changed later."
+          />
+          <Field
+            label="Contact Email (optional)"
+            type="email"
+            value={createForm.contactEmail}
+            onChange={v => setCreateForm(f => ({ ...f, contactEmail: v }))}
+            placeholder="admin@org.com"
+          />
+          <PlanSelect value={createForm.plan} onChange={v => setCreateForm(f => ({ ...f, plan: v }))} />
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Notes (optional)</label>
+            <textarea
+              rows={3}
+              value={createForm.notes}
+              onChange={e => setCreateForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Internal notes…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            />
+          </div>
+          {createError && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" /> {createError}
+            </div>
+          )}
+        </SlideOver>
+      )}
+
+      {/* ── Edit Org slide-over ────────────────────────────────────────────── */}
+      {editOrg && (
+        <SlideOver
+          title="Edit Organisation"
+          subtitle={`Editing: ${editOrg.slug}`}
+          onClose={() => setEditOrg(null)}
+          footer={
+            <>
+              <button type="button" onClick={() => setEditOrg(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:text-white transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleEdit}
+                disabled={editLoading || !editForm.name}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-sm font-semibold transition"
+              >
+                {editLoading ? <RefreshCw size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                {editLoading ? 'Saving…' : 'Save Changes'}
+              </button>
+            </>
+          }
+        >
+          <Field
+            label="Slug (read-only)"
+            value={editOrg.slug}
+            readOnly
+            hint="Slug cannot be changed — it is tied to the database schema."
+          />
+          <Field
+            label="Organisation Name"
+            value={editForm.name}
+            onChange={v => setEditForm(f => ({ ...f, name: v }))}
+            placeholder="Organisation display name"
+          />
+          <Field
+            label="Contact Email"
+            type="email"
+            value={editForm.contactEmail}
+            onChange={v => setEditForm(f => ({ ...f, contactEmail: v }))}
+            placeholder="admin@org.com"
+          />
+          <PlanSelect value={editForm.plan} onChange={v => setEditForm(f => ({ ...f, plan: v }))} />
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Notes</label>
+            <textarea
+              rows={4}
+              value={editForm.notes}
+              onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+              placeholder="Internal notes…"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+            />
+          </div>
+          {editError && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" /> {editError}
+            </div>
+          )}
+        </SlideOver>
       )}
     </div>
   );

@@ -118,6 +118,7 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
   if (!authCtx || authCtx.userType !== 'super_admin')
     return err('Forbidden — super-admin only', 403);
 
+  // ── GET: list or single org ───────────────────────────────────────────────
   if (req.method === 'GET') {
     const orgId = qp(req.query, 'id');
     if (orgId) {
@@ -143,6 +144,45 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
     return ok(r.rows);
   }
 
+  // ── POST: super admin creates an org directly (auto-approved + provisioned) ─
+  if (req.method === 'POST') {
+    const body = req.body;
+    if (!body) return err('Body required');
+    const { name, slug, contactEmail, plan = 'free', notes } = body as {
+      name: string; slug: string; contactEmail?: string; plan?: string; notes?: string;
+    };
+    if (!name?.trim() || name.trim().length < 3)
+      return err('Organisation name must be ≥ 3 characters');
+    if (!slug || !SLUG_REGEX.test(slug))
+      return err('Invalid slug format. Use lowercase letters, numbers, hyphens (4–50 chars).');
+
+    const slugCheck = await client.query(
+      `SELECT 1 FROM platform.orgs WHERE slug=$1 LIMIT 1`, [slug]
+    );
+    if (slugCheck.rowCount && slugCheck.rowCount > 0)
+      return err('Slug already taken', 409);
+
+    await client.query('BEGIN');
+    const insert = await client.query<{ id: string }>(
+      `INSERT INTO platform.orgs (name, slug, status, plan, contact_email, notes,
+         approved_at, approved_by)
+       VALUES ($1,$2,'approved',$3,$4,$5,NOW(),$6) RETURNING id`,
+      [name.trim(), slug, plan, contactEmail ?? null, notes ?? null, authCtx.userId]
+    );
+    const orgId = insert.rows[0].id;
+    // Provision the schema immediately for SA-created orgs
+    await client.query(`SELECT platform.provision_org_schema($1)`, [slug]);
+    await client.query('COMMIT');
+
+    const refreshed = await client.query(
+      `SELECT o.*, COUNT(m.id)::int AS member_count FROM platform.orgs o
+       LEFT JOIN platform.org_members m ON m.org_id = o.id WHERE o.id=$1 GROUP BY o.id`,
+      [orgId]
+    );
+    return ok(refreshed.rows[0], 201);
+  }
+
+  // ── PUT: approve/reject/suspend ────────────────────────────────────────────
   if (req.method === 'PUT') {
     const body = req.body;
     if (!body) return err('Body required');
@@ -173,6 +213,36 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
       await client.query(`SELECT platform.provision_org_schema($1)`, [upd.rows[0].slug]);
     }
     await client.query('COMMIT');
+
+    const refreshed = await client.query(
+      `SELECT o.*, COUNT(m.id)::int AS member_count FROM platform.orgs o
+       LEFT JOIN platform.org_members m ON m.org_id = o.id WHERE o.id=$1 GROUP BY o.id`,
+      [id]
+    );
+    return ok(refreshed.rows[0]);
+  }
+
+  // ── PATCH: edit org details (name, contact, plan, notes) ──────────────────
+  if (req.method === 'PATCH') {
+    const body = req.body;
+    if (!body) return err('Body required');
+    const { id, name, contactEmail, plan, notes } = body as {
+      id: string; name?: string; contactEmail?: string; plan?: string; notes?: string;
+    };
+    if (!id) return err('id required');
+    if (name !== undefined && name.trim().length < 3)
+      return err('Organisation name must be ≥ 3 characters');
+
+    const upd = await client.query(
+      `UPDATE platform.orgs SET
+         name         = COALESCE($1, name),
+         contact_email= COALESCE($2, contact_email),
+         plan         = COALESCE($3, plan),
+         notes        = COALESCE($4, notes)
+       WHERE id=$5`,
+      [name?.trim() ?? null, contactEmail ?? null, plan ?? null, notes ?? null, id]
+    );
+    if (!upd.rowCount) return err('Org not found', 404);
 
     const refreshed = await client.query(
       `SELECT o.*, COUNT(m.id)::int AS member_count FROM platform.orgs o
@@ -313,7 +383,7 @@ async function handleRegister(authCtx: any, req: VercelReq, client: Client): Pro
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function handler(req: VercelReq, res: VercelRes) {
-  setCors(res, 'GET, POST, PUT, OPTIONS');
+  setCors(res, 'GET, POST, PUT, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const action = qp(req.query, 'action');
