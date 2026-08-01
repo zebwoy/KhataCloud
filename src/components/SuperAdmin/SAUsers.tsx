@@ -255,8 +255,8 @@ export default function SAUsers() {
                     <CheckCircle size={15} /> Account created!
                   </div>
                   <p className="text-xs text-slate-400">
-                    Share this one-time sign-in link with the user. It expires in 7 days.
-                    They'll be signed in automatically and can set their own password.
+                    Share this <strong className="text-slate-200">one-time</strong> sign-in link.
+                    It expires in 7 days.
                   </p>
                   <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2">
                     <Link2 size={13} className="text-slate-500 shrink-0" />
@@ -272,6 +272,12 @@ export default function SAUsers() {
                     >
                       <Copy size={12} /> {copied ? 'Copied!' : 'Copy'}
                     </button>
+                  </div>
+                  {/* Warning: must set password */}
+                  <div className="rounded-lg bg-amber-900/20 border border-amber-800/40 px-3 py-2.5 text-xs text-amber-400 leading-relaxed">
+                    ⚠️ <strong>Remind the user:</strong> After signing in via this link, they must go to{' '}
+                    <em>Account Settings → Security → Set Password</em> to create a password.
+                    Without it, they'll need "Forgot Password" to sign in again next time.
                   </div>
                 </div>
               )}
