@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   CheckCircle, XCircle, PauseCircle, RefreshCw,
   ChevronDown, ChevronUp, Users, Search, Plus, Pencil, X,
-  AlertCircle,
+  AlertCircle, ShieldCheck, ShieldMinus, Mail, Calendar, Crown,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
 import { Select } from '../../ui';
@@ -17,12 +17,23 @@ interface Org {
   status: 'pending' | 'approved' | 'rejected' | 'suspended';
   plan: string;
   schema_provisioned: boolean;
+  clerk_org_id: string | null;
   contact_email: string | null;
   notes: string | null;
   created_at: string;
   approved_at: string | null;
   owner_user_id: string | null;
   member_count: number;
+}
+
+interface OrgMember {
+  userId:    string;
+  firstName: string;
+  lastName:  string;
+  email:     string;
+  imageUrl:  string;
+  role:      string; // 'org:admin' | 'org:member'
+  joinedAt:  number;
 }
 
 type CreateForm = { name: string; slug: string; contactEmail: string; plan: string; notes: string };
@@ -79,8 +90,156 @@ function Field({
   );
 }
 
+// ─── Org Members sub-component ───────────────────────────────────────────────
+function OrgMembersSection({
+  clerkOrgId, orgSlug,
+}: {
+  clerkOrgId: string; orgSlug: string;
+}) {
+  const saFetch = useSaFetch();
+  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [roleLoading, setRoleLoading] = useState<string | null>(null);
 
-// ─── Slide-over shell ────────────────────────────────────────────────────────
+  const fetchMembers = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await saFetch(`/admin?action=org-members&clerkOrgId=${clerkOrgId}`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      setMembers(await res.json());
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [clerkOrgId]);
+
+  useEffect(() => { fetchMembers(); }, [fetchMembers]);
+
+  const changeRole = async (member: OrgMember, newRole: 'org:admin' | 'org:member') => {
+    const action = newRole === 'org:admin' ? 'make admin' : 'remove admin from';
+    if (!window.confirm(`${action} "${member.firstName} ${member.lastName}"?`)) return;
+    setRoleLoading(member.userId);
+    try {
+      const res = await saFetch('/admin?action=org-member-role', {
+        method: 'PATCH',
+        body: JSON.stringify({ clerkOrgId, userId: member.userId, role: newRole, orgSlug }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      setMembers(prev => prev.map(m =>
+        m.userId === member.userId ? { ...m, role: newRole } : m
+      ));
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    } finally {
+      setRoleLoading(null);
+    }
+  };
+
+  const initials = (m: OrgMember) =>
+    ((m.firstName?.[0] ?? '') + (m.lastName?.[0] ?? '')).toUpperCase() || m.email[0]?.toUpperCase() || '?';
+
+  if (loading) return (
+    <div className="flex items-center gap-2 py-4 text-slate-500 text-sm">
+      <RefreshCw size={13} className="animate-spin" /> Loading members…
+    </div>
+  );
+
+  if (error) return (
+    <p className="text-xs text-red-400 py-2">Failed to load members: {error}</p>
+  );
+
+  if (members.length === 0) return (
+    <p className="text-xs text-slate-600 py-2">No members in this organisation yet.</p>
+  );
+
+  // Sort: admins first
+  const sorted = [...members].sort((a, b) => {
+    if (a.role === b.role) return a.email.localeCompare(b.email);
+    return a.role === 'org:admin' ? -1 : 1;
+  });
+
+  return (
+    <div className="space-y-2">
+      {sorted.map(m => {
+        const isAdmin = m.role === 'org:admin';
+        const acting  = roleLoading === m.userId;
+        return (
+          <div key={m.userId}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition
+              ${ isAdmin
+                ? 'bg-indigo-950/30 border-indigo-800/40'
+                : 'bg-slate-800/40 border-slate-700/40' }`}
+          >
+            {/* Avatar */}
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+              ${ isAdmin ? 'bg-indigo-600/30 text-indigo-300' : 'bg-slate-700 text-slate-300' }`}>
+              {m.imageUrl
+                ? <img src={m.imageUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
+                : initials(m)}
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-white truncate">
+                  {m.firstName} {m.lastName}
+                </p>
+                {isAdmin && <Crown size={11} className="text-indigo-400 shrink-0" />}
+              </div>
+              <div className="flex items-center gap-3 mt-0.5">
+                <span className="flex items-center gap-1 text-xs text-slate-500 truncate">
+                  <Mail size={10} /> {m.email}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-slate-600">
+                  <Calendar size={10} />
+                  {new Date(m.joinedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Role badge */}
+            <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${
+              isAdmin
+                ? 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30'
+                : 'bg-slate-700/50 text-slate-400 border-slate-600/40'
+            }`}>
+              {isAdmin ? 'Admin' : 'Member'}
+            </span>
+
+            {/* Role action — only for admins (promote) or demote current admins */}
+            {acting ? (
+              <RefreshCw size={14} className="animate-spin text-slate-500 shrink-0" />
+            ) : isAdmin ? (
+              <button
+                onClick={() => changeRole(m, 'org:member')}
+                title="Remove admin role"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                  bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-800/30
+                  transition shrink-0"
+              >
+                <ShieldMinus size={12} /> Remove Admin
+              </button>
+            ) : (
+              <button
+                onClick={() => changeRole(m, 'org:admin')}
+                title="Promote to admin"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                  bg-indigo-900/20 hover:bg-indigo-900/40 text-indigo-400 border border-indigo-800/30
+                  transition shrink-0"
+              >
+                <ShieldCheck size={12} /> Make Admin
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
 function SlideOver({ title, subtitle, onClose, children, footer }: {
   title: string; subtitle: string; onClose: () => void;
   children: React.ReactNode; footer: React.ReactNode;
@@ -363,6 +522,24 @@ export default function SAOrgs() {
                         className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
+
+                    {/* ── Members section ── */}
+                    {org.clerk_org_id && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                          <Users size={13} /> Members
+                        </p>
+                        <OrgMembersSection
+                          clerkOrgId={org.clerk_org_id}
+                          orgSlug={org.slug}
+                        />
+                      </div>
+                    )}
+                    {!org.clerk_org_id && (
+                      <p className="text-xs text-slate-600 flex items-center gap-1.5">
+                        <Users size={12} /> No Clerk org linked — approve org first to see members.
+                      </p>
+                    )}
 
                     <div className="flex flex-wrap gap-2">
                       {/* Edit details */}

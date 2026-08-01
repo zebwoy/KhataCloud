@@ -501,6 +501,79 @@ async function handleSlugCheck(req: VercelReq, client: Client): Promise<SubResul
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Org Members — list Clerk org memberships for SA view
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleOrgMembers(authCtx: any, req: VercelReq): Promise<SubResult> {
+  if (!authCtx || authCtx.userType !== 'super_admin') return err('Forbidden', 403);
+
+  const clerkOrgId = qp(req.query, 'clerkOrgId');
+  if (!clerkOrgId) return err('clerkOrgId required');
+
+  try {
+    const clerk = clerkClient();
+    const { data } = await clerk.organizations.getOrganizationMembershipList({
+      organizationId: clerkOrgId,
+      limit: 100,
+    });
+
+    const members = data.map((m: any) => ({
+      userId:    m.publicUserData?.userId    ?? '',
+      firstName: m.publicUserData?.firstName ?? '',
+      lastName:  m.publicUserData?.lastName  ?? '',
+      email:     m.publicUserData?.identifier ?? '',
+      imageUrl:  m.publicUserData?.imageUrl  ?? '',
+      role:      m.role,                        // 'org:admin' | 'org:member'
+      joinedAt:  m.createdAt,
+    }));
+
+    return ok(members);
+  } catch (e: any) {
+    return err(`Clerk error: ${e.message}`, 500);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Set Org Member Role — SA promotes/demotes org admins
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleSetOrgMemberRole(
+  authCtx: any, req: VercelReq, client: Client
+): Promise<SubResult> {
+  if (!authCtx || authCtx.userType !== 'super_admin') return err('Forbidden', 403);
+  if (req.method !== 'PATCH') return err('Method not allowed', 405);
+
+  const { clerkOrgId, userId, role, orgSlug } = req.body ?? {};
+  if (!clerkOrgId || !userId || !role) return err('clerkOrgId, userId, role required');
+  if (!['org:admin', 'org:member'].includes(role))
+    return err('Invalid role. Must be org:admin or org:member');
+
+  try {
+    const clerk = clerkClient();
+    await clerk.organizations.updateOrganizationMembership({
+      organizationId: clerkOrgId,
+      userId,
+      role,
+    });
+  } catch (e: any) {
+    return err(`Clerk error: ${e.message}`, 500);
+  }
+
+  // Audit (best-effort)
+  if (orgSlug) {
+    await logAudit(client, {
+      orgSlug,
+      userId:     authCtx.userId!,
+      userRole:   'super_admin',
+      action:     'change_member_role',
+      entityType: 'member',
+      entityId:   userId,
+      summary:    `SA set role '${role}' for user ${userId} in org '${orgSlug}'`,
+    });
+  }
+
+  return ok({ ok: true, userId, role });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
 export default async function handler(req: VercelReq, res: VercelRes) {
@@ -518,10 +591,12 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
     let result: SubResult;
     switch (action) {
-      case 'whoami':   result = await handleWhoami(authCtx, client); break;
-      case 'stats':    result = await handleStats(authCtx, client); break;
-      case 'orgs':     result = await handleOrgs(authCtx, req, client); break;
-      case 'provision':result = await handleProvision(authCtx, req, client); break;
+      case 'whoami':          result = await handleWhoami(authCtx, client); break;
+      case 'stats':            result = await handleStats(authCtx, client); break;
+      case 'orgs':             result = await handleOrgs(authCtx, req, client); break;
+      case 'org-members':      result = await handleOrgMembers(authCtx, req); break;
+      case 'org-member-role':  result = await handleSetOrgMemberRole(authCtx, req, client); break;
+      case 'provision':        result = await handleProvision(authCtx, req, client); break;
       case 'register': result = req.method === 'GET'
         ? await handleSlugCheck(req, client)
         : err('Org self-registration is disabled. Contact a super admin.', 410);
