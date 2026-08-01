@@ -101,8 +101,8 @@ export default function LoginScreen() {
              * Together these cover every Clerk sign-in path:
              *   email+password, Google OAuth, magic link, SSO
              */
-            forceRedirectUrl="/admin"
-            fallbackRedirectUrl="/admin"
+            forceRedirectUrl="/auth"
+            fallbackRedirectUrl="/auth"
             appearance={{
               variables: {
                 colorPrimary:        '#7c3aed',
