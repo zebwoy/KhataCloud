@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
-  UserPlus, RefreshCw, Eye, EyeOff,
+  UserPlus, RefreshCw,
   CheckCircle, AlertCircle, Search, X, Copy, Link2,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
@@ -57,8 +57,7 @@ export default function SAUsers() {
   const [error, setError] = useState('');
 
   // Provision form state
-  const [form, setForm] = useState({ name: '', email: '', password: '', orgSlug: '', role: 'member' });
-  const [showPw, setShowPw] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', orgSlug: '', role: 'member' });
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [signInUrl, setSignInUrl] = useState<string | null>(null);
@@ -83,7 +82,7 @@ export default function SAUsers() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const resetForm = (keepOrg = false) => {
-    setForm({ name: '', email: '', password: '', orgSlug: keepOrg ? form.orgSlug : '', role: 'member' });
+    setForm({ name: '', email: '', orgSlug: keepOrg ? form.orgSlug : '', role: 'member' });
     setFormError('');
     setSignInUrl(null);
     setCopied(false);
@@ -102,8 +101,6 @@ export default function SAUsers() {
         orgSlug: form.orgSlug,
         role: form.role,
       };
-      // Only send password if the SA explicitly set one
-      if (form.password) payload.password = form.password;
 
       const res = await saFetch('/admin?action=provision', {
         method: 'POST',
@@ -210,7 +207,7 @@ export default function SAUsers() {
             <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between shrink-0">
               <div>
                 <p className="text-base font-bold text-white">Provision User</p>
-                <p className="text-xs text-slate-500 mt-0.5">Create a Clerk account and link to an org</p>
+                <p className="text-xs text-slate-500 mt-0.5">Create a Clerk account linked to an org. A sign-in link is generated for the user.</p>
               </div>
               <button onClick={() => setPanelOpen(false)} className="text-slate-500 hover:text-white transition">
                 <X size={20} />
@@ -222,29 +219,6 @@ export default function SAUsers() {
               <ProvisionInput label="Full name" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ahmad Raza" />
               <ProvisionInput label="Email" type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@example.com" />
 
-              {/* Password field — optional */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-                  Password <span className="normal-case font-normal text-slate-600">(optional)</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPw ? 'text' : 'password'}
-                    value={form.password}
-                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Leave blank — user gets a sign-in link"
-                    minLength={8}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 pr-11 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition">
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-600 mt-1">
-                  If left blank, a one-time sign-in link is generated. No breach-check issues.
-                </p>
-              </div>
 
               {/* Org dropdown */}
               <Select
