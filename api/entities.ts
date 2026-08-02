@@ -40,6 +40,19 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     if (!auth) return res.status(401).json({ error: 'Unauthorized' });
 
     const { userType } = auth;
+
+    // Reject no_org — prevents querying public.entities which doesn't exist on SaaS DB
+    if (userType === 'no_org') {
+      return res.status(403).json({
+        error: 'No organisation assigned. Please contact your administrator.',
+      });
+    }
+    if (userType === 'org_member' && !auth.orgSlug) {
+      return res.status(403).json({
+        error: 'Org schema not linked. Please ask a super-admin to complete org setup.',
+      });
+    }
+
     const isTrial    = userType === 'trial' ? 'Y' : 'N';
     const entityTable = userType === 'org_member' && auth.orgSlug
       ? `org_${auth.orgSlug.replace(/-/g, '_')}.entities`
@@ -48,6 +61,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     if (req.method !== 'GET') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
+
 
     const entityType = qp(req.query, 'entityType');
 

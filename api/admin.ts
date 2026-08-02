@@ -349,17 +349,61 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
     return ok(refreshed.rows[0]);
   }
 
-  // ── PATCH: edit org details ───────────────────────────────────────────────
+  // ── PATCH: edit org details + special repair actions ─────────────────────
   if (req.method === 'PATCH') {
     const body = req.body;
     if (!body) return err('Body required');
-    const { id, name, contactEmail, plan, notes } = body as {
+    const { id, name, contactEmail, plan, notes, linkClerkOrgId, reprovisionSchema } = body as {
       id: string; name?: string; contactEmail?: string; plan?: string; notes?: string;
+      linkClerkOrgId?: string;   // Set/update the clerk_org_id for this org
+      reprovisionSchema?: boolean; // Re-run provision_org_schema (idempotent)
     };
     if (!id) return err('id required');
     if (name !== undefined && name.trim().length < 3)
       return err('Organisation name must be ≥ 3 characters');
 
+    // ── Special action: link a Clerk org ID ──────────────────────────────────
+    if (linkClerkOrgId !== undefined) {
+      const linkUpd = await client.query<{ slug: string }>(
+        `UPDATE platform.orgs SET clerk_org_id=$1 WHERE id=$2 RETURNING slug`,
+        [linkClerkOrgId || null, id]
+      );
+      if (!linkUpd.rowCount) return err('Org not found', 404);
+
+      const slug = linkUpd.rows[0].slug;
+      // Sync org slug in Clerk org public metadata if clerk_org_id was provided
+      if (linkClerkOrgId) {
+        try {
+          await clerkClient().organizations.updateOrganization(linkClerkOrgId, {
+            publicMetadata: { slug, schemaProvisioned: true },
+          });
+        } catch (e) {
+          console.error('[admin] Could not update Clerk org metadata:', e);
+          // Non-fatal
+        }
+      }
+
+      const refreshed = await client.query(`SELECT * FROM platform.orgs WHERE id=$1`, [id]);
+      return ok({ ...refreshed.rows[0], _info: 'clerk_org_id updated' });
+    }
+
+    // ── Special action: reprovision schema ───────────────────────────────────
+    if (reprovisionSchema) {
+      const orgRow = await client.query<{ slug: string }>(
+        `SELECT slug FROM platform.orgs WHERE id=$1 AND status='approved' LIMIT 1`, [id]
+      );
+      if (!orgRow.rowCount) return err('Org not found or not approved', 404);
+      const slug = orgRow.rows[0].slug;
+      try {
+        await client.query(`SELECT platform.provision_org_schema($1)`, [slug]);
+      } catch (e) {
+        return err(`Provisioning failed: ${(e as Error).message}`, 500);
+      }
+      const refreshed = await client.query(`SELECT * FROM platform.orgs WHERE id=$1`, [id]);
+      return ok({ ...refreshed.rows[0], _info: 'schema reprovisioned' });
+    }
+
+    // ── Normal edit ──────────────────────────────────────────────────────────
     const upd = await client.query<{ clerk_org_id: string | null }>(
       `UPDATE platform.orgs SET
          name          = COALESCE($1, name),
@@ -387,6 +431,7 @@ async function handleOrgs(authCtx: any, req: VercelReq, client: Client): Promise
 
   return err('Method Not Allowed', 405);
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Provision user — SA power tool (all roles, audited)

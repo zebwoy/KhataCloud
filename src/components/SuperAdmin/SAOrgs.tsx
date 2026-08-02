@@ -6,6 +6,7 @@ import {
   CheckCircle, XCircle, PauseCircle, RefreshCw,
   ChevronDown, ChevronUp, Users, Search, Plus, Pencil, X,
   AlertCircle, ShieldCheck, ShieldMinus, Mail, Calendar, Crown,
+  Link, Database, AlertTriangle,
 } from 'lucide-react';
 import { useSaFetch } from '../../lib/useSaFetch';
 import { Select } from '../../ui';
@@ -290,6 +291,15 @@ export default function SAOrgs() {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState('');
 
+  // Link Clerk Org panel
+  const [linkOrg, setLinkOrg] = useState<Org | null>(null);
+  const [linkClerkId, setLinkClerkId] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
+  // Reprovision loading per org id
+  const [reprovisionLoading, setReprovisionLoading] = useState<string | null>(null);
+
   const fetchOrgs = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -389,6 +399,57 @@ export default function SAOrgs() {
       setEditError(e.message);
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  // ── Link Clerk Org ────────────────────────────────────────────────────────
+  const openLink = (org: Org) => {
+    setLinkOrg(org);
+    setLinkClerkId(org.clerk_org_id ?? '');
+    setLinkError('');
+  };
+
+  const handleLinkClerk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!linkOrg) return;
+    const trimmed = linkClerkId.trim();
+    if (trimmed && !trimmed.startsWith('org_'))
+      return setLinkError('Clerk org IDs start with "org_"');
+    setLinkLoading(true);
+    setLinkError('');
+    try {
+      const res = await saFetch('/admin?action=orgs', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: linkOrg.id, linkClerkOrgId: trimmed || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setOrgs(prev => prev.map(o => o.id === data.id ? { ...o, clerk_org_id: data.clerk_org_id } : o));
+      setLinkOrg(null);
+    } catch (e: any) {
+      setLinkError(e.message);
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  // ── Reprovision schema ────────────────────────────────────────────────────
+  const handleReprovision = async (org: Org) => {
+    if (!window.confirm(`Re-run provision_org_schema for "${org.name}"? This is safe (idempotent) but may take a moment.`)) return;
+    setReprovisionLoading(org.id);
+    try {
+      const res = await saFetch('/admin?action=orgs', {
+        method: 'PATCH',
+        body: JSON.stringify({ id: org.id, reprovisionSchema: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setOrgs(prev => prev.map(o => o.id === data.id ? { ...o, schema_provisioned: data.schema_provisioned } : o));
+      alert('Schema reprovisioned successfully!');
+    } catch (e: any) {
+      alert(`Reprovision failed: ${(e as any).message}`);
+    } finally {
+      setReprovisionLoading(null);
     }
   };
 
@@ -523,6 +584,40 @@ export default function SAOrgs() {
                       />
                     </div>
 
+                    {/* ── Clerk status + repair section ── */}
+                    {!org.clerk_org_id ? (
+                      <div className="rounded-xl border border-amber-800/50 bg-amber-900/15 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
+                            <AlertTriangle size={14} />
+                            Clerk org not linked
+                          </div>
+                          <button
+                            onClick={() => openLink(org)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
+                              bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-600/25 transition"
+                          >
+                            <Link size={12} /> Link Clerk Org
+                          </button>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-1">
+                          Members can't sign in until this org is linked to a Clerk organisation.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        <span className="text-emerald-500">✓</span>
+                        <span className="font-mono text-slate-500">{org.clerk_org_id}</span>
+                        <button
+                          onClick={() => openLink(org)}
+                          title="Change linked Clerk org"
+                          className="text-slate-600 hover:text-slate-400 transition"
+                        >
+                          <Pencil size={11} />
+                        </button>
+                      </div>
+                    )}
+
                     {/* ── Members section ── */}
                     {org.clerk_org_id && (
                       <div>
@@ -535,11 +630,6 @@ export default function SAOrgs() {
                         />
                       </div>
                     )}
-                    {!org.clerk_org_id && (
-                      <p className="text-xs text-slate-600 flex items-center gap-1.5">
-                        <Users size={12} /> No Clerk org linked — approve org first to see members.
-                      </p>
-                    )}
 
                     <div className="flex flex-wrap gap-2">
                       {/* Edit details */}
@@ -548,6 +638,19 @@ export default function SAOrgs() {
                         className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-sm font-medium transition"
                       >
                         <Pencil size={14} /> Edit Details
+                      </button>
+
+                      {/* Reprovision schema */}
+                      <button
+                        onClick={() => handleReprovision(org)}
+                        disabled={reprovisionLoading === org.id}
+                        title="Re-run provision_org_schema (safe to repeat)"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded-xl text-sm font-medium disabled:opacity-50 transition"
+                      >
+                        {reprovisionLoading === org.id
+                          ? <RefreshCw size={14} className="animate-spin" />
+                          : <Database size={14} />}
+                        Reprovision Schema
                       </button>
 
                       {org.status !== 'approved' && (
@@ -704,6 +807,54 @@ export default function SAOrgs() {
           )}
         </SlideOver>
       )}
+
+      {/* ── Link Clerk Org slide-over ───────────────────────────────────────── */}
+      {linkOrg && (
+        <SlideOver
+          title="Link Clerk Organisation"
+          subtitle={`Org: ${linkOrg.name} (${linkOrg.slug})`}
+          onClose={() => setLinkOrg(null)}
+          footer={
+            <>
+              <button type="button" onClick={() => setLinkOrg(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-700 text-sm text-slate-400 hover:text-white transition">
+                Cancel
+              </button>
+              <button
+                onClick={handleLinkClerk}
+                disabled={linkLoading}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl text-sm font-semibold transition"
+              >
+                {linkLoading ? <RefreshCw size={15} className="animate-spin" /> : <Link size={15} />}
+                {linkLoading ? 'Saving…' : 'Link Org'}
+              </button>
+            </>
+          }
+        >
+          <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 px-4 py-4 text-xs text-slate-400 space-y-1">
+            <p className="font-semibold text-slate-300">How to find the Clerk Org ID:</p>
+            <ol className="list-decimal list-inside space-y-0.5 text-slate-500">
+              <li>Go to <strong className="text-slate-400">clerk.com/dashboard</strong></li>
+              <li>Click <strong className="text-slate-400">Organizations</strong></li>
+              <li>Click on <strong className="text-slate-400">{linkOrg.name}</strong></li>
+              <li>Copy the ID starting with <code className="bg-slate-700 px-1 rounded">org_</code></li>
+            </ol>
+          </div>
+          <Field
+            label="Clerk Organisation ID"
+            value={linkClerkId}
+            onChange={setLinkClerkId}
+            placeholder="org_xxxxxxxxxxxxxxxxxxxx"
+            hint="Leave blank to unlink. Must start with org_"
+          />
+          {linkError && (
+            <div className="flex items-start gap-2 rounded-xl border border-red-800/60 bg-red-900/20 px-4 py-3 text-sm text-red-400">
+              <AlertCircle size={15} className="shrink-0 mt-0.5" /> {linkError}
+            </div>
+          )}
+        </SlideOver>
+      )}
     </div>
   );
 }
+

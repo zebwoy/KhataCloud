@@ -50,12 +50,28 @@ export default async function handler(req: VercelReq, res: VercelRes) {
 
     const { userType } = auth;
 
+    // ── Org routing ────────────────────────────────────────────────────────────
+    // Reject no_org early — prevents falling through to public.transactions
+    // which doesn't exist on a fresh SaaS-only database.
+    if (userType === 'no_org') {
+      return res.status(403).json({
+        message: 'No organisation assigned. Please contact your administrator.',
+      });
+    }
+
     const getTableName = (): string => {
       if (userType === 'trial') return 'trial_transactions';
       if (userType === 'org_member' && auth.orgSlug)
         return `org_${auth.orgSlug.replace(/-/g, '_')}.transactions`;
       return 'transactions'; // admin + super_admin → public schema
     };
+
+    if (userType === 'org_member' && !auth.orgSlug) {
+      return res.status(403).json({
+        message: 'Org schema not linked. Please ask a super-admin to complete org setup.',
+      });
+    }
+
     const tableName = getTableName();
 
     // Ensure trial_transactions table exists on first access
