@@ -189,7 +189,6 @@ body {
 }
 @media (max-width: 767px) {
   .cl-userButtonPopoverCard {
-    margin-left: -165px !important;
     margin-bottom: 8px !important;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;

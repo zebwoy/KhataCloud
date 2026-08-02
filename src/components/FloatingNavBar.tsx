@@ -132,7 +132,7 @@ export default function FloatingNavBar({
         hidden md:flex
         fixed top-4 left-1/2 -translate-x-1/2 z-50
         items-center gap-1
-        bg-slate-900/95 backdrop-blur-xl
+        bg-slate-900/70 backdrop-blur-xl
         border border-white/10
         rounded-2xl px-3 py-2
         shadow-2xl shadow-black/50
@@ -205,13 +205,13 @@ export default function FloatingNavBar({
                   ref={subMenuRef}
                   className="
                     absolute top-full mt-2 left-0 z-50
-                    bg-slate-900/95 backdrop-blur-xl border border-white/10
+                    bg-slate-900/70 backdrop-blur-xl border border-white/10
                     rounded-2xl p-1.5 shadow-2xl shadow-black/50
                     flex flex-col gap-0.5 min-w-[200px]
                     section-enter
                   "
                 >
-                  <SubMenuContent onClose={() => setShowSubMenu(false)} />
+                  <SubMenuContent onClose={() => setTimeout(() => setShowSubMenu(false), 20)} />
                 </div>
               )}
             </div>
@@ -244,7 +244,7 @@ export default function FloatingNavBar({
       <nav className="
         md:hidden
         fixed bottom-0 left-0 right-0 z-50
-        bg-slate-900/95 backdrop-blur-xl
+        bg-slate-900/70 backdrop-blur-xl
         border-t border-white/10
         shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
       ">
@@ -254,14 +254,14 @@ export default function FloatingNavBar({
             ref={subMenuRef}
             className="
               mx-4 mb-3
-              bg-slate-900/95 backdrop-blur-xl border border-white/10
+              bg-slate-900/70 backdrop-blur-xl border border-white/10
               rounded-2xl p-1.5 shadow-2xl shadow-black/60
               flex gap-1.5
               section-enter
             "
           >
             <button
-              onClick={() => { onSubViewChange('view'); setShowSubMenu(false); }}
+              onClick={() => { onSubViewChange('view'); setTimeout(() => setShowSubMenu(false), 20); }}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
@@ -274,7 +274,7 @@ export default function FloatingNavBar({
               <Eye size={14} /> All
             </button>
             <button
-              onClick={() => { onSubViewChange('add'); setShowSubMenu(false); }}
+              onClick={() => { onSubViewChange('add'); setTimeout(() => setShowSubMenu(false), 20); }}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
