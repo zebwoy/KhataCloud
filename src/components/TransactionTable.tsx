@@ -491,7 +491,7 @@ export default function TransactionTable({
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.subcategory || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.custodian}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">{t.counterparty}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold">
+                      <td className="px-4 py-3 text-sm text-right font-semibold whitespace-nowrap">
                         <span className={
                           t.category === 'Income'
                             ? 'text-green-600 dark:text-green-400'

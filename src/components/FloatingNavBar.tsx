@@ -16,14 +16,14 @@ import { useAuth, UserButton } from '@clerk/react';
 import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, User } from 'lucide-react';
 
 export interface FloatingNavBarProps {
-  isAdmin:            boolean;
-  activeSection:      'transactions' | 'reports' | 'admin';
-  onSectionChange:    (s: 'transactions' | 'reports' | 'admin') => void;
+  isAdmin: boolean;
+  activeSection: 'transactions' | 'reports' | 'admin';
+  onSectionChange: (s: 'transactions' | 'reports' | 'admin') => void;
   transactionSubView: 'view' | 'add';
-  onSubViewChange:    (v: 'view' | 'add') => void;
-  navStyle?:          'pill' | 'classic';
-  orgId?:             string;
-  trialMode?:         boolean;
+  onSubViewChange: (v: 'view' | 'add') => void;
+  navStyle?: 'pill' | 'classic';
+  orgId?: string;
+  trialMode?: boolean;
 }
 
 export default function FloatingNavBar({
@@ -38,10 +38,10 @@ export default function FloatingNavBar({
 }: FloatingNavBarProps) {
   const { getToken } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
-  const [showSubMenu, setShowSubMenu]   = useState(false);
-  const subMenuRef        = useRef<HTMLDivElement>(null);
-  const txnBtnDesktopRef  = useRef<HTMLButtonElement>(null);
-  const txnBtnMobileRef   = useRef<HTMLButtonElement>(null);
+  const [showSubMenu, setShowSubMenu] = useState(false);
+  const subMenuRef = useRef<HTMLDivElement>(null);
+  const txnBtnDesktopRef = useRef<HTMLButtonElement>(null);
+  const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
 
   // Poll pending requests count every 60 s (org admins only)
   useEffect(() => {
@@ -68,9 +68,9 @@ export default function FloatingNavBar({
     if (!showSubMenu) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      const inMenu    = subMenuRef.current?.contains(t);
+      const inMenu = subMenuRef.current?.contains(t);
       const inDesktop = txnBtnDesktopRef.current?.contains(t);
-      const inMobile  = txnBtnMobileRef.current?.contains(t);
+      const inMobile = txnBtnMobileRef.current?.contains(t);
       if (!inMenu && !inDesktop && !inMobile) setShowSubMenu(false);
     };
     document.addEventListener('mousedown', handler);
@@ -91,7 +91,7 @@ export default function FloatingNavBar({
 
   const navItems = [
     { key: 'transactions', label: 'Transactions', icon: BookOpen },
-    { key: 'reports',      label: 'Reports',      icon: BarChart2 },
+    { key: 'reports', label: 'Reports', icon: BarChart2 },
     ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: ShieldAlert }] : []),
   ] as { key: 'transactions' | 'reports' | 'admin'; label: string; icon: React.ElementType }[];
 
@@ -132,11 +132,12 @@ export default function FloatingNavBar({
         hidden md:flex
         fixed top-4 left-1/2 -translate-x-1/2 z-50
         items-center gap-1
-        bg-slate-900/70 backdrop-blur-xl
+        bg-slate-900/70
         border border-white/10
         rounded-2xl px-3 py-2
-        shadow-2xl shadow-black/50
-      ">
+        shadow-2xl shadow-black/50"
+        style={{ backdropFilter: 'blur(3px)' }}
+      >
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
           <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
@@ -151,9 +152,9 @@ export default function FloatingNavBar({
 
         {/* Nav items */}
         {navItems.map(({ key, label, icon: Icon }) => {
-          const isActive      = activeSection === key;
-          const hasBadge      = key === 'admin' && pendingCount > 0;
-          const isTxn         = key === 'transactions';
+          const isActive = activeSection === key;
+          const hasBadge = key === 'admin' && pendingCount > 0;
+          const isTxn = key === 'transactions';
           return (
             <div key={key} className="relative">
               <button
@@ -244,7 +245,7 @@ export default function FloatingNavBar({
       <nav className="
         md:hidden
         fixed bottom-0 left-0 right-0 z-50
-        bg-slate-900/70 backdrop-blur-xl
+        bg-slate-900 backdrop-blur-xl
         border-t border-white/10
         shadow-[0_-8px_32px_rgba(0,0,0,0.5)]
       ">
@@ -253,15 +254,15 @@ export default function FloatingNavBar({
           <div
             ref={subMenuRef}
             className="
-              mx-4 mb-3
+              mx-4
               bg-slate-900/70 backdrop-blur-xl border border-white/10
               rounded-2xl p-1.5 shadow-2xl shadow-black/60
               flex gap-1.5
               section-enter
-            "
+            " style={{ marginTop: '1rem' }}
           >
             <button
-              onClick={() => { onSubViewChange('view'); setTimeout(() => setShowSubMenu(false), 20); }}
+              onClick={() => onSubViewChange('view')}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
@@ -274,7 +275,7 @@ export default function FloatingNavBar({
               <Eye size={14} /> All
             </button>
             <button
-              onClick={() => { onSubViewChange('add'); setTimeout(() => setShowSubMenu(false), 20); }}
+              onClick={() => onSubViewChange('add')}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
@@ -293,7 +294,7 @@ export default function FloatingNavBar({
           {navItems.map(({ key, label, icon: Icon }) => {
             const isActive = activeSection === key;
             const hasBadge = key === 'admin' && pendingCount > 0;
-            const isTxn    = key === 'transactions';
+            const isTxn = key === 'transactions';
             return (
               <button
                 key={key}
