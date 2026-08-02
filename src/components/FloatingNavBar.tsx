@@ -75,7 +75,8 @@ export default function FloatingNavBar({
   const { getToken } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
-  const subMenuRef = useRef<HTMLDivElement>(null);
+  const subMenuDesktopRef = useRef<HTMLDivElement>(null);
+  const subMenuMobileRef = useRef<HTMLDivElement>(null);
   const txnBtnDesktopRef = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
 
@@ -104,10 +105,13 @@ export default function FloatingNavBar({
     if (!showSubMenu) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
-      const inMenu = subMenuRef.current?.contains(t);
-      const inDesktop = txnBtnDesktopRef.current?.contains(t);
-      const inMobile = txnBtnMobileRef.current?.contains(t);
-      if (!inMenu && !inDesktop && !inMobile) setShowSubMenu(false);
+      const inDesktopMenu = subMenuDesktopRef.current?.contains(t);
+      const inMobileMenu = subMenuMobileRef.current?.contains(t);
+      const inDesktopBtn = txnBtnDesktopRef.current?.contains(t);
+      const inMobileBtn = txnBtnMobileRef.current?.contains(t);
+      if (!inDesktopMenu && !inMobileMenu && !inDesktopBtn && !inMobileBtn) {
+        setShowSubMenu(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -213,7 +217,7 @@ export default function FloatingNavBar({
               {/* Desktop sub-menu popover */}
               {isTxn && showSubMenu && navStyle === 'pill' && (
                 <div
-                  ref={subMenuRef}
+                  ref={subMenuDesktopRef}
                   className="
                     absolute top-full mt-3 left-0 z-50
                     bg-slate-900/70 border border-white/10
@@ -267,7 +271,7 @@ export default function FloatingNavBar({
         {/* Mobile sub-menu (floats above the tab bar) */}
         {activeSection === 'transactions' && showSubMenu && navStyle === 'pill' && (
           <div
-            ref={subMenuRef}
+            ref={subMenuMobileRef}
             className="
               mx-4
               bg-slate-900/70 backdrop-blur-xl border border-white/10
@@ -277,7 +281,11 @@ export default function FloatingNavBar({
             " style={{ marginTop: '1rem' }}
           >
             <button
-              onClick={() => onSubViewChange('view')}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSubViewChange('view');
+                setTimeout(() => setShowSubMenu(false), 20);
+              }}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
@@ -290,7 +298,11 @@ export default function FloatingNavBar({
               <Eye size={14} /> All
             </button>
             <button
-              onClick={() => onSubViewChange('add')}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSubViewChange('add');
+                setTimeout(() => setShowSubMenu(false), 20);
+              }}
               className={`
                 flex-1 flex items-center justify-center gap-2
                 py-2.5 px-3 rounded-xl text-sm font-medium
