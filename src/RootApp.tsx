@@ -297,6 +297,8 @@ function OrgAppShell({
   };
 
   // Write Clerk JWT to sessionStorage for AccountingSystem's apiFetch
+  // Also expose a global so apiFetch can call getToken() directly on every
+  // request, preventing stale-token 401s (Clerk JWTs expire in ~60 seconds).
   useEffect(() => {
     let cancelled = false;
     const writeToken = async () => {
@@ -311,18 +313,26 @@ function OrgAppShell({
       }
     };
     writeToken();
-    // Refresh token before it expires (Clerk JWTs are ~60 min)
+    // Expose a global so App.tsx's apiFetch always gets a fresh token
+    (window as any).__getClerkToken = () => getToken();
+    // Fallback interval: refresh in sessionStorage every 45s in case the
+    // global is not called (Clerk tokens expire after ~60 seconds)
     const interval = setInterval(async () => {
       const fresh = await getToken().catch(() => null);
       if (fresh) sessionStorage.setItem('madrasah_auth_token', fresh);
-    }, 55 * 60 * 1000);
-    return () => { cancelled = true; clearInterval(interval); };
+    }, 45_000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      delete (window as any).__getClerkToken;
+    };
   }, [getToken]);
 
   if (!bridged) return <PageSpinner label="Loading your account…" />;
 
   // Determine which App.tsx internal tab to show based on activeSection
-  const appTab = activeSection === 'reports' ? 'reports' : 'view';
+  // NOTE: App.tsx uses 'report' (not 'reports') as the tab key
+  const appTab = activeSection === 'reports' ? 'report' : 'view';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">

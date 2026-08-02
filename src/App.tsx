@@ -29,7 +29,14 @@ import {
 } from './utils/constants';
 
 const apiFetch = async (url: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('madrasah_auth_token');
+  // Prefer a live Clerk token (exposed by OrgAppShell when in saas mode).
+  // This ensures we never send an expired JWT — Clerk tokens expire in ~60 s.
+  let token: string | null = null;
+  const clerkGetter = (window as any).__getClerkToken as (() => Promise<string | null>) | undefined;
+  if (clerkGetter) {
+    try { token = await clerkGetter(); } catch { /* fall through */ }
+  }
+  if (!token) token = sessionStorage.getItem('madrasah_auth_token');
   const headers = {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -796,8 +803,47 @@ export default function AccountingSystem({
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        {/* ── Tab controls ── */}
+        {saasMode ? (
+          /* saasMode: compact pill toggle (View ↔ Add). Reports handled by FloatingNavBar. */
+          activeTab !== 'report' && (
+            <div
+              className="flex mb-6"
+              style={{ background: 'none' }}
+            >
+              <div className="inline-flex bg-slate-900 border border-white/10 rounded-2xl p-1 gap-1 shadow-xl">
+                <button
+                  id="tab-view"
+                  onClick={() => { handleCancelEdit(); setActiveTab('view'); }}
+                  className={`
+                    px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+                    ${ activeTab === 'view'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }
+                  `}
+                >
+                  All Transactions
+                </button>
+                <button
+                  id="tab-add"
+                  onClick={() => { if (activeTab !== 'add') handleCancelEdit(); setActiveTab('add'); }}
+                  className={`
+                    flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+                    ${ activeTab === 'add'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }
+                  `}
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          /* Legacy mode: original 3 tab buttons */
+          <div className="flex flex-wrap gap-2 mb-6">
           <button
             onClick={() => {
               if (activeTab !== 'add') {
@@ -872,7 +918,8 @@ export default function AccountingSystem({
               ⚙️ Super Admin
             </button>
           )}
-        </div>
+          </div>
+        )}
 
 
         {/* Add Transaction Tab */}

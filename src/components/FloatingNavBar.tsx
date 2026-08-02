@@ -74,7 +74,7 @@ export default function FloatingNavBar({
             <LayoutDashboard size={12} className="text-white" />
           </div>
           <span className="text-sm font-bold text-white tracking-tight hidden lg:block">
-            HisaabKitaab
+            KhataCloud
           </span>
         </div>
 
