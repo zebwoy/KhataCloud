@@ -10,6 +10,18 @@
 .scroll-hidden::-webkit-scrollbar { display: none; }
 .scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
 
+/* ── Section panel transition ──────────────────────────────────────────── */
+/* Applied to a panel when it becomes visible (display none → block).     */
+/* Browsers start @keyframes fresh when an element goes display:none→block */
+@keyframes sectionFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.section-enter {
+  animation: sectionFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+
 /* ── KhataCloud Design Tokens ──────────────────────────────────────────── */
 :root {
   --kc-brand:        #7c3aed; /* violet-600 */

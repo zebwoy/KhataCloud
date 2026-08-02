@@ -344,14 +344,37 @@ function OrgAppShell({
       />
       {/* Top padding to clear floating navbar, bottom padding for mobile tab bar */}
       <div className="pt-20 pb-24 md:pb-6">
-        {activeSection === 'admin' && isAdmin
-          ? <OrgAdminApp orgSlug={orgSlug!} />
-          : <AccountingSystem
-              saasMode
-              onSignOut={handleSignOut}
-              initialTab={appTab}
-            />
-        }
+        {/*
+          All three panels are ALWAYS mounted — switching sections just
+          toggles display:none.  This means:
+          - No re-fetching / re-initialising when coming back to a section
+          - No "Loading your data…" flash on Transactions after visiting Admin
+          - No "Loading admin…" flash when returning to Admin
+          The section-enter class triggers the fade-slide animation every
+          time a panel transitions from display:none → display:block.
+        */}
+
+        {/* ── Transactions + Reports panel ── */}
+        <div
+          style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
+          className={activeSection !== 'admin' ? 'section-enter' : ''}
+        >
+          <AccountingSystem
+            saasMode
+            onSignOut={handleSignOut}
+            initialTab={appTab}
+          />
+        </div>
+
+        {/* ── Admin panel (org admins only) ── */}
+        {isAdmin && (
+          <div
+            style={{ display: activeSection === 'admin' ? 'block' : 'none' }}
+            className={activeSection === 'admin' ? 'section-enter' : ''}
+          >
+            <OrgAdminApp orgSlug={orgSlug!} />
+          </div>
+        )}
       </div>
     </div>
   );
