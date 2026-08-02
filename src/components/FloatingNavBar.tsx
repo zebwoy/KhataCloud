@@ -1,15 +1,6 @@
 /**
  * FloatingNavBar.tsx — Premium floating navigation bar
- *
- * Desktop: pill-shaped, centered, fixed at top with glass morphism
- * Mobile: full-width bottom tab bar
- *
- * Features:
- * - Transactions sub-menu (View / New) on secondary click (pill navStyle)
- * - "Admin" tab appears only for org admins
- * - Notification badge on Admin tab for pending join requests
- * - <UserButton /> from Clerk with "Settings" tooltip overlay
- * - trialMode: plain avatar placeholder instead of Clerk UserButton
+ * Reverted to commit d685080
  */
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
