@@ -136,7 +136,7 @@ export default function FloatingNavBar({
         border border-white/10
         rounded-2xl px-3 py-2
         shadow-2xl shadow-black/50"
-        style={{ backdropFilter: 'blur(3px)' }}
+        style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
       >
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
@@ -205,12 +205,13 @@ export default function FloatingNavBar({
                 <div
                   ref={subMenuRef}
                   className="
-                    absolute top-full mt-2 left-0 z-50
-                    bg-slate-900/70 backdrop-blur-xl border border-white/10
+                    absolute top-full mt-3 left-0 z-50
+                    bg-slate-900/70 border border-white/10
                     rounded-2xl p-1.5 shadow-2xl shadow-black/50
                     flex flex-col gap-0.5 min-w-[200px]
                     section-enter
                   "
+                  style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
                 >
                   <SubMenuContent onClose={() => setTimeout(() => setShowSubMenu(false), 20)} />
                 </div>
