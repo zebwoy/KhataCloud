@@ -389,7 +389,6 @@ function OrgAppShell({
   }, [getToken]);
 
   if (!bridged) return <PageSpinner label="Loading your account…" />;
-  if (!appReady) return <PageSpinner label="Loading your data…" />;
 
   // Determine which App.tsx internal tab to show based on activeSection + sub-view
   // NOTE: App.tsx uses 'report' (not 'reports') as the tab key
@@ -400,46 +399,49 @@ function OrgAppShell({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <FloatingNavBar
-        isAdmin={isAdmin}
-        activeSection={activeSection}
-        onSectionChange={handleSectionChange}
-        transactionSubView={transactionSubView}
-        onSubViewChange={handleSubViewChange}
-        navStyle={navStyle}
-        orgId={orgId}
-      />
-      {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
-      <div className="pt-0 md:pt-20 pb-24 md:pb-6">
-        {/*
-          All three panels are ALWAYS mounted — switching sections just
-          toggles display:none.  No re-fetching / re-initialising.
-          .section-enter plays the fade-slide animation on reveal.
-        */}
+      {!appReady && <PageSpinner label="Loading your data…" />}
+      <div style={{ display: appReady ? 'block' : 'none' }}>
+        <FloatingNavBar
+          isAdmin={isAdmin}
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          transactionSubView={transactionSubView}
+          onSubViewChange={handleSubViewChange}
+          navStyle={navStyle}
+          orgId={orgId}
+        />
+        {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+          {/*
+            All three panels are ALWAYS mounted — switching sections just
+            toggles display:none.  No re-fetching / re-initialising.
+            .section-enter plays the fade-slide animation on reveal.
+          */}
 
-        {/* ── Transactions + Reports panel ── */}
-        <div
-          style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
-          className={activeSection !== 'admin' ? 'section-enter' : ''}
-        >
-          <AccountingSystem
-            saasMode
-            onSignOut={handleSignOut}
-            initialTab={appTab}
-            navStyle={navStyle}
-            onReady={handleAppReady}
-          />
-        </div>
-
-        {/* ── Admin panel (org admins only) ── */}
-        {isAdmin && (
+          {/* ── Transactions + Reports panel ── */}
           <div
-            style={{ display: activeSection === 'admin' ? 'block' : 'none' }}
-            className={activeSection === 'admin' ? 'section-enter' : ''}
+            style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
+            className={activeSection !== 'admin' ? 'section-enter' : ''}
           >
-            <OrgAdminApp orgSlug={orgSlug!} />
+            <AccountingSystem
+              saasMode
+              onSignOut={handleSignOut}
+              initialTab={appTab}
+              navStyle={navStyle}
+              onReady={handleAppReady}
+            />
           </div>
-        )}
+
+          {/* ── Admin panel (org admins only) ── */}
+          {isAdmin && (
+            <div
+              style={{ display: activeSection === 'admin' ? 'block' : 'none' }}
+              className={activeSection === 'admin' ? 'section-enter' : ''}
+            >
+              <OrgAdminApp orgSlug={orgSlug!} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
