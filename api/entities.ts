@@ -31,6 +31,24 @@ interface Entity {
   created_at: string;
 }
 
+/** Module-level cache: confirmed-provisioned slugs in this Vercel instance */
+const confirmedProvisioned = new Set<string>();
+
+async function ensureOrgSchema(orgSlug: string, client: Client): Promise<void> {
+  if (confirmedProvisioned.has(orgSlug)) return;
+  const safeSlug = orgSlug.replace(/-/g, '_');
+  const check = await client.query(
+    `SELECT 1 FROM information_schema.tables
+     WHERE table_schema = $1 AND table_name = 'entities' LIMIT 1`,
+    [`org_${safeSlug}`]
+  );
+  if ((check.rowCount ?? 0) === 0) {
+    await client.query(`SELECT platform.provision_org_schema($1)`, [orgSlug]);
+    console.info(`[entities] Auto-provisioned schema for org: ${orgSlug}`);
+  }
+  confirmedProvisioned.add(orgSlug);
+}
+
 export default async function handler(req: VercelReq, res: VercelRes) {
   setCors(res, 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -93,6 +111,10 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     const client = new Client({ connectionString: cs });
     try {
       await client.connect();
+      // Ensure org schema tables exist on first access (auto-heals failed migrations)
+      if (userType === 'org_member' && auth.orgSlug) {
+        await ensureOrgSchema(auth.orgSlug, client);
+      }
       const result = await client.query<Entity>(query, params);
       return res.status(200).json(result.rows);
     } finally {
@@ -100,6 +122,6 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     }
   } catch (err) {
     console.error('Error fetching entities:', err);
-    return res.status(500).json({ error: 'Failed to fetch entities' });
+    return res.status(500).json({ error: (err as Error).message });
   }
 }

@@ -18,6 +18,30 @@ import { getAuthContext } from '../lib/authHelper.js';
 import { setCors, qp } from '../lib/vercel-handler.js';
 import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
 
+/**
+ * Module-level cache: tracks which org slugs have been confirmed-provisioned
+ * in this Vercel instance. Resets only on cold starts.
+ * Prevents repeated information_schema checks on every warm request.
+ */
+const confirmedProvisioned = new Set<string>();
+
+/** Ensure org schema tables exist. No-op if already confirmed in this instance. */
+async function ensureOrgSchema(orgSlug: string, rq: typeof runQuery): Promise<void> {
+  if (confirmedProvisioned.has(orgSlug)) return;
+  const safeSlug = orgSlug.replace(/-/g, '_');
+  const check = await rq(
+    `SELECT 1 FROM information_schema.tables
+     WHERE table_schema = $1 AND table_name = 'transactions' LIMIT 1`,
+    [`org_${safeSlug}`]
+  );
+  if ((check.rowCount ?? 0) === 0) {
+    // Tables missing — provision now (idempotent stored procedure)
+    await rq(`SELECT platform.provision_org_schema($1)`, [orgSlug]);
+    console.info(`[transactions] Auto-provisioned schema for org: ${orgSlug}`);
+  }
+  confirmedProvisioned.add(orgSlug);
+}
+
 const getConnectionString = () =>
   process.env.DATABASE_URL ||
   process.env.NEON_POOLED_CONNECTION_STRING ||
@@ -93,6 +117,11 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           IsDeleted     CHAR(1)       DEFAULT 'N'
         );
       `);
+    }
+
+    // Ensure org schema tables exist on first access (auto-heals failed migrations)
+    if (userType === 'org_member' && auth.orgSlug) {
+      await ensureOrgSchema(auth.orgSlug, runQuery);
     }
 
     // ── GET ─────────────────────────────────────────────────────────────────
