@@ -9,7 +9,7 @@
  * "Open Demo Account" links to /trial which auto-authenticates as trial user.
  */
 import { SignIn } from '@clerk/react';
-import { BookOpen, BarChart3, Shield, Zap, ArrowRight } from 'lucide-react';
+import { BookOpen, BarChart3, Shield, ArrowRight } from 'lucide-react';
 
 const FEATURES = [
   { icon: BookOpen,  label: 'Khata & Ledger',     sub: 'Track every rupee in and out' },
@@ -39,11 +39,13 @@ export default function LoginScreen() {
 
           {/* Logo */}
           <div className="relative">
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
-                <Zap size={18} className="text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">KhataCloud</span>
+            <div className="flex items-center gap-3 mb-2">
+              <img
+                src="/logo.png"
+                alt="KhataCloud"
+                className="w-12 h-12 rounded-2xl object-cover shadow-lg shadow-black/40"
+              />
+              <span className="text-2xl font-bold tracking-tight">KhataCloud</span>
             </div>
             <p className="text-sm text-violet-200/80 leading-relaxed">
               Smart accounting &amp; reporting for educational institutions
@@ -84,10 +86,12 @@ export default function LoginScreen() {
         {/* ── RIGHT SIGN-IN PANEL ───────────────────────────────────────── */}
         <div className="flex-1 bg-slate-900 flex flex-col items-center justify-center px-6 py-10">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-8 md:hidden">
-            <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
-              <Zap size={16} className="text-white" />
-            </div>
+          <div className="flex items-center gap-2.5 mb-8 md:hidden">
+            <img
+              src="/logo.png"
+              alt="KhataCloud"
+              className="w-9 h-9 rounded-xl object-cover shadow-md shadow-black/30"
+            />
             <span className="text-base font-bold text-white tracking-tight">KhataCloud</span>
           </div>
 

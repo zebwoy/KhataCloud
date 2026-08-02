@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import {
   LayoutDashboard, Building2, Users, LogOut,
-  Menu, X, Zap, ChevronRight,
+  Menu, X, ChevronRight,
 } from 'lucide-react';
 
 export type SAPage = 'dashboard' | 'orgs' | 'users';
@@ -32,9 +32,11 @@ export default function SALayout({ page, setPage, userName, userEmail, onSignOut
       {/* Brand */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center shadow-md shadow-violet-900/40">
-            <Zap size={16} className="text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="KhataCloud"
+            className="w-9 h-9 rounded-xl object-cover shadow-md shadow-black/40"
+          />
           <div>
             <p className="text-sm font-bold text-white leading-none">KhataCloud</p>
             <p className="text-xs text-violet-400 mt-0.5">Admin Console</p>
@@ -112,7 +114,11 @@ export default function SALayout({ page, setPage, userName, userEmail, onSignOut
             {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2">
-            <Zap size={18} className="text-violet-400" />
+            <img
+              src="/logo.png"
+              alt="KhataCloud"
+              className="w-7 h-7 rounded-lg object-cover"
+            />
             <span className="text-sm font-semibold text-white">KhataCloud Admin</span>
           </div>
         </header>

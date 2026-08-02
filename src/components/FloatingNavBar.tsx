@@ -12,7 +12,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
-import { LayoutDashboard, BookOpen, BarChart2, ShieldAlert } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert } from 'lucide-react';
 
 interface FloatingNavBarProps {
   isAdmin:         boolean;
@@ -70,9 +70,11 @@ export default function FloatingNavBar({
       ">
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-            <LayoutDashboard size={12} className="text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="KhataCloud"
+            className="w-8 h-8 rounded-xl object-cover shadow-md shadow-black/30"
+          />
           <span className="text-sm font-bold text-white tracking-tight hidden lg:block">
             KhataCloud
           </span>
