@@ -40,11 +40,9 @@ export default function LoginScreen() {
           {/* Logo */}
           <div className="relative">
             <div className="flex items-center gap-3 mb-2">
-              <img
-                src="/logo.png"
-                alt="KhataCloud"
-                className="w-12 h-12 rounded-2xl object-cover shadow-lg shadow-black/40"
-              />
+              <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-black/40 shrink-0">
+                <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
+              </div>
               <span className="text-2xl font-bold tracking-tight">KhataCloud</span>
             </div>
             <p className="text-sm text-violet-200/80 leading-relaxed">
@@ -87,11 +85,9 @@ export default function LoginScreen() {
         <div className="flex-1 bg-slate-900 flex flex-col items-center justify-center px-6 py-10">
           {/* Mobile logo */}
           <div className="flex items-center gap-2.5 mb-8 md:hidden">
-            <img
-              src="/logo.png"
-              alt="KhataCloud"
-              className="w-9 h-9 rounded-xl object-cover shadow-md shadow-black/30"
-            />
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
+              <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
+            </div>
             <span className="text-base font-bold text-white tracking-tight">KhataCloud</span>
           </div>
 

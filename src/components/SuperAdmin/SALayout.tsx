@@ -32,11 +32,9 @@ export default function SALayout({ page, setPage, userName, userEmail, onSignOut
       {/* Brand */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <img
-            src="/logo.png"
-            alt="KhataCloud"
-            className="w-9 h-9 rounded-xl object-cover shadow-md shadow-black/40"
-          />
+          <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-black/40 shrink-0">
+            <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
+          </div>
           <div>
             <p className="text-sm font-bold text-white leading-none">KhataCloud</p>
             <p className="text-xs text-violet-400 mt-0.5">Admin Console</p>
@@ -114,11 +112,9 @@ export default function SALayout({ page, setPage, userName, userEmail, onSignOut
             {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
           <div className="flex items-center gap-2">
-            <img
-              src="/logo.png"
-              alt="KhataCloud"
-              className="w-7 h-7 rounded-lg object-cover"
-            />
+            <div className="w-7 h-7 rounded-lg overflow-hidden shrink-0">
+              <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
+            </div>
             <span className="text-sm font-semibold text-white">KhataCloud Admin</span>
           </div>
         </header>

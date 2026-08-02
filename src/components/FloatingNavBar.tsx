@@ -70,11 +70,9 @@ export default function FloatingNavBar({
       ">
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
-          <img
-            src="/logo.png"
-            alt="KhataCloud"
-            className="w-8 h-8 rounded-xl object-cover shadow-md shadow-black/30"
-          />
+          <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
+            <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
+          </div>
           <span className="text-sm font-bold text-white tracking-tight hidden lg:block">
             KhataCloud
           </span>
