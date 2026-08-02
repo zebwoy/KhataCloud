@@ -69,11 +69,15 @@ export default function FloatingNavBar({
   }, [showSubMenu]);
 
   const handleTransactionsClick = () => {
-    if (activeSection === 'transactions' && navStyle === 'pill') {
-      // Already here — toggle the sub-menu
-      setShowSubMenu(v => !v);
+    if (navStyle === 'pill') {
+      if (activeSection !== 'transactions') {
+        onSectionChange('transactions');
+        onSubViewChange('view');
+        setShowSubMenu(true);
+      } else {
+        setShowSubMenu(v => !v);
+      }
     } else {
-      // Navigate there, default to view, close any open menu
       onSectionChange('transactions');
       onSubViewChange('view');
       setShowSubMenu(false);

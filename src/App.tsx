@@ -70,6 +70,13 @@ export default function AccountingSystem({
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
   // In saasMode default to 'view'; otherwise 'add'
   const [activeTab, setActiveTab] = useState(saasMode ? (initialTab ?? 'view') : 'add');
+
+  // Sync initialTab prop changes from FloatingNavBar / RootApp to internal activeTab
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataError, setDataError] = useState('');
