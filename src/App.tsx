@@ -74,7 +74,9 @@ export default function AccountingSystem({
   // Sync initialTab prop changes from FloatingNavBar / RootApp to internal activeTab
   useEffect(() => {
     if (initialTab) {
+      handleCancelEdit();
       setActiveTab(initialTab);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [initialTab]);
   const [isLoadingData, setIsLoadingData] = useState(false);

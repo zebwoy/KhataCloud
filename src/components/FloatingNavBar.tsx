@@ -17,6 +17,51 @@ export interface FloatingNavBarProps {
   trialMode?: boolean;
 }
 
+interface SubMenuContentProps {
+  transactionSubView: 'view' | 'add';
+  onSubViewChange: (v: 'view' | 'add') => void;
+  onClose: () => void;
+}
+
+function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMenuContentProps) {
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSubViewChange('view');
+          onClose();
+        }}
+        className={`
+          flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
+          transition-all duration-150 w-full text-left
+          ${transactionSubView === 'view'
+            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
+            : 'text-slate-300 hover:text-white hover:bg-white/8'}
+        `}
+      >
+        <Eye size={14} /> All Transactions
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onSubViewChange('add');
+          onClose();
+        }}
+        className={`
+          flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
+          transition-all duration-150 w-full text-left
+          ${transactionSubView === 'add'
+            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
+            : 'text-slate-300 hover:text-white hover:bg-white/8'}
+        `}
+      >
+        <Plus size={14} /> New Transaction
+      </button>
+    </>
+  );
+}
+
 export default function FloatingNavBar({
   isAdmin,
   activeSection,
@@ -89,36 +134,6 @@ export default function FloatingNavBar({
     { key: 'reports', label: 'Reports', icon: BarChart2 },
     ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: ShieldAlert }] : []),
   ] as { key: 'transactions' | 'reports' | 'admin'; label: string; icon: React.ElementType }[];
-
-  // ── Sub-menu (shared content) ─────────────────────────────────────────────
-  const SubMenuContent = ({ onClose }: { onClose: () => void }) => (
-    <>
-      <button
-        onClick={() => { onSubViewChange('view'); onClose(); }}
-        className={`
-          flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
-          transition-all duration-150 w-full text-left
-          ${transactionSubView === 'view'
-            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
-            : 'text-slate-300 hover:text-white hover:bg-white/8'}
-        `}
-      >
-        <Eye size={14} /> All Transactions
-      </button>
-      <button
-        onClick={() => { onSubViewChange('add'); onClose(); }}
-        className={`
-          flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
-          transition-all duration-150 w-full text-left
-          ${transactionSubView === 'add'
-            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
-            : 'text-slate-300 hover:text-white hover:bg-white/8'}
-        `}
-      >
-        <Plus size={14} /> New Transaction
-      </button>
-    </>
-  );
 
   return (
     <>
@@ -208,7 +223,11 @@ export default function FloatingNavBar({
                   "
                   style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
                 >
-                  <SubMenuContent onClose={() => setTimeout(() => setShowSubMenu(false), 20)} />
+                  <SubMenuContent
+                    transactionSubView={transactionSubView}
+                    onSubViewChange={onSubViewChange}
+                    onClose={() => setTimeout(() => setShowSubMenu(false), 20)}
+                  />
                 </div>
               )}
             </div>
