@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
-import { ToggleLeft, ToggleRight, Save, Loader2 } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Save, Loader2, LayoutTemplate } from 'lucide-react';
 import { Spinner, Input, Button, Alert } from '../../ui';
 
 interface OrgSettings {
@@ -27,6 +27,9 @@ export default function OASettings(_props: Props) {
   const [accepting, setAccepting]     = useState(false);
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
+  const [navStyle, setNavStyle]       = useState<'pill' | 'classic'>(
+    () => (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic'
+  );
 
   const fetch_ = useCallback(async () => {
     setLoading(true);
@@ -136,6 +139,52 @@ export default function OASettings(_props: Props) {
             onChange={e => setContactEmail(e.target.value)}
             hint="Shown to super admin for correspondence."
           />
+        </div>
+
+        {/* Customization */}
+        <div className="border-t border-gray-100 dark:border-slate-800" />
+
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <LayoutTemplate size={14} className="text-violet-500" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Navigation Style</h3>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Controls how View/Add is surfaced for Transactions.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {(['pill', 'classic'] as const).map(style => (
+              <button
+                key={style}
+                id={`nav-style-${style}`}
+                onClick={() => {
+                  setNavStyle(style);
+                  localStorage.setItem('kc_nav_style', style);
+                }}
+                className={`
+                  rounded-xl border-2 p-3 text-left transition-all duration-200
+                  ${ navStyle === style
+                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/30'
+                    : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
+                  }
+                `}
+              >
+                <p className={`text-sm font-semibold mb-0.5 ${
+                  navStyle === style ? 'text-violet-700 dark:text-violet-300' : 'text-gray-800 dark:text-gray-200'
+                }`}>
+                  {style === 'pill' ? 'Sub-menu (Default)' : 'Classic Tabs'}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {style === 'pill'
+                    ? 'View / Add from nav link popup'
+                    : 'Toggle inside content area'}
+                </p>
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-2">
+            Applies immediately — reload to see the change.
+          </p>
         </div>
 
         {/* Feedback */}

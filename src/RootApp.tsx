@@ -19,7 +19,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser, AuthenticateWithRedirectCallback } from '@clerk/react';
-import { Zap } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import AccountingSystem from './App';
 import SuperAdminApp from './SuperAdminApp';
 import LoginScreen from './LoginScreen';
@@ -66,13 +66,59 @@ export default function RootApp() {
 
   if (route === 'home')         return null;
   if (route === 'sso-callback') return <AuthenticateWithRedirectCallback />;
-  if (route === 'trial')        return <AccountingSystem />;
+  if (route === 'trial')        return <TrialShell />;
   if (route === 'unknown') {
     window.location.replace('/auth');
     return <PageSpinner label="Redirecting…" />;
   }
 
   return <AuthenticatedShell route={route as 'auth' | 'admin' | 'app'} />;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TrialShell — wraps demo AccountingSystem with the same premium nav shell
+// ─────────────────────────────────────────────────────────────────────────────
+function TrialShell() {
+  type Section = 'transactions' | 'reports';
+  const [activeSection,      setActiveSection]      = useState<Section>('transactions');
+  const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
+  const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
+
+  const handleSectionChange = (s: Section | 'admin') => {
+    if (s === 'admin') return; // no admin in trial
+    setActiveSection(s);
+    if (s !== 'transactions') setTransactionSubView('view');
+  };
+
+  const handleSubViewChange = (v: 'view' | 'add') => {
+    setTransactionSubView(v);
+  };
+
+  const appTab =
+    activeSection === 'reports' ? 'report'
+    : navStyle === 'pill' ? transactionSubView
+    : 'view'; // classic: internal tabs handle view/add
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <FloatingNavBar
+        isAdmin={false}
+        activeSection={activeSection}
+        onSectionChange={handleSectionChange}
+        transactionSubView={transactionSubView}
+        onSubViewChange={handleSubViewChange}
+        navStyle={navStyle}
+        trialMode
+      />
+      <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+        <AccountingSystem
+          saasMode
+          initialTab={appTab}
+          navStyle={navStyle}
+        />
+      </div>
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,7 +173,7 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-900/30 border border-amber-800/50 mb-5">
-            <Zap size={24} className="text-amber-400" />
+            <AlertTriangle size={24} className="text-amber-400" />
           </div>
           <h1 className="text-xl font-bold text-white">Auth Unavailable</h1>
           <p className="text-sm text-slate-500 mt-3 leading-relaxed">
@@ -287,14 +333,28 @@ function OrgAppShell({
   const { signOut } = useAuth();
 
   type Section = 'transactions' | 'reports' | 'admin';
-  const [activeSection, setActiveSection] = useState<Section>('transactions');
-  const [bridged, setBridged]             = useState(false);
+  const [activeSection,      setActiveSection]      = useState<Section>('transactions');
+  const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
+  const [bridged,  setBridged]  = useState(false);
+  const [appReady, setAppReady] = useState(false);
+  const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
   const handleSignOut = async () => {
     sessionStorage.removeItem('madrasah_auth_token');
     sessionStorage.removeItem('madrasah_user_type');
     await signOut();
   };
+
+  const handleSectionChange = (s: Section) => {
+    setActiveSection(s);
+    if (s !== 'transactions') setTransactionSubView('view');
+  };
+
+  const handleSubViewChange = (v: 'view' | 'add') => {
+    setTransactionSubView(v);
+  };
+
+  const handleAppReady = useCallback(() => setAppReady(true), []);
 
   // Write Clerk JWT to sessionStorage for AccountingSystem's apiFetch
   // Also expose a global so apiFetch can call getToken() directly on every
@@ -329,29 +389,32 @@ function OrgAppShell({
   }, [getToken]);
 
   if (!bridged) return <PageSpinner label="Loading your account…" />;
+  if (!appReady) return <PageSpinner label="Loading your data…" />;
 
-  // Determine which App.tsx internal tab to show based on activeSection
+  // Determine which App.tsx internal tab to show based on activeSection + sub-view
   // NOTE: App.tsx uses 'report' (not 'reports') as the tab key
-  const appTab = activeSection === 'reports' ? 'report' : 'view';
+  const appTab =
+    activeSection === 'reports' ? 'report'
+    : navStyle === 'pill' ? transactionSubView
+    : 'view'; // classic mode: internal pill toggle manages view/add
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <FloatingNavBar
         isAdmin={isAdmin}
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={handleSectionChange}
+        transactionSubView={transactionSubView}
+        onSubViewChange={handleSubViewChange}
+        navStyle={navStyle}
         orgId={orgId}
       />
-      {/* Top padding to clear floating navbar, bottom padding for mobile tab bar */}
-      <div className="pt-20 pb-24 md:pb-6">
+      {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
+      <div className="pt-0 md:pt-20 pb-24 md:pb-6">
         {/*
           All three panels are ALWAYS mounted — switching sections just
-          toggles display:none.  This means:
-          - No re-fetching / re-initialising when coming back to a section
-          - No "Loading your data…" flash on Transactions after visiting Admin
-          - No "Loading admin…" flash when returning to Admin
-          The section-enter class triggers the fade-slide animation every
-          time a panel transitions from display:none → display:block.
+          toggles display:none.  No re-fetching / re-initialising.
+          .section-enter plays the fade-slide animation on reveal.
         */}
 
         {/* ── Transactions + Reports panel ── */}
@@ -363,6 +426,8 @@ function OrgAppShell({
             saasMode
             onSignOut={handleSignOut}
             initialTab={appTab}
+            navStyle={navStyle}
+            onReady={handleAppReady}
           />
         </div>
 

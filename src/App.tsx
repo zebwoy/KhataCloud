@@ -48,10 +48,14 @@ export default function AccountingSystem({
   saasMode = false,
   onSignOut,
   initialTab,
+  navStyle = 'pill',
+  onReady,
 }: {
-  saasMode?:    boolean;
-  onSignOut?:   () => void;
-  initialTab?:  string;     // 'view' | 'reports' — controlled by FloatingNavBar
+  saasMode?:   boolean;
+  onSignOut?:  () => void;
+  initialTab?: string;           // 'view' | 'add' | 'report' — from FloatingNavBar
+  navStyle?:   'pill' | 'classic'; // 'pill' = sub-menu handles view/add; 'classic' = inline toggle
+  onReady?:    () => void;       // called once when initial data fetch completes
 } = {}) {
   // Auth state + handlers (login, logout, user type selection)
   const {
@@ -73,7 +77,8 @@ export default function AccountingSystem({
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
-  
+  const hasCalledReady = useRef(false);
+
   interface ToastMessage {
     id: string;
     type: 'success' | 'error' | 'info';
@@ -222,6 +227,15 @@ export default function AccountingSystem({
       setTrusteeOptions([]);
     }
   }, [isLoggedIn, userType, fetchTransactions, fetchEntities]);
+
+  // Signal parent (OrgAppShell) that initial data load is done — fires once
+  useEffect(() => {
+    if (!isInitializing && !hasCalledReady.current) {
+      hasCalledReady.current = true;
+      onReady?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitializing]);
 
 
   // Helper function to filter transactions by date range
@@ -805,12 +819,10 @@ export default function AccountingSystem({
 
         {/* ── Tab controls ── */}
         {saasMode ? (
-          /* saasMode: compact pill toggle (View ↔ Add). Reports handled by FloatingNavBar. */
-          activeTab !== 'report' && (
-            <div
-              className="flex mb-6"
-              style={{ background: 'none' }}
-            >
+          /* saasMode pill: FloatingNavBar sub-menu controls view/add; nothing rendered here.
+             saasMode classic: show the inline pill toggle so users can switch view/add. */
+          navStyle === 'classic' && activeTab !== 'report' && (
+            <div className="flex mb-6" style={{ background: 'none' }}>
               <div className="inline-flex bg-slate-900 border border-white/10 rounded-2xl p-1 gap-1 shadow-xl">
                 <button
                   id="tab-view"
