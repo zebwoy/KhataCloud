@@ -63,7 +63,14 @@ async function resolveOrgSlug(
   orgSlugFromToken?: string
 ): Promise<string | null> {
   // Fast path — JWT template injects org_slug from org.publicMetadata
-  if (orgSlugFromToken) return orgSlugFromToken;
+  // IMPORTANT: validate the value before trusting it. Clerk JWT templates that
+  // haven't resolved (e.g. no active org session) can inject the raw Handlebars
+  // placeholder "{{org.publicMetadata.slug}}" as a literal string. If we use it
+  // as-is, the table name becomes org_{{...}}.transactions → PostgreSQL 42601.
+  const VALID_SLUG = /^[a-z0-9][a-z0-9-]{1,49}$/;
+  if (orgSlugFromToken && VALID_SLUG.test(orgSlugFromToken)) {
+    return orgSlugFromToken;
+  }
 
   // Fallback — DB lookup (used before JWT template is configured)
   const cs = getConnectionString();
