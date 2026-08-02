@@ -37,7 +37,15 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
   return fetch(url, { ...options, headers });
 };
 
-export default function AccountingSystem() {
+export default function AccountingSystem({
+  saasMode = false,
+  onSignOut,
+  initialTab,
+}: {
+  saasMode?:    boolean;
+  onSignOut?:   () => void;
+  initialTab?:  string;     // 'view' | 'reports' — controlled by FloatingNavBar
+} = {}) {
   // Auth state + handlers (login, logout, user type selection)
   const {
     isLoggedIn,
@@ -49,7 +57,8 @@ export default function AccountingSystem() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
-  const [activeTab, setActiveTab] = useState('add');
+  // In saasMode default to 'view'; otherwise 'add'
+  const [activeTab, setActiveTab] = useState(saasMode ? (initialTab ?? 'view') : 'add');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataError, setDataError] = useState('');
@@ -181,6 +190,14 @@ export default function AccountingSystem() {
       fetchSavedCounterparties();
     }
   }, [isLoggedIn, fetchSavedCounterparties]);
+
+  // In saasMode the logout button calls Clerk signOut; otherwise old flow
+  const effectiveLogout = saasMode && onSignOut ? onSignOut : handleLogout;
+
+  // Sync activeTab when FloatingNavBar switches between Transactions/Reports
+  useEffect(() => {
+    if (saasMode && initialTab) setActiveTab(initialTab);
+  }, [saasMode, initialTab]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -693,7 +710,8 @@ export default function AccountingSystem() {
   // progress. Once the token lands, isLoggedIn flips to true and the dashboard
   // renders. After a logout, handleLogout() itself navigates to /auth so this
   // branch is never reached post-logout.
-  if (!isLoggedIn) {
+  // Not logged in — redirect to /auth (skip in saasMode; token is set by OrgAppShell)
+  if (!isLoggedIn && !saasMode) {
     if (window.location.pathname === '/trial') {
       return <LoadingScreen label="Preparing demo account…" />;
     }
@@ -723,13 +741,16 @@ export default function AccountingSystem() {
         </div>
       )}
 
-      <Header
-        displayTitle={displayTitle}
-        userType={userType}
-        theme={theme}
-        onThemeChange={setTheme}
-        onLogout={handleLogout}
-      />
+      {/* Old header — hidden in saasMode (FloatingNavBar handles navigation + logout) */}
+      {!saasMode && (
+        <Header
+          displayTitle={displayTitle}
+          userType={userType}
+          theme={theme}
+          onThemeChange={setTheme}
+          onLogout={effectiveLogout}
+        />
+      )}
 
       <div className="max-w-6xl mx-auto p-4">
         {/* Dashboard Stats - All Time */}

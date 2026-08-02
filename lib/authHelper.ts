@@ -14,7 +14,7 @@
  * data APIs. The `orgRole` field distinguishes them where needed.
  */
 import { verifyJwt } from './jwt.js';
-import { verifyToken } from '@clerk/backend';
+import { verifyToken, createClerkClient as mkClerkClient } from '@clerk/backend';
 import { Client } from 'pg';
 
 export interface AuthContext {
@@ -124,8 +124,7 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
     // active yet. We query the Backend API to find their membership.
     if (!clerkOrgId) {
       try {
-        const { createClerkClient } = await import('@clerk/backend');
-        const clerkSDK = createClerkClient({
+        const clerkSDK = mkClerkClient({
           secretKey: process.env.CLERK_SECRET_KEY || '',
         });
         const memberships = await clerkSDK.users.getOrganizationMembershipList({

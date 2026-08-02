@@ -283,8 +283,18 @@ function OrgAppShell({
   orgSlug?:  string;
   orgId?:    string;
 }) {
-  const [activeSection, setActiveSection] = useState<'app' | 'admin'>('app');
+  // Get Clerk signOut directly — no need to thread it from AuthenticatedShell
+  const { signOut } = useAuth();
+
+  type Section = 'transactions' | 'reports' | 'admin';
+  const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [bridged, setBridged]             = useState(false);
+
+  const handleSignOut = async () => {
+    sessionStorage.removeItem('madrasah_auth_token');
+    sessionStorage.removeItem('madrasah_user_type');
+    await signOut();
+  };
 
   // Write Clerk JWT to sessionStorage for AccountingSystem's apiFetch
   useEffect(() => {
@@ -301,6 +311,7 @@ function OrgAppShell({
       }
     };
     writeToken();
+    // Refresh token before it expires (Clerk JWTs are ~60 min)
     const interval = setInterval(async () => {
       const fresh = await getToken().catch(() => null);
       if (fresh) sessionStorage.setItem('madrasah_auth_token', fresh);
@@ -310,6 +321,9 @@ function OrgAppShell({
 
   if (!bridged) return <PageSpinner label="Loading your account…" />;
 
+  // Determine which App.tsx internal tab to show based on activeSection
+  const appTab = activeSection === 'reports' ? 'reports' : 'view';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <FloatingNavBar
@@ -318,11 +332,15 @@ function OrgAppShell({
         onSectionChange={setActiveSection}
         orgId={orgId}
       />
-      {/* Top padding to clear floating navbar, bottom padding for mobile */}
+      {/* Top padding to clear floating navbar, bottom padding for mobile tab bar */}
       <div className="pt-20 pb-24 md:pb-6">
         {activeSection === 'admin' && isAdmin
           ? <OrgAdminApp orgSlug={orgSlug!} />
-          : <AccountingSystem />
+          : <AccountingSystem
+              saasMode
+              onSignOut={handleSignOut}
+              initialTab={appTab}
+            />
         }
       </div>
     </div>

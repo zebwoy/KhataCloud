@@ -12,12 +12,12 @@
  */
 import { useState, useEffect } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
-import { LayoutDashboard, BookOpen, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, BookOpen, BarChart2, ShieldAlert } from 'lucide-react';
 
 interface FloatingNavBarProps {
   isAdmin:         boolean;
-  activeSection:   'app' | 'admin';
-  onSectionChange: (s: 'app' | 'admin') => void;
+  activeSection:   'transactions' | 'reports' | 'admin';
+  onSectionChange: (s: 'transactions' | 'reports' | 'admin') => void;
   orgId?:          string;
 }
 
@@ -51,9 +51,10 @@ export default function FloatingNavBar({
   }, [isAdmin, orgId, getToken]);
 
   const navItems = [
-    { key: 'app',   label: 'Transactions', icon: BookOpen },
+    { key: 'transactions', label: 'Transactions', icon: BookOpen },
+    { key: 'reports',      label: 'Reports',      icon: BarChart2 },
     ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: ShieldAlert }] : []),
-  ] as { key: 'app' | 'admin'; label: string; icon: React.ElementType }[];
+  ] as { key: 'transactions' | 'reports' | 'admin'; label: string; icon: React.ElementType }[];
 
   return (
     <>
