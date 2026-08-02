@@ -96,10 +96,10 @@ export default function AccountingSystem({
   const [trusteeOptions, setTrusteeOptions] = useState<TrusteeOption[]>([]);
   const [isInitializing, setIsInitializing] = useState(() => {
     // Start as initializing if:
-    // a) Already logged in (prevents showing stale data on page refresh), OR
-    // b) On /trial without a token — auto-trial is about to fire. Starting as
-    //    true means when isLoggedIn flips to true the data-load spinner starts
-    //    immediately, preventing a one-frame flash of the empty dashboard.
+    // a) saasMode is true (always wait for Clerk / data fetch before ready)
+    // b) Already logged in (prevents showing stale data on page refresh), OR
+    // c) On /trial without a token — auto-trial is about to fire.
+    if (saasMode) return true;
     const isTrialPending =
       window.location.pathname === '/trial' &&
       !sessionStorage.getItem('madrasah_auth_token');

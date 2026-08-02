@@ -132,10 +132,10 @@ export default function FloatingNavBar({
         hidden md:flex
         fixed top-4 left-1/2 -translate-x-1/2 z-50
         items-center gap-1
-        bg-slate-900/80 backdrop-blur-xl
+        bg-slate-900/95 backdrop-blur-xl
         border border-white/10
         rounded-2xl px-3 py-2
-        shadow-2xl shadow-black/40
+        shadow-2xl shadow-black/50
       ">
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
@@ -220,9 +220,9 @@ export default function FloatingNavBar({
 
         <div className="w-px h-5 bg-white/10 mx-1" />
 
-        {/* Avatar — Clerk UserButton with "Settings" tooltip, or trial placeholder */}
+        {/* Avatar — Clerk UserButton aligned bottom-end, or trial placeholder */}
         {!trialMode ? (
-          <div className="relative group/avatar flex items-center px-1">
+          <div className="flex items-center px-1">
             <UserButton
               appearance={{
                 elements: {
@@ -230,16 +230,6 @@ export default function FloatingNavBar({
                 },
               }}
             />
-            {/* "Settings" tooltip overlay */}
-            <span className="
-              absolute -top-9 left-1/2 -translate-x-1/2
-              bg-slate-800 text-white text-xs px-2.5 py-1 rounded-lg
-              opacity-0 group-hover/avatar:opacity-100
-              transition-opacity duration-150 pointer-events-none whitespace-nowrap
-              border border-white/10 shadow-lg
-            ">
-              Settings
-            </span>
           </div>
         ) : (
           <div className="flex items-center px-1">

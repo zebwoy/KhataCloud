@@ -82,6 +82,7 @@ function TrialShell() {
   type Section = 'transactions' | 'reports';
   const [activeSection,      setActiveSection]      = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
+  const [appReady, setAppReady]                     = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
   const handleSectionChange = (s: Section | 'admin') => {
@@ -94,6 +95,8 @@ function TrialShell() {
     setTransactionSubView(v);
   };
 
+  const handleAppReady = useCallback(() => setAppReady(true), []);
+
   const appTab =
     activeSection === 'reports' ? 'report'
     : navStyle === 'pill' ? transactionSubView
@@ -101,21 +104,25 @@ function TrialShell() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <FloatingNavBar
-        isAdmin={false}
-        activeSection={activeSection}
-        onSectionChange={handleSectionChange}
-        transactionSubView={transactionSubView}
-        onSubViewChange={handleSubViewChange}
-        navStyle={navStyle}
-        trialMode
-      />
-      <div className="pt-0 md:pt-20 pb-24 md:pb-6">
-        <AccountingSystem
-          saasMode
-          initialTab={appTab}
+      {!appReady && <PageSpinner label="Preparing demo account…" />}
+      <div style={{ display: appReady ? 'block' : 'none' }}>
+        <FloatingNavBar
+          isAdmin={false}
+          activeSection={activeSection}
+          onSectionChange={handleSectionChange}
+          transactionSubView={transactionSubView}
+          onSubViewChange={handleSubViewChange}
           navStyle={navStyle}
+          trialMode
         />
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+          <AccountingSystem
+            saasMode
+            initialTab={appTab}
+            navStyle={navStyle}
+            onReady={handleAppReady}
+          />
+        </div>
       </div>
     </div>
   );
