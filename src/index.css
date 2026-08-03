@@ -244,6 +244,17 @@ body {
 }
 
 /* Master dark glass background on outer card */
+/* .cl-userButtonPopoverCard {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+  color: #f8fafc !important;
+  border-radius: 1rem !important;
+} */
+
 .cl-userButtonPopoverCard {
   background-color: rgba(15, 23, 42, 0.95) !important;
   background: rgba(15, 23, 42, 0.95) !important;
@@ -293,13 +304,26 @@ body {
 }
 
 /* Desktop: align right-edge of popup under the floating navbar avatar */
-@media (min-width: 768px) {
+/* @media (min-width: 768px) {
   .cl-userButtonPopoverCard {
-    margin-top: 10px !important;
+    margin-top: 6px !important;
     margin-left: -140px !important;
     transform: none !important;
   }
+} */
+
+/* Desktop positioning & layout rules */
+@media (min-width: 768px) {
+  .cl-userButtonPopoverCard {
+    margin-top: 6px !important;
+    margin-left: -140px !important;
+    transform: none !important;
+    /* Enforce the blur styles inside the media query blocks */
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
 }
+
 
 /* Mobile: center fixed container above bottom tab bar */
 @media (max-width: 767px) {
