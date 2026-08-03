@@ -62,38 +62,12 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
   );
 }
 
+// Clerk appearance config — ONLY avatarBox trigger styling.
+// All popover card visuals are handled exclusively by CSS in index.css
+// to avoid dual-layer conflicts (inline styles vs !important CSS).
 const clerkUserButtonAppearance = {
   elements: {
     avatarBox: 'w-8 h-8 ring-2 ring-white/20 hover:ring-violet-400/50 transition-all',
-    userButtonPopoverCard: {
-      backgroundColor: 'rgba(15, 23, 42, 0.92)',
-      backdropFilter: 'blur(3px)',
-      WebkitBackdropFilter: 'blur(3px)',
-      border: '1px solid rgba(255, 255, 255, 0.10)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.55)',
-      color: '#e2e8f0',
-    },
-    userPreviewMainIdentifier: {
-      color: '#ffffff',
-      fontWeight: '600',
-    },
-    userPreviewSecondaryIdentifier: {
-      color: '#9ca3af',
-    },
-    userButtonPopoverActionButton: {
-      color: '#cbd5e1',
-      '&:hover': {
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        color: '#ffffff',
-      },
-    },
-    userButtonPopoverActionButtonIcon: {
-      color: '#a78bfa',
-    },
-    userButtonPopoverFooter: {
-      borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-      backgroundColor: 'transparent',
-    },
   },
 };
 

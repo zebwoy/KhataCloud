@@ -227,23 +227,12 @@ body {
   }
 }
 
-/* ── Clerk UserButton popover — dark glass visual styling & alignment ─────── */
+/* ── Clerk UserButton popover — dark glass theme (single source of truth) ──── */
+/* All popover styling is here in CSS. FloatingNavBar.tsx appearance prop only
+   handles avatarBox. This eliminates the dual-layer conflict that caused the
+   recurring half-white / half-dark rendering bug. */
 
-/* Force transparent background on all internal Clerk wrappers */
-.cl-userButtonPopoverCard,
-.cl-userButtonPopoverCard *,
-.cl-userButtonPopoverCard div,
-.cl-userButtonPopoverCard main,
-.cl-userButtonPopoverCard section,
-.cl-userButtonPopoverCard header,
-.cl-card,
-.cl-userPreview,
-.cl-userButtonPopoverActions {
-  background-color: transparent !important;
-  background: transparent !important;
-}
-
-/* Master dark glass background on outer card */
+/* 1. Outer card: dark glass */
 .cl-userButtonPopoverCard {
   background-color: rgba(15, 23, 42, 0.95) !important;
   background: rgba(15, 23, 42, 0.95) !important;
@@ -255,24 +244,34 @@ body {
   border-radius: 1rem !important;
 }
 
-/* Text & typography colors */
-.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier,
-.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonText,
-.cl-userButtonPopoverCard span,
-.cl-userButtonPopoverCard p,
-.cl-userButtonPopoverCard h1,
-.cl-userButtonPopoverCard h2,
-.cl-userButtonPopoverCard h3 {
-  color: #ffffff !important;
+/* 2. Internal Clerk containers — strip their default white fills */
+.cl-userButtonPopoverCard .cl-internal-b3fm6y,
+.cl-userButtonPopoverCard .cl-card,
+.cl-userButtonPopoverCard .cl-userPreview,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActions,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
-.cl-userButtonPopoverCard .cl-userPreviewSecondaryIdentifier,
-.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
-.cl-userButtonPopoverCard .cl-userButtonPopoverFooter * {
+/* 3. Primary text (username, action labels) */
+.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonText {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* 4. Secondary text (email, footer) */
+.cl-userButtonPopoverCard .cl-userPreviewSecondaryIdentifier {
   color: #94a3b8 !important;
 }
 
-/* Buttons and hover highlights */
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter * {
+  color: #64748b !important;
+}
+
+/* 5. Action buttons & hover */
 .cl-userButtonPopoverCard .cl-userButtonPopoverActionButton {
   color: #cbd5e1 !important;
   border-radius: 0.5rem !important;
@@ -284,10 +283,12 @@ body {
   color: #ffffff !important;
 }
 
+/* 6. Action button icons — violet accent */
 .cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonIcon {
   color: #a78bfa !important;
 }
 
+/* 7. Footer separator */
 .cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
