@@ -208,12 +208,19 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
     if (!isSignedIn) return <LoginScreen />;
     if (roleState === 'checking') return <PageSpinner label="Signing you in…" />;
     if (roleState === 'super_admin') {
-      window.location.replace('/admin');
-      return <PageSpinner label="Redirecting to dashboard…" />;
+      window.history.replaceState({}, '', '/admin');
+      return <SuperAdminApp />;
     }
     if (roleState === 'org_admin' || roleState === 'org_member') {
-      window.location.replace('/app');
-      return <PageSpinner label="Loading your account…" />;
+      window.history.replaceState({}, '', '/app');
+      return (
+        <OrgAppShell
+          getToken={getToken}
+          isAdmin={roleState === 'org_admin'}
+          orgSlug={whoami?.orgSlug}
+          orgId={whoami?.orgId}
+        />
+      );
     }
     if (roleState === 'pending') {
       return (
@@ -239,13 +246,23 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
 
   // ── /admin ─────────────────────────────────────────────────────────────────
   if (route === 'admin') {
-    if (!isSignedIn) { window.location.replace('/auth'); return null; }
+    if (!isSignedIn) {
+      window.history.replaceState({}, '', '/auth');
+      return <LoginScreen />;
+    }
     if (roleState === 'checking') return <PageSpinner label="Verifying access…" />;
     if (roleState === 'super_admin') return <SuperAdminApp />;
     // Non-SA tried to access /admin → redirect to their correct destination
     if (roleState === 'org_admin' || roleState === 'org_member') {
-      window.location.replace('/app');
-      return <PageSpinner label="Loading your account…" />;
+      window.history.replaceState({}, '', '/app');
+      return (
+        <OrgAppShell
+          getToken={getToken}
+          isAdmin={roleState === 'org_admin'}
+          orgSlug={whoami?.orgSlug}
+          orgId={whoami?.orgId}
+        />
+      );
     }
     if (roleState === 'pending') {
       return (
@@ -269,7 +286,10 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   }
 
   // ── /app ───────────────────────────────────────────────────────────────────
-  if (!isSignedIn) { window.location.replace('/auth'); return null; }
+  if (!isSignedIn) {
+    window.history.replaceState({}, '', '/auth');
+    return <LoginScreen />;
+  }
   if (roleState === 'checking') return <PageSpinner label="Loading your account…" />;
 
   if (roleState === 'pending') {
