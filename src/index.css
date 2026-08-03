@@ -227,17 +227,68 @@ body {
   }
 }
 
-/* ── Clerk UserButton popover — responsive layout positioning ──────────────── */
+/* ── Clerk UserButton popover — dark glass visual styling & alignment ─────── */
 
-/* Desktop: align offset below top floating navbar avatar */
+/* Shared dark glass base styling for Clerk popover */
+.cl-userButtonPopoverCard {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Remove white background from Clerk internal containers */
+.cl-userButtonPopoverCard .cl-card,
+.cl-userButtonPopoverCard .cl-userPreview,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActions,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Text & label colors */
+.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.cl-userButtonPopoverCard .cl-userPreviewSecondaryIdentifier,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+  color: #9ca3af !important;
+}
+
+/* Buttons and hover effects */
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButton {
+  color: #cbd5e1 !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.15s ease !important;
+}
+
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButton:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonIcon {
+  color: #a78bfa !important;
+}
+
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Desktop: Shift container right to align cleanly with the top avatar */
 @media (min-width: 768px) {
   .cl-userButtonPopoverCard {
-    margin-top: 8px !important;
-    margin-left: -140px !important;
+    margin-top: 12px !important;
+    left: auto !important;
+    transform: translateX(110px) !important;
   }
 }
 
-/* Mobile: position above bottom tab bar as centered popover sheet */
+/* Mobile: center fixed container above bottom tab bar */
 @media (max-width: 767px) {
   .cl-userButtonPopoverCard {
     position: fixed !important;
