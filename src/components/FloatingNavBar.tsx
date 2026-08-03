@@ -154,10 +154,10 @@ export default function FloatingNavBar({
       <nav className="
         hidden md:flex
         fixed top-4 left-1/2 -translate-x-1/2 z-50
-        items-center gap-3
+        items-center gap-6
         bg-slate-900/70
         border border-white/10
-        rounded-2xl px-10 py-3
+        rounded-2xl px-10 py-0.5
         shadow-2xl shadow-black/50"
         style={{ backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }}
       >
@@ -173,7 +173,7 @@ export default function FloatingNavBar({
 
         <div className="w-px h-5 bg-white/10 mx-6" />
 
-        {/* Nav items — gap-4 group, px-8 py-3 per item */}
+        {/* Nav items */}
         <div className="flex items-center gap-4">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeSection === key;
@@ -193,11 +193,11 @@ export default function FloatingNavBar({
                   }
                 }}
                 className={`
-                  relative flex items-center gap-2.5 px-8 py-3 rounded-xl
+                  relative flex items-center gap-2.5 rounded-xl
                   text-sm font-medium transition-all duration-200
                   ${isActive
-                    ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
-                    : 'text-slate-400 hover:text-white hover:bg-white/8'
+                    ? 'px-6 py-1 bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
+                    : 'px-4 py-1 text-slate-400 hover:text-white hover:bg-white/8'
                   }
                 `}
               >
