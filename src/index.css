@@ -7,16 +7,30 @@
 /* ── Scrollbar utilities ───────────────────────────────────────────────── */
 /* Hide native scrollbar while keeping scroll functionality.               */
 /* Standard for premium dark UIs (Linear, Vercel, Notion, Figma).         */
-.scroll-hidden::-webkit-scrollbar { display: none; }
-.scroll-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* ── Section panel transition ──────────────────────────────────────────── */
 /* Applied to a panel when it becomes visible (display none → block).     */
 /* Browsers start @keyframes fresh when an element goes display:none→block */
 @keyframes sectionFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
+
 .section-enter {
   animation: sectionFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -24,18 +38,22 @@
 
 /* ── KhataCloud Design Tokens ──────────────────────────────────────────── */
 :root {
-  --kc-brand:        #7c3aed; /* violet-600 */
-  --kc-brand-dark:   #6d28d9; /* violet-700 */
-  --kc-brand-light:  #8b5cf6; /* violet-500 */
-  --kc-surface:      #ffffff;
-  --kc-surface-dark: #020617; /* slate-950  */
-  --kc-radius:       0.75rem;
+  --kc-brand: #7c3aed;
+  /* violet-600 */
+  --kc-brand-dark: #6d28d9;
+  /* violet-700 */
+  --kc-brand-light: #8b5cf6;
+  /* violet-500 */
+  --kc-surface: #ffffff;
+  --kc-surface-dark: #020617;
+  /* slate-950  */
+  --kc-radius: 0.75rem;
 }
 
 /* Apply Inter globally */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing:  antialiased;
+  -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin: 0;
 }
@@ -116,6 +134,7 @@ body {
     transform: translateY(1rem) scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: translateY(0) scale(1);
     opacity: 1;
@@ -132,23 +151,28 @@ body {
   font-family: inherit !important;
   background-color: transparent !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__header {
   background-color: transparent !important;
   border-bottom: none !important;
   padding-top: 0 !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__day-name,
 .react-datepicker-inline-container .react-datepicker__day {
   width: 2.25rem !important;
   line-height: 2.25rem !important;
   margin: 0.1rem !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__navigation {
   top: 2px !important;
 }
+
 .dark .react-datepicker-inline-container .react-datepicker__navigation-icon::before {
   border-color: #9ca3af !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__current-month {
   font-size: 0.875rem !important;
   font-weight: 700 !important;
@@ -161,10 +185,27 @@ body {
     background: white !important;
     color: black !important;
   }
-  header, nav, button, .no-print, input, select, .react-datepicker-wrapper, .react-datepicker, .react-datepicker__header {
+
+  header,
+  nav,
+  button,
+  .no-print,
+  input,
+  select,
+  .react-datepicker-wrapper,
+  .react-datepicker,
+  .react-datepicker__header {
     display: none !important;
   }
-  .max-w-6xl, .bg-white, .dark\:bg-black, .bg-gray-50, .shadow-xl, .shadow-2xl, .p-6, .p-4 {
+
+  .max-w-6xl,
+  .bg-white,
+  .dark\:bg-black,
+  .bg-gray-50,
+  .shadow-xl,
+  .shadow-2xl,
+  .p-6,
+  .p-4 {
     width: 100% !important;
     max-width: 100% !important;
     box-shadow: none !important;
@@ -173,12 +214,20 @@ body {
     padding: 0 !important;
     background: transparent !important;
   }
-  h1, h2, h3, h4, p, span, td, th {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  td,
+  th {
     color: black !important;
   }
 }
 
-/* Align Clerk user profile popover card with the right edge of the avatar */
+/* Align Clerk user profile popover card with the right edge of the avatar
 @media (min-width: 768px) {
   .cl-userButtonPopoverCard {
     margin-left: -150px !important;
@@ -193,5 +242,42 @@ body {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
   }
+} */
+
+/* Custom styling for Clerk user profile popover card */
+
+/* --- DESKTOP VIEW --- */
+@media (min-width: 768px) {
+  .cl-userButtonPopoverCard {
+    /* Uses standard absolute placement but lets you fine-tune offsets safely */
+    margin-top: 8px !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
 }
 
+/* --- MOBILE VIEW --- */
+@media (max-width: 767px) {
+  .cl-userButtonPopoverCard {
+    /* 1. Force override Clerk's inline positioning script */
+    position: fixed !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+
+    /* 2. Turn it into a modern full-width bottom sheet */
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    border-radius: 20px 20px 0 0 !important;
+    /* Rounded top corners for mobile */
+
+    /* 3. Keep your aesthetic styling */
+    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.3) !important;
+    /* Adjusted shadow direction for bottom sheet */
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-bottom: none !important;
+    /* Removes border at the very bottom edge of screen */
+  }
+}

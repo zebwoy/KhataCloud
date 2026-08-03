@@ -150,7 +150,7 @@ export default function FloatingNavBar({
         border border-white/10
         rounded-2xl px-3 py-2
         shadow-2xl shadow-black/50"
-        style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+        style={{ backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }}
       >
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 px-3 mr-1">
