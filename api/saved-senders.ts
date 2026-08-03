@@ -11,7 +11,7 @@
  *   org_member → org_{slug}.saved_senders
  *   admin      → public.saved_senders
  */
-import { Client } from 'pg';
+import { Client, QueryResultRow } from 'pg';
 import { getAuthContext } from '../lib/authHelper.js';
 import { setCors, qp } from '../lib/vercel-handler.js';
 import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
@@ -23,7 +23,7 @@ const getConnectionString = () =>
   process.env.NETLIFY_DATABASE_URL ||
   '';
 
-const runQuery = async <T = unknown>(
+const runQuery = async <T extends QueryResultRow = any>(
   query: string,
   params: unknown[] = []
 ): Promise<{ rows: T[] }> => {

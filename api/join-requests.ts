@@ -10,7 +10,6 @@
  *   DELETE ?action=cancel  → cancel own pending request
  */
 import { Client } from 'pg';
-import { createClerkClient } from '@clerk/backend';
 import { getAuthContext } from '../lib/authHelper.js';
 import { setCors, qp } from '../lib/vercel-handler.js';
 import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';

@@ -465,7 +465,7 @@ async function handleProvision(authCtx: any, req: VercelReq, client: Client): Pr
   if (!orgResult.rows.length)
     return err(`Org '${orgSlug}' not found or not approved`, 404);
 
-  const { id: orgId, clerk_org_id: clerkOrgId } = orgResult.rows[0];
+  const { clerk_org_id: clerkOrgId } = orgResult.rows[0];
   if (!clerkOrgId)
     return err(`Org '${orgSlug}' is not linked to Clerk yet — approve the org first`, 422);
 
