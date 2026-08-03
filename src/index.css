@@ -229,37 +229,50 @@ body {
 
 /* ── Clerk UserButton popover — dark glass visual styling & alignment ─────── */
 
-/* Shared dark glass base styling for Clerk popover */
-.cl-userButtonPopoverCard {
-  background-color: rgba(15, 23, 42, 0.92) !important;
-  backdrop-filter: blur(3px) !important;
-  -webkit-backdrop-filter: blur(3px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
-  color: #e2e8f0 !important;
-}
-
-/* Remove white background from Clerk internal containers */
-.cl-userButtonPopoverCard .cl-card,
-.cl-userButtonPopoverCard .cl-userPreview,
-.cl-userButtonPopoverCard .cl-userButtonPopoverActions,
-.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+/* Force transparent background on all internal Clerk wrappers */
+.cl-userButtonPopoverCard,
+.cl-userButtonPopoverCard *,
+.cl-userButtonPopoverCard div,
+.cl-userButtonPopoverCard main,
+.cl-userButtonPopoverCard section,
+.cl-userButtonPopoverCard header,
+.cl-card,
+.cl-userPreview,
+.cl-userButtonPopoverActions {
   background-color: transparent !important;
   background: transparent !important;
 }
 
-/* Text & label colors */
-.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier {
+/* Master dark glass background on outer card */
+.cl-userButtonPopoverCard {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+  color: #f8fafc !important;
+  border-radius: 1rem !important;
+}
+
+/* Text & typography colors */
+.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonText,
+.cl-userButtonPopoverCard span,
+.cl-userButtonPopoverCard p,
+.cl-userButtonPopoverCard h1,
+.cl-userButtonPopoverCard h2,
+.cl-userButtonPopoverCard h3 {
   color: #ffffff !important;
-  font-weight: 600 !important;
 }
 
 .cl-userButtonPopoverCard .cl-userPreviewSecondaryIdentifier,
-.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
-  color: #9ca3af !important;
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter * {
+  color: #94a3b8 !important;
 }
 
-/* Buttons and hover effects */
+/* Buttons and hover highlights */
 .cl-userButtonPopoverCard .cl-userButtonPopoverActionButton {
   color: #cbd5e1 !important;
   border-radius: 0.5rem !important;
@@ -279,12 +292,12 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Desktop: Shift container right to align cleanly with the top avatar */
+/* Desktop: align right-edge of popup under the floating navbar avatar */
 @media (min-width: 768px) {
   .cl-userButtonPopoverCard {
-    margin-top: 12px !important;
-    left: auto !important;
-    transform: translateX(110px) !important;
+    margin-top: 10px !important;
+    margin-left: -140px !important;
+    transform: none !important;
   }
 }
 
