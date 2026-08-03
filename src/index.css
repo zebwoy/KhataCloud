@@ -244,12 +244,19 @@ body {
   border-radius: 1rem !important;
 }
 
-/* 2. Internal Clerk containers — strip their default white fills */
-.cl-userButtonPopoverCard .cl-internal-b3fm6y,
+/* 2. Internal Clerk containers — strip ALL default white fills from internal elements */
+.cl-userButtonPopoverCard div,
+.cl-userButtonPopoverCard main,
+.cl-userButtonPopoverCard section,
+.cl-userButtonPopoverCard header,
+.cl-userButtonPopoverCard footer,
 .cl-userButtonPopoverCard .cl-card,
 .cl-userButtonPopoverCard .cl-userPreview,
+.cl-userButtonPopoverCard .cl-userButtonPopoverMain,
 .cl-userButtonPopoverCard .cl-userButtonPopoverActions,
-.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
+.cl-userButtonPopoverCard .cl-rootBox,
+.cl-userButtonPopoverCard .cl-popoverBox {
   background-color: transparent !important;
   background: transparent !important;
 }

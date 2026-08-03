@@ -115,7 +115,7 @@ function TrialShell() {
           navStyle={navStyle}
           trialMode
         />
-        <div className="pt-0 md:pt-20 pb-24 md:pb-6" style={{ paddingTop: '4rem' }}>
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
           <AccountingSystem
             saasMode
             initialTab={appTab}
@@ -418,7 +418,7 @@ function OrgAppShell({
           orgId={orgId}
         />
         {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
-        <div className="pt-0 md:pt-20 pb-24 md:pb-6" style={{ paddingTop: '4rem' }}>
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
           {/*
             All three panels are ALWAYS mounted — switching sections just
             toggles display:none.  No re-fetching / re-initialising.
