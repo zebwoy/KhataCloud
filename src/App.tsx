@@ -72,9 +72,11 @@ export default function AccountingSystem({
   const [activeTab, setActiveTab] = useState(saasMode ? (initialTab ?? 'view') : 'add');
 
   // Sync initialTab prop changes from FloatingNavBar / RootApp to internal activeTab
+  // NOTE: do NOT call handleCancelEdit here — it is defined at line ~605 (const, not hoisted).
+  // Calling it from this useEffect at line ~75 hits the temporal dead zone and silently
+  // aborts the effect before setActiveTab ever runs.
   useEffect(() => {
     if (initialTab) {
-      handleCancelEdit();
       setActiveTab(initialTab);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
