@@ -292,15 +292,7 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Desktop: align popover right-edge naturally beneath the avatar button */
-@media (min-width: 768px) {
-  .cl-userButtonPopoverCard {
-    margin-top: 8px !important;
-    right: 0 !important;
-    left: auto !important;
-    transform: none !important;
-  }
-}
+
 
 /* Mobile: center fixed container above bottom tab bar */
 @media (max-width: 767px) {
