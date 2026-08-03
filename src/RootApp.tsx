@@ -39,12 +39,12 @@ export type RoleState =
   | 'unauthorized';
 
 export interface WhoamiData {
-  userType:    string;
-  orgSlug?:    string;
-  orgRole?:    string;    // 'org:admin' | 'org:member'
-  orgId?:      string;
-  userId?:     string;
-  orgName?:    string;    // set when pending
+  userType: string;
+  orgSlug?: string;
+  orgRole?: string;    // 'org:admin' | 'org:member'
+  orgId?: string;
+  userId?: string;
+  orgName?: string;    // set when pending
   requestedAt?: string;  // set when pending
 }
 
@@ -52,21 +52,21 @@ type RouteType = 'home' | 'auth' | 'admin' | 'sso-callback' | 'trial' | 'app' | 
 
 function classifyRoute(): RouteType {
   const p = window.location.pathname;
-  if (p === '/')                              return 'home';
+  if (p === '/') return 'home';
   if (p === '/auth' || p.startsWith('/auth/')) return 'auth';
   if (p === '/admin' || p.startsWith('/admin/')) return 'admin';
-  if (p === '/sso-callback')                  return 'sso-callback';
-  if (p === '/trial')                         return 'trial';
-  if (p === '/app'  || p.startsWith('/app/'))  return 'app';
+  if (p === '/sso-callback') return 'sso-callback';
+  if (p === '/trial') return 'trial';
+  if (p === '/app' || p.startsWith('/app/')) return 'app';
   return 'unknown';
 }
 
 export default function RootApp() {
   const route = classifyRoute();
 
-  if (route === 'home')         return null;
+  if (route === 'home') return null;
   if (route === 'sso-callback') return <AuthenticateWithRedirectCallback />;
-  if (route === 'trial')        return <TrialShell />;
+  if (route === 'trial') return <TrialShell />;
   if (route === 'unknown') {
     window.location.replace('/auth');
     return <PageSpinner label="Redirecting…" />;
@@ -80,9 +80,9 @@ export default function RootApp() {
 // ─────────────────────────────────────────────────────────────────────────────
 function TrialShell() {
   type Section = 'transactions' | 'reports';
-  const [activeSection,      setActiveSection]      = useState<Section>('transactions');
+  const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
-  const [appReady, setAppReady]                     = useState(false);
+  const [appReady, setAppReady] = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
   const handleSectionChange = (s: Section | 'admin') => {
@@ -99,8 +99,8 @@ function TrialShell() {
 
   const appTab =
     activeSection === 'reports' ? 'report'
-    : navStyle === 'pill' ? transactionSubView
-    : 'view'; // classic: internal tabs handle view/add
+      : navStyle === 'pill' ? transactionSubView
+        : 'view'; // classic: internal tabs handle view/add
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -115,7 +115,7 @@ function TrialShell() {
           navStyle={navStyle}
           trialMode
         />
-        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6" style={{ paddingTop: '4rem' }}>
           <AccountingSystem
             saasMode
             initialTab={appTab}
@@ -132,8 +132,8 @@ function TrialShell() {
 function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
   const { user } = useUser();
-  const [roleState, setRoleState]     = useState<RoleState>('checking');
-  const [whoami, setWhoami]           = useState<WhoamiData | null>(null);
+  const [roleState, setRoleState] = useState<RoleState>('checking');
+  const [whoami, setWhoami] = useState<WhoamiData | null>(null);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
 
   useEffect(() => {
@@ -170,7 +170,7 @@ function AuthenticatedShell({ route }: { route: 'auth' | 'admin' | 'app' }) {
   }, [getToken]);
 
   useEffect(() => {
-    if (isLoaded && isSignedIn)  checkRole();
+    if (isLoaded && isSignedIn) checkRole();
     if (isLoaded && !isSignedIn) setRoleState('checking');
   }, [isLoaded, isSignedIn, checkRole]);
 
@@ -331,18 +331,18 @@ function OrgAppShell({
   orgSlug,
   orgId,
 }: {
-  getToken:  () => Promise<string | null>;
-  isAdmin:   boolean;
-  orgSlug?:  string;
-  orgId?:    string;
+  getToken: () => Promise<string | null>;
+  isAdmin: boolean;
+  orgSlug?: string;
+  orgId?: string;
 }) {
   // Get Clerk signOut directly — no need to thread it from AuthenticatedShell
   const { signOut } = useAuth();
 
   type Section = 'transactions' | 'reports' | 'admin';
-  const [activeSection,      setActiveSection]      = useState<Section>('transactions');
+  const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
-  const [bridged,  setBridged]  = useState(false);
+  const [bridged, setBridged] = useState(false);
   const [appReady, setAppReady] = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
@@ -401,8 +401,8 @@ function OrgAppShell({
   // NOTE: App.tsx uses 'report' (not 'reports') as the tab key
   const appTab =
     activeSection === 'reports' ? 'report'
-    : navStyle === 'pill' ? transactionSubView
-    : 'view'; // classic mode: internal pill toggle manages view/add
+      : navStyle === 'pill' ? transactionSubView
+        : 'view'; // classic mode: internal pill toggle manages view/add
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -418,7 +418,7 @@ function OrgAppShell({
           orgId={orgId}
         />
         {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
-        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+        <div className="pt-0 md:pt-20 pb-24 md:pb-6" style={{ paddingTop: '4rem' }}>
           {/*
             All three panels are ALWAYS mounted — switching sections just
             toggles display:none.  No re-fetching / re-initialising.

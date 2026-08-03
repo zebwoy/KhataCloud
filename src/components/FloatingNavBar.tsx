@@ -157,7 +157,7 @@ export default function FloatingNavBar({
         items-center gap-6
         bg-slate-900/70
         border border-white/10
-        rounded-2xl px-10 py-0.5
+        rounded-2xl px-10 py-1
         shadow-2xl shadow-black/50"
         style={{ backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }}
       >
@@ -175,43 +175,43 @@ export default function FloatingNavBar({
 
         {/* Nav items */}
         <div className="flex items-center gap-4">
-        {navItems.map(({ key, label, icon: Icon }) => {
-          const isActive = activeSection === key;
-          const hasBadge = key === 'admin' && pendingCount > 0;
-          const isTxn = key === 'transactions';
-          return (
-            <div key={key} className="relative">
-              <button
-                ref={isTxn ? txnBtnDesktopRef : undefined}
-                id={`nav-${key}`}
-                onClick={() => {
-                  if (isTxn) {
-                    handleTransactionsClick();
-                  } else {
-                    onSectionChange(key);
-                    setShowSubMenu(false);
-                  }
-                }}
-                className={`
+          {navItems.map(({ key, label, icon: Icon }) => {
+            const isActive = activeSection === key;
+            const hasBadge = key === 'admin' && pendingCount > 0;
+            const isTxn = key === 'transactions';
+            return (
+              <div key={key} className="relative">
+                <button
+                  ref={isTxn ? txnBtnDesktopRef : undefined}
+                  id={`nav-${key}`}
+                  onClick={() => {
+                    if (isTxn) {
+                      handleTransactionsClick();
+                    } else {
+                      onSectionChange(key);
+                      setShowSubMenu(false);
+                    }
+                  }}
+                  className={`
                   relative flex items-center gap-2.5 rounded-xl
                   text-sm font-medium transition-all duration-200
                   ${isActive
-                    ? 'px-6 py-1 bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
-                    : 'px-4 py-1 text-slate-400 hover:text-white hover:bg-white/8'
-                  }
+                      ? 'px-6 py-1 bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
+                      : 'px-4 py-1 text-slate-400 hover:text-white hover:bg-white/8'
+                    }
                 `}
-              >
-                <Icon size={15} />
-                {label}
-                {/* Sub-view indicator dot */}
-                {isTxn && isActive && navStyle === 'pill' && (
-                  <span className={`
+                >
+                  <Icon size={15} />
+                  {label}
+                  {/* Sub-view indicator dot */}
+                  {isTxn && isActive && navStyle === 'pill' && (
+                    <span className={`
                     w-1.5 h-1.5 rounded-full ml-0.5 shrink-0
                     ${transactionSubView === 'add' ? 'bg-emerald-400' : 'bg-white/30'}
                   `} />
-                )}
-                {hasBadge && (
-                  <span className="
+                  )}
+                  {hasBadge && (
+                    <span className="
                     absolute -top-1 -right-1
                     min-w-[18px] h-[18px] px-1
                     rounded-full bg-rose-500
@@ -219,34 +219,34 @@ export default function FloatingNavBar({
                     flex items-center justify-center
                     animate-pulse
                   ">
-                    {pendingCount > 9 ? '9+' : pendingCount}
-                  </span>
-                )}
-              </button>
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
+                </button>
 
-              {/* Desktop sub-menu popover */}
-              {isTxn && showSubMenu && navStyle === 'pill' && (
-                <div
-                  ref={subMenuDesktopRef}
-                  className="
+                {/* Desktop sub-menu popover */}
+                {isTxn && showSubMenu && navStyle === 'pill' && (
+                  <div
+                    ref={subMenuDesktopRef}
+                    className="
                     absolute top-full mt-3 left-0 z-50
                     bg-slate-900/70 border border-white/10
                     rounded-2xl p-1.5 shadow-2xl shadow-black/50
                     flex flex-col gap-0.5 min-w-[200px]
                     section-enter
                   "
-                  style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
-                >
-                  <SubMenuContent
-                    transactionSubView={transactionSubView}
-                    onSubViewChange={onSubViewChange}
-                    onClose={() => setTimeout(() => setShowSubMenu(false), 20)}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    style={{ backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+                  >
+                    <SubMenuContent
+                      transactionSubView={transactionSubView}
+                      onSubViewChange={onSubViewChange}
+                      onClose={() => setTimeout(() => setShowSubMenu(false), 20)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="w-px h-5 bg-white/10 mx-6" />
