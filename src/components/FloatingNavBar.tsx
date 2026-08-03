@@ -180,15 +180,15 @@ export default function FloatingNavBar({
       <nav className="
         hidden md:flex
         fixed top-4 left-1/2 -translate-x-1/2 z-50
-        items-center gap-1
+        items-center gap-2
         bg-slate-900/70
         border border-white/10
-        rounded-2xl px-3 py-2
+        rounded-2xl px-6 py-2.5
         shadow-2xl shadow-black/50"
         style={{ backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)' }}
       >
         {/* Logo / Brand */}
-        <div className="flex items-center gap-2 px-3 mr-1">
+        <div className="flex items-center gap-2.5 px-4 mr-2 shrink-0">
           <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
             <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
           </div>
@@ -197,9 +197,10 @@ export default function FloatingNavBar({
           </span>
         </div>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-4" />
 
-        {/* Nav items */}
+        {/* Nav items — gap-3 group, px-6 py-2.5 per item */}
+        <div className="flex items-center gap-3">
         {navItems.map(({ key, label, icon: Icon }) => {
           const isActive = activeSection === key;
           const hasBadge = key === 'admin' && pendingCount > 0;
@@ -218,7 +219,7 @@ export default function FloatingNavBar({
                   }
                 }}
                 className={`
-                  relative flex items-center gap-2 px-4 py-2 rounded-xl
+                  relative flex items-center gap-2 px-6 py-2.5 rounded-xl
                   text-sm font-medium transition-all duration-200
                   ${isActive
                     ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
@@ -272,16 +273,17 @@ export default function FloatingNavBar({
             </div>
           );
         })}
+        </div>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-4" />
 
         {/* Avatar — Clerk UserButton aligned bottom-end, or trial placeholder */}
         {!trialMode ? (
-          <div className="flex items-center px-1">
+          <div className="relative flex items-center px-2">
             <UserButton appearance={clerkUserButtonAppearance} />
           </div>
         ) : (
-          <div className="flex items-center px-1">
+          <div className="relative flex items-center px-2">
             <div className="w-8 h-8 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
               <User size={14} className="text-slate-400" />
             </div>
