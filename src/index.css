@@ -227,57 +227,26 @@ body {
   }
 }
 
-/* Align Clerk user profile popover card with the right edge of the avatar
+/* ── Clerk UserButton popover — responsive layout positioning ──────────────── */
+
+/* Desktop: align offset below top floating navbar avatar */
 @media (min-width: 768px) {
   .cl-userButtonPopoverCard {
-    margin-left: -150px !important;
     margin-top: 8px !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  }
-}
-@media (max-width: 767px) {
-  .cl-userButtonPopoverCard {
-    margin-bottom: 8px !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  }
-} */
-
-/* Custom styling for Clerk user profile popover card */
-
-/* --- DESKTOP VIEW --- */
-@media (min-width: 768px) {
-  .cl-userButtonPopoverCard {
-    /* Uses standard absolute placement but lets you fine-tune offsets safely */
-    margin-top: 8px !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    margin-left: -140px !important;
   }
 }
 
-/* --- MOBILE VIEW --- */
+/* Mobile: position above bottom tab bar as centered popover sheet */
 @media (max-width: 767px) {
   .cl-userButtonPopoverCard {
-    /* 1. Force override Clerk's inline positioning script */
     position: fixed !important;
     top: auto !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-
-    /* 2. Turn it into a modern full-width bottom sheet */
-    width: 100% !important;
-    max-width: 100% !important;
-    transform: none !important;
-    border-radius: 20px 20px 0 0 !important;
-    /* Rounded top corners for mobile */
-
-    /* 3. Keep your aesthetic styling */
-    box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.3) !important;
-    /* Adjusted shadow direction for bottom sheet */
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-bottom: none !important;
-    /* Removes border at the very bottom edge of screen */
+    bottom: 80px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: 360px !important;
+    border-radius: 1.25rem !important;
   }
 }
