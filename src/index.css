@@ -317,10 +317,10 @@ body {
   }
 }
 
-/* ── Left slide-in drawer animation for filter panel ─────────────────────── */
-@keyframes slideInLeft {
+/* ── Right slide-in drawer animation for filter panel ─────────────────────── */
+@keyframes slideInRight {
   from {
-    transform: translateX(-100%);
+    transform: translateX(100%);
     opacity: 0;
   }
   to {
@@ -329,6 +329,6 @@ body {
   }
 }
 
-.animate-slide-in-left {
-  animation: slideInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.animate-slide-in-right {
+  animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
