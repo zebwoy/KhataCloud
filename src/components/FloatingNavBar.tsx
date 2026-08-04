@@ -105,7 +105,12 @@ function TrialUserPopover({ onSignOut }: { onSignOut: () => void }) {
           <span className="text-[10px] text-slate-500 font-mono">(Unavailable)</span>
         </div>
         <button
-          onClick={onSignOut}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onSignOut();
+          }}
           className="flex items-center justify-between w-full px-3 py-2 rounded-xl text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left"
         >
           <span>Sign Out</span>
@@ -133,7 +138,7 @@ export default function FloatingNavBar({
   trialMode = false,
   onTrialSignOut,
 }: FloatingNavBarProps) {
-  const { getToken, signOut } = useAuth();
+  const { getToken } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
   const [showTrialUserPopover, setShowTrialUserPopover] = useState(false);
@@ -143,16 +148,10 @@ export default function FloatingNavBar({
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
   const trialUserRef = useRef<HTMLDivElement>(null);
 
-  // Default trial sign-out: clear session, sign out of Clerk if signed in, and navigate to /auth.
-  const handleTrialSignOut = onTrialSignOut ?? (async () => {
-    sessionStorage.removeItem('kc_auth_token');
-    sessionStorage.removeItem('kc_user_type');
-    try {
-      if (signOut) await signOut();
-    } catch {
-      /* ignore if not signed in to Clerk */
-    }
-    window.location.replace('/auth');
+  // Synchronous trial sign-out: clear session immediately and navigate to /auth
+  const handleTrialSignOut = onTrialSignOut ?? (() => {
+    sessionStorage.clear();
+    window.location.href = '/auth';
   });
 
   // Poll pending requests count every 60 s (org admins only)

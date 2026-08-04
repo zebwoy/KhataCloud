@@ -175,6 +175,10 @@ function TrialShell() {
           onSubViewChange={handleSubViewChange}
           navStyle={navStyle}
           trialMode
+          onTrialSignOut={() => {
+            sessionStorage.clear();
+            window.location.href = '/auth';
+          }}
         />
         <div style={{ paddingTop: '4rem' }}>
           {/* ── Transactions + Reports panel ── */}
@@ -512,6 +516,13 @@ function OrgAppShell({
           onSubViewChange={handleSubViewChange}
           navStyle={navStyle}
           orgId={orgId}
+          onTrialSignOut={() => {
+            sessionStorage.clear();
+            if (signOut) {
+              signOut().catch(() => {});
+            }
+            window.location.href = '/auth';
+          }}
         />
         {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
         <div className="pt-0 md:pt-20 pb-24 md:pb-6">
