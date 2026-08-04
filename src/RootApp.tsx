@@ -83,7 +83,38 @@ function TrialShell() {
   const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
   const [appReady, setAppReady] = useState(false);
+  const [trialReady, setTrialReady] = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
+
+  useEffect(() => {
+    // Clear any Clerk token getter left over from authenticated sessions
+    delete (window as any).__getClerkToken;
+
+    const currentType = sessionStorage.getItem('madrasah_user_type');
+    const currentToken = sessionStorage.getItem('madrasah_auth_token');
+
+    if (currentToken && currentType === 'trial') {
+      setTrialReady(true);
+      return;
+    }
+
+    // Force set user type to 'trial' and fetch a fresh trial JWT
+    sessionStorage.setItem('madrasah_user_type', 'trial');
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userType: 'trial' }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          sessionStorage.setItem('madrasah_auth_token', data.token);
+          sessionStorage.setItem('madrasah_user_type', 'trial');
+        }
+      })
+      .catch((err) => console.error('[TrialShell] Auth error:', err))
+      .finally(() => setTrialReady(true));
+  }, []);
 
   const handleSectionChange = (s: Section) => {
     setActiveSection(s);
@@ -100,6 +131,10 @@ function TrialShell() {
     activeSection === 'reports' ? 'report'
       : navStyle === 'pill' ? transactionSubView
         : 'view'; // classic: internal tabs handle view/add
+
+  if (!trialReady) {
+    return <PageSpinner label="Preparing demo account…" />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -121,6 +156,7 @@ function TrialShell() {
             className={activeSection !== 'admin' ? 'section-enter' : ''}
           >
             <AccountingSystem
+              saasMode
               initialTab={appTab}
               navStyle={navStyle}
               onReady={handleAppReady}
