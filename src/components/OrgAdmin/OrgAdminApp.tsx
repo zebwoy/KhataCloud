@@ -18,14 +18,16 @@ type AdminTab = 'members' | 'requests' | 'provision' | 'audit' | 'settings';
 
 interface Props {
   orgSlug: string;
+  trialMode?: boolean;
 }
 
-export default function OrgAdminApp({ orgSlug }: Props) {
+export default function OrgAdminApp({ orgSlug, trialMode = false }: Props) {
   const { getToken }      = useAuth();
   const [tab, setTab]     = useState<AdminTab>('members');
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(trialMode ? 1 : 0);
 
   useEffect(() => {
+    if (trialMode) return;
     const fetchCount = async () => {
       try {
         const token = await getToken();
@@ -41,7 +43,7 @@ export default function OrgAdminApp({ orgSlug }: Props) {
     fetchCount();
     const interval = setInterval(fetchCount, 30_000);
     return () => clearInterval(interval);
-  }, [getToken]);
+  }, [getToken, trialMode]);
 
   const tabs = [
     { key: 'members',   label: 'Members',   icon: Users },
@@ -53,6 +55,20 @@ export default function OrgAdminApp({ orgSlug }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto px-4">
+      {/* Demo Banner */}
+      {trialMode && (
+        <div className="mb-6 p-3.5 rounded-xl bg-violet-950/40 border border-violet-500/20 text-violet-300 text-xs flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold text-[10px] uppercase tracking-wide">
+              Demo Mode
+            </span>
+            <span>
+              Exploring Admin Capabilities — Member actions are read-only; Customization is fully interactive!
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 pt-2">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
@@ -89,11 +105,11 @@ export default function OrgAdminApp({ orgSlug }: Props) {
 
       {/* Tab content */}
       <div>
-        {tab === 'members'   && <OAMembers   />}
-        {tab === 'requests'  && <OARequests  onCountChange={setPendingCount} />}
-        {tab === 'provision' && <OAProvision onDone={() => setTab('members')} />}
-        {tab === 'audit'     && <OAAudit     orgSlug={orgSlug} />}
-        {tab === 'settings'  && <OASettings  />}
+        {tab === 'members'   && <OAMembers   trialMode={trialMode} />}
+        {tab === 'requests'  && <OARequests  onCountChange={setPendingCount} trialMode={trialMode} />}
+        {tab === 'provision' && <OAProvision onDone={() => setTab('members')} trialMode={trialMode} />}
+        {tab === 'audit'     && <OAAudit     orgSlug={orgSlug} trialMode={trialMode} />}
+        {tab === 'settings'  && <OASettings  trialMode={trialMode} />}
       </div>
     </div>
   );

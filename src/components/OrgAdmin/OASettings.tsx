@@ -16,15 +16,28 @@ interface OrgSettings {
   notes:              string | null;
 }
 
-interface Props { orgSlug?: string; }
+interface Props {
+  orgSlug?: string;
+  trialMode?: boolean;
+}
 
-export default function OASettings(_props: Props) {
+const DEMO_SETTINGS: OrgSettings = {
+  id: 'demo-org-101',
+  name: 'Demo Organisation / Madrasah',
+  slug: 'demo',
+  plan: 'Enterprise (Demo)',
+  contact_email: 'demo@khata.cloud',
+  accepting_requests: true,
+  notes: null,
+};
+
+export default function OASettings({ trialMode = false }: Props) {
   const { getToken } = useAuth();
-  const [settings, setSettings]       = useState<OrgSettings | null>(null);
-  const [loading, setLoading]         = useState(true);
+  const [settings, setSettings]       = useState<OrgSettings | null>(trialMode ? DEMO_SETTINGS : null);
+  const [loading, setLoading]         = useState(!trialMode);
   const [saving, setSaving]           = useState(false);
-  const [contactEmail, setContactEmail] = useState('');
-  const [accepting, setAccepting]     = useState(false);
+  const [contactEmail, setContactEmail] = useState(trialMode ? 'demo@khata.cloud' : '');
+  const [accepting, setAccepting]     = useState(trialMode ? true : false);
   const [success, setSuccess]         = useState('');
   const [error, setError]             = useState('');
   const [navStyle, setNavStyle]       = useState<'pill' | 'classic'>(
@@ -32,6 +45,7 @@ export default function OASettings(_props: Props) {
   );
 
   const fetch_ = useCallback(async () => {
+    if (trialMode) return;
     setLoading(true);
     try {
       const token = await getToken();
@@ -45,11 +59,12 @@ export default function OASettings(_props: Props) {
         setAccepting(d.accepting_requests);
       }
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [getToken, trialMode]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
   const handleSave = async () => {
+    if (trialMode) return;
     setSaving(true); setError(''); setSuccess('');
     try {
       const token = await getToken();
@@ -136,6 +151,7 @@ export default function OASettings(_props: Props) {
             type="email"
             placeholder="admin@yourorg.com"
             value={contactEmail}
+            disabled={trialMode}
             onChange={e => setContactEmail(e.target.value)}
             hint="Shown to super admin for correspondence."
           />
@@ -149,11 +165,11 @@ export default function OASettings(_props: Props) {
           id="btn-save-settings"
           variant="primary"
           fullWidth
-          disabled={saving}
+          disabled={trialMode || saving}
           onClick={handleSave}
           leftIcon={saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
         >
-          {saving ? 'Saving…' : 'Save Settings'}
+          {trialMode ? 'Save Settings (Demo Mode Locked)' : saving ? 'Saving…' : 'Save Settings'}
         </Button>
       </div>
 

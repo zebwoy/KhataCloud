@@ -6,9 +6,12 @@ import { useAuth } from '@clerk/react';
 import { UserPlus, Copy, Check, Loader2 } from 'lucide-react';
 import { Input, Button, Alert } from '../../ui';
 
-interface Props { onDone: () => void; }
+interface Props {
+  onDone: () => void;
+  trialMode?: boolean;
+}
 
-export default function OAProvision({ onDone }: Props) {
+export default function OAProvision({ onDone, trialMode = false }: Props) {
   const { getToken } = useAuth();
   const [name,  setName]  = useState('');
   const [email, setEmail] = useState('');
@@ -18,6 +21,7 @@ export default function OAProvision({ onDone }: Props) {
   const [error, setError]         = useState('');
 
   const handleSubmit = async () => {
+    if (trialMode) return;
     if (!name.trim() || !email.trim()) { setError('Name and email are required'); return; }
     setLoading(true); setError(''); setSignInUrl(null);
     try {
@@ -97,6 +101,12 @@ export default function OAProvision({ onDone }: Props) {
           </div>
         </div>
 
+        {trialMode && (
+          <Alert variant="info" className="mb-4">
+            Member invitations and provisioning are locked in demo mode.
+          </Alert>
+        )}
+
         {error && (
           <Alert variant="error" className="mb-4">{error}</Alert>
         )}
@@ -107,6 +117,7 @@ export default function OAProvision({ onDone }: Props) {
             label="Full Name"
             placeholder="Zaid Ahmad"
             value={name}
+            disabled={trialMode}
             onChange={e => setName(e.target.value)}
           />
           <Input
@@ -115,6 +126,7 @@ export default function OAProvision({ onDone }: Props) {
             type="email"
             placeholder="zaid@example.com"
             value={email}
+            disabled={trialMode}
             onChange={e => setEmail(e.target.value)}
           />
         </div>
@@ -128,11 +140,11 @@ export default function OAProvision({ onDone }: Props) {
             id="btn-add-member"
             variant="primary"
             fullWidth
-            disabled={loading}
+            disabled={trialMode || loading}
             onClick={handleSubmit}
             leftIcon={loading ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
           >
-            {loading ? 'Creating account…' : 'Create Member & Get Link'}
+            {trialMode ? 'Create Member (Demo Mode Locked)' : loading ? 'Creating account…' : 'Create Member & Get Link'}
           </Button>
         </div>
       </div>

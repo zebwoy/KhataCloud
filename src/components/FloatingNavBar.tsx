@@ -4,7 +4,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
-import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, User } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Eye, Plus } from 'lucide-react';
 
 export interface FloatingNavBarProps {
   isAdmin: boolean;
@@ -71,6 +71,53 @@ const clerkUserButtonAppearance = {
   },
 };
 
+function TrialUserPopover() {
+  return (
+    <div
+      className="
+        absolute top-full mt-3 right-0 z-50
+        bg-slate-900/95 backdrop-blur-xl border border-white/10
+        rounded-2xl p-4 shadow-2xl shadow-black/80
+        flex flex-col gap-3 min-w-[270px]
+        section-enter text-left
+      "
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* User Header */}
+      <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 ring-2 ring-white/20 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-md">
+          DA
+        </div>
+        <div className="overflow-hidden">
+          <h4 className="text-sm font-semibold text-white truncate">Demo Administrator</h4>
+          <p className="text-xs text-slate-400 truncate">demo@khata.cloud</p>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[10px] font-medium">
+            Demo Account • Read Only
+          </span>
+        </div>
+      </div>
+
+      {/* Profile Actions */}
+      <div className="flex flex-col gap-1 py-1">
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-400 bg-white/5 opacity-65 cursor-not-allowed">
+          <span>Manage Account</span>
+          <span className="text-[10px] text-slate-500 font-mono">(Unavailable)</span>
+        </div>
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-400 bg-white/5 opacity-65 cursor-not-allowed">
+          <span>Sign Out</span>
+          <span className="text-[10px] text-slate-500 font-mono">(Demo Mode)</span>
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-white/10 text-center">
+        <p className="text-[11px] text-slate-400">
+          Viewing interactive live demo. Settings and customisation are active.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function FloatingNavBar({
   isAdmin,
   activeSection,
@@ -84,10 +131,12 @@ export default function FloatingNavBar({
   const { getToken } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
+  const [showTrialUserPopover, setShowTrialUserPopover] = useState(false);
   const subMenuDesktopRef = useRef<HTMLDivElement>(null);
   const subMenuMobileRef = useRef<HTMLDivElement>(null);
   const txnBtnDesktopRef = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
+  const trialUserRef = useRef<HTMLDivElement>(null);
 
   // Poll pending requests count every 60 s (org admins only)
   useEffect(() => {
@@ -109,22 +158,27 @@ export default function FloatingNavBar({
     return () => clearInterval(interval);
   }, [isAdmin, orgId, getToken, trialMode]);
 
-  // Close sub-menu on outside click
+  // Close sub-menu & trial user popover on outside click
   useEffect(() => {
-    if (!showSubMenu) return;
+    if (!showSubMenu && !showTrialUserPopover) return;
     const handler = (e: MouseEvent) => {
       const t = e.target as Node;
       const inDesktopMenu = subMenuDesktopRef.current?.contains(t);
       const inMobileMenu = subMenuMobileRef.current?.contains(t);
       const inDesktopBtn = txnBtnDesktopRef.current?.contains(t);
       const inMobileBtn = txnBtnMobileRef.current?.contains(t);
+      const inTrialUser = trialUserRef.current?.contains(t);
+
       if (!inDesktopMenu && !inMobileMenu && !inDesktopBtn && !inMobileBtn) {
         setShowSubMenu(false);
+      }
+      if (!inTrialUser) {
+        setShowTrialUserPopover(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [showSubMenu]);
+  }, [showSubMenu, showTrialUserPopover]);
 
   const handleTransactionsClick = () => {
     if (navStyle === 'pill') {
@@ -142,10 +196,12 @@ export default function FloatingNavBar({
     }
   };
 
+  const showAdmin = isAdmin || trialMode;
+
   const navItems = [
     { key: 'transactions', label: 'Transactions', icon: BookOpen },
     { key: 'reports', label: 'Reports', icon: BarChart2 },
-    ...(isAdmin ? [{ key: 'admin', label: 'Admin', icon: ShieldAlert }] : []),
+    ...(showAdmin ? [{ key: 'admin', label: 'Admin', icon: ShieldAlert }] : []),
   ] as { key: 'transactions' | 'reports' | 'admin'; label: string; icon: React.ElementType }[];
 
   return (
@@ -251,16 +307,21 @@ export default function FloatingNavBar({
 
         <div className="w-px h-5 bg-white/10 mx-6" />
 
-        {/* Avatar — Clerk UserButton aligned bottom-end, or trial placeholder */}
+        {/* Avatar — Clerk UserButton or trial mode popover avatar */}
         {!trialMode ? (
           <div className="flex items-center px-3">
             <UserButton appearance={clerkUserButtonAppearance} />
           </div>
         ) : (
-          <div className="flex items-center px-3">
-            <div className="w-8 h-8 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
-              <User size={14} className="text-slate-400" />
-            </div>
+          <div ref={trialUserRef} className="relative flex items-center px-3">
+            <button
+              onClick={() => setShowTrialUserPopover(v => !v)}
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 ring-2 ring-white/20 hover:ring-violet-400/50 transition-all flex items-center justify-center text-white font-bold text-xs shadow-md"
+              title="Demo Administrator (Click for info)"
+            >
+              DA
+            </button>
+            {showTrialUserPopover && <TrialUserPopover />}
           </div>
         )}
       </nav>
@@ -389,11 +450,16 @@ export default function FloatingNavBar({
               <span className="text-[10px] font-medium text-slate-500">Settings</span>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-1 px-4 py-2 min-w-[60px]">
-              <div className="p-1.5 w-9 h-9 rounded-full bg-slate-700 border border-white/10 flex items-center justify-center">
-                <User size={14} className="text-slate-400" />
-              </div>
-              <span className="text-[10px] font-medium text-slate-500">Trial</span>
+            <div ref={trialUserRef} className="relative flex flex-col items-center gap-1 px-4 py-2 min-w-[60px]">
+              <button
+                onClick={() => setShowTrialUserPopover(v => !v)}
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 ring-2 ring-white/20 hover:ring-violet-400/50 transition-all flex items-center justify-center text-white font-bold text-xs shadow-md"
+                title="Demo Administrator"
+              >
+                DA
+              </button>
+              <span className="text-[10px] font-medium text-slate-400">Trial</span>
+              {showTrialUserPopover && <TrialUserPopover />}
             </div>
           )}
         </div>

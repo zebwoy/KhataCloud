@@ -27,15 +27,54 @@ const ACTION_LABEL: Record<string, { label: string; variant: 'success' | 'danger
   delete_transaction:   { label: 'Deleted txn',  variant: 'danger'  },
 };
 
-export default function OAAudit({ orgSlug: _orgSlug }: { orgSlug: string }) {
+interface Props {
+  orgSlug: string;
+  trialMode?: boolean;
+}
+
+const DEMO_AUDIT_ENTRIES: AuditEntry[] = [
+  {
+    id: 101,
+    user_id: 'user_demo_admin',
+    user_role: 'org:admin',
+    action: 'create_transaction',
+    entity_type: 'transaction',
+    entity_id: 'txn_101',
+    summary: 'Created Income transaction: ₹5,000 for Monthly Fees',
+    created_at: new Date(Date.now() - 3600_000 * 2).toISOString(),
+  },
+  {
+    id: 102,
+    user_id: 'user_demo_admin',
+    user_role: 'org:admin',
+    action: 'approve_join_request',
+    entity_type: 'join_request',
+    entity_id: 'req_202',
+    summary: 'Approved member request for Abdur Rauf',
+    created_at: new Date(Date.now() - 3600_000 * 24).toISOString(),
+  },
+  {
+    id: 103,
+    user_id: 'user_demo_admin',
+    user_role: 'org:admin',
+    action: 'provision_member',
+    entity_type: 'member',
+    entity_id: 'usr_303',
+    summary: 'Provisioned demo account for Ayman Shafi',
+    created_at: new Date(Date.now() - 3600_000 * 48).toISOString(),
+  },
+];
+
+export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props) {
   const { getToken }      = useAuth();
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [entries, setEntries] = useState<AuditEntry[]>(trialMode ? DEMO_AUDIT_ENTRIES : []);
   const [page, setPage]   = useState(1);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState(trialMode ? DEMO_AUDIT_ENTRIES.length : 0);
   const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!trialMode);
 
   const fetch_ = useCallback(async (p: number) => {
+    if (trialMode) return;
     setLoading(true);
     try {
       const token = await getToken();
@@ -49,7 +88,7 @@ export default function OAAudit({ orgSlug: _orgSlug }: { orgSlug: string }) {
         setTotalPages(d.totalPages ?? 1);
       }
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [getToken, trialMode]);
 
   useEffect(() => { fetch_(page); }, [fetch_, page]);
 

@@ -79,14 +79,13 @@ export default function RootApp() {
 // TrialShell — wraps demo AccountingSystem with the same premium nav shell
 // ─────────────────────────────────────────────────────────────────────────────
 function TrialShell() {
-  type Section = 'transactions' | 'reports';
+  type Section = 'transactions' | 'reports' | 'admin';
   const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
   const [appReady, setAppReady] = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
-  const handleSectionChange = (s: Section | 'admin') => {
-    if (s === 'admin') return; // no admin in trial
+  const handleSectionChange = (s: Section) => {
     setActiveSection(s);
     if (s !== 'transactions') setTransactionSubView('view');
   };
@@ -107,7 +106,7 @@ function TrialShell() {
       {!appReady && <PageSpinner label="Preparing demo account…" />}
       <div style={{ display: appReady ? 'block' : 'none' }}>
         <FloatingNavBar
-          isAdmin={false}
+          isAdmin={true}
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
           transactionSubView={transactionSubView}
@@ -116,12 +115,26 @@ function TrialShell() {
           trialMode
         />
         <div className="pt-0 md:pt-20 pb-24 md:pb-6">
-          <AccountingSystem
-            saasMode
-            initialTab={appTab}
-            navStyle={navStyle}
-            onReady={handleAppReady}
-          />
+          {/* ── Transactions + Reports panel ── */}
+          <div
+            style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
+            className={activeSection !== 'admin' ? 'section-enter' : ''}
+          >
+            <AccountingSystem
+              saasMode
+              initialTab={appTab}
+              navStyle={navStyle}
+              onReady={handleAppReady}
+            />
+          </div>
+
+          {/* ── Admin panel (demo view) ── */}
+          <div
+            style={{ display: activeSection === 'admin' ? 'block' : 'none' }}
+            className={activeSection === 'admin' ? 'section-enter' : ''}
+          >
+            <OrgAdminApp orgSlug="demo" trialMode />
+          </div>
         </div>
       </div>
     </div>

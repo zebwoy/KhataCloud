@@ -16,15 +16,26 @@ interface Member {
   joinedAt:  string;
 }
 
-interface Props { orgSlug?: string; }
+interface Props {
+  orgSlug?: string;
+  trialMode?: boolean;
+}
 
-export default function OAMembers(_props: Props) {
+const DEMO_MEMBERS: Member[] = [
+  { userId: 'demo-1', firstName: 'Demo', lastName: 'Admin', email: 'demo@khata.cloud', imageUrl: '', role: 'org:admin', joinedAt: '2026-01-01' },
+  { userId: 'demo-2', firstName: 'Abdur', lastName: 'Rauf', email: 'abdurrauf@example.com', imageUrl: '', role: 'org:member', joinedAt: '2026-01-15' },
+  { userId: 'demo-3', firstName: 'Ayman', lastName: 'Shafi', email: 'ayman@example.com', imageUrl: '', role: 'org:member', joinedAt: '2026-02-01' },
+  { userId: 'demo-4', firstName: 'Rahib', lastName: 'Ahmed', email: 'rahib@example.com', imageUrl: '', role: 'org:member', joinedAt: '2026-02-10' },
+];
+
+export default function OAMembers({ trialMode = false }: Props) {
   const { getToken }         = useAuth();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<Member[]>(trialMode ? DEMO_MEMBERS : []);
+  const [loading, setLoading] = useState(!trialMode);
   const [removing, setRemoving] = useState<string | null>(null);
 
   const fetch_ = useCallback(async () => {
+    if (trialMode) return;
     setLoading(true);
     try {
       const token = await getToken();
@@ -36,11 +47,12 @@ export default function OAMembers(_props: Props) {
         setMembers(d.members ?? []);
       }
     } finally { setLoading(false); }
-  }, [getToken]);
+  }, [getToken, trialMode]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
   const handleRemove = async (member: Member) => {
+    if (trialMode) return;
     if (!confirm(`Remove ${member.firstName} ${member.lastName} from this organisation?`)) return;
     setRemoving(member.userId);
     try {
@@ -96,10 +108,11 @@ export default function OAMembers(_props: Props) {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemove(m)}
-                      disabled={removing === m.userId}
+                      disabled={trialMode || removing === m.userId}
                       leftIcon={<UserX size={13} />}
+                      title={trialMode ? 'Member management is locked in demo mode' : undefined}
                     >
-                      Remove
+                      {trialMode ? 'Remove (Demo Mode)' : 'Remove'}
                     </Button>
                   )}
                 </div>

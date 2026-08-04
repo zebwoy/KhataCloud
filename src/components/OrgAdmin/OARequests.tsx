@@ -19,16 +19,30 @@ interface JoinRequest {
 
 interface Props {
   onCountChange: (n: number) => void;
+  trialMode?: boolean;
 }
 
-export default function OARequests({ onCountChange }: Props) {
+const DEMO_REQUESTS: JoinRequest[] = [
+  {
+    id: 'req-demo-1',
+    user_id: 'user-zaid',
+    status: 'pending',
+    requested_at: new Date().toISOString(),
+    email: 'zaid@example.com',
+    firstName: 'Zaid',
+    lastName: 'Khan',
+  },
+];
+
+export default function OARequests({ onCountChange, trialMode = false }: Props) {
   const { getToken }           = useAuth();
-  const [requests, setRequests] = useState<JoinRequest[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [requests, setRequests] = useState<JoinRequest[]>(trialMode ? DEMO_REQUESTS : []);
+  const [loading, setLoading]   = useState(!trialMode);
   const [acting, setActing]     = useState<string | null>(null);
   const [toast, setToast]       = useState('');
 
   const fetch_ = useCallback(async () => {
+    if (trialMode) return;
     setLoading(true);
     try {
       const token = await getToken();
@@ -41,11 +55,12 @@ export default function OARequests({ onCountChange }: Props) {
         onCountChange(data.length);
       }
     } finally { setLoading(false); }
-  }, [getToken, onCountChange]);
+  }, [getToken, onCountChange, trialMode]);
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
   const act = async (requestId: string, action: 'approve' | 'reject') => {
+    if (trialMode) return;
     setActing(requestId);
     try {
       const token = await getToken();
@@ -110,21 +125,21 @@ export default function OARequests({ onCountChange }: Props) {
                       id={`approve-${req.id}`}
                       variant="primary"
                       size="sm"
-                      disabled={acting === req.id}
+                      disabled={trialMode || acting === req.id}
                       onClick={() => act(req.id, 'approve')}
                       leftIcon={<Check size={13} />}
                     >
-                      Approve
+                      {trialMode ? 'Approve (Demo Mode)' : 'Approve'}
                     </Button>
                     <Button
                       id={`reject-${req.id}`}
                       variant="outline"
                       size="sm"
-                      disabled={acting === req.id}
+                      disabled={trialMode || acting === req.id}
                       onClick={() => act(req.id, 'reject')}
                       leftIcon={<X size={13} />}
                     >
-                      Reject
+                      {trialMode ? 'Reject (Demo Mode)' : 'Reject'}
                     </Button>
                   </div>
                 </li>
