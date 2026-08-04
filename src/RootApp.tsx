@@ -114,7 +114,7 @@ function TrialShell() {
           navStyle={navStyle}
           trialMode
         />
-        <div className="pt-0 md:pt-20 pb-24 md:pb-6">
+        <div style={{ paddingTop: '4rem' }}>
           {/* ── Transactions + Reports panel ── */}
           <div
             style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
