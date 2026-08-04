@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
-import { ToggleLeft, ToggleRight, Save, Loader2, LayoutTemplate } from 'lucide-react';
+import { Save, Loader2, LayoutTemplate } from 'lucide-react';
 import { Spinner, Input, Button, Alert } from '../../ui';
 
 interface OrgSettings {
@@ -134,10 +134,6 @@ export default function OASettings({ trialMode = false }: Props) {
             <span className={`text-sm font-medium transition-colors ${accepting ? 'text-violet-600 dark:text-violet-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {accepting ? 'Accepting new members' : 'Not accepting requests'}
             </span>
-            {accepting
-              ? <ToggleRight size={20} className="ml-auto text-violet-500" />
-              : <ToggleLeft  size={20} className="ml-auto text-gray-400" />
-            }
           </button>
         </div>
 

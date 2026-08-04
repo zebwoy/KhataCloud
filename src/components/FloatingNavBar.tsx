@@ -15,6 +15,7 @@ export interface FloatingNavBarProps {
   navStyle?: 'pill' | 'classic';
   orgId?: string;
   trialMode?: boolean;
+  onTrialSignOut?: () => void;
 }
 
 interface SubMenuContentProps {
@@ -71,7 +72,7 @@ const clerkUserButtonAppearance = {
   },
 };
 
-function TrialUserPopover() {
+function TrialUserPopover({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div
       className="
@@ -103,10 +104,13 @@ function TrialUserPopover() {
           <span>Manage Account</span>
           <span className="text-[10px] text-slate-500 font-mono">(Unavailable)</span>
         </div>
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-400 bg-white/5 opacity-65 cursor-not-allowed">
+        <button
+          onClick={onSignOut}
+          className="flex items-center justify-between w-full px-3 py-2 rounded-xl text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left"
+        >
           <span>Sign Out</span>
-          <span className="text-[10px] text-slate-500 font-mono">(Demo Mode)</span>
-        </div>
+          <span className="text-[10px] text-rose-500/70 font-mono">→ /auth</span>
+        </button>
       </div>
 
       <div className="pt-2 border-t border-white/10 text-center">
@@ -127,6 +131,7 @@ export default function FloatingNavBar({
   navStyle = 'pill',
   orgId,
   trialMode = false,
+  onTrialSignOut,
 }: FloatingNavBarProps) {
   const { getToken } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
@@ -137,6 +142,13 @@ export default function FloatingNavBar({
   const txnBtnDesktopRef = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
   const trialUserRef = useRef<HTMLDivElement>(null);
+
+  // Default trial sign-out: clear session and go to /auth
+  const handleTrialSignOut = onTrialSignOut ?? (() => {
+    sessionStorage.removeItem('kc_auth_token');
+    sessionStorage.removeItem('kc_user_type');
+    window.location.replace('/auth');
+  });
 
   // Poll pending requests count every 60 s (org admins only)
   useEffect(() => {
@@ -321,7 +333,7 @@ export default function FloatingNavBar({
             >
               DA
             </button>
-            {showTrialUserPopover && <TrialUserPopover />}
+            {showTrialUserPopover && <TrialUserPopover onSignOut={handleTrialSignOut} />}
           </div>
         )}
       </nav>
@@ -459,7 +471,7 @@ export default function FloatingNavBar({
                 DA
               </button>
               <span className="text-[10px] font-medium text-slate-400">Trial</span>
-              {showTrialUserPopover && <TrialUserPopover />}
+              {showTrialUserPopover && <TrialUserPopover onSignOut={handleTrialSignOut} />}
             </div>
           )}
         </div>

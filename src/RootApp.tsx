@@ -19,7 +19,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth, useUser, AuthenticateWithRedirectCallback } from '@clerk/react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ChevronUp } from 'lucide-react';
 import AccountingSystem from './App';
 import SuperAdminApp from './SuperAdminApp';
 import LoginScreen from './LoginScreen';
@@ -28,6 +28,33 @@ import OrgSelectionScreen from './components/OrgSelectionScreen';
 import PendingApprovalScreen from './components/PendingApprovalScreen';
 import OrgAdminApp from './components/OrgAdmin/OrgAdminApp';
 import { PageSpinner } from './ui';
+
+// ── Shared go-to-top button — shown on all shells after 300px scroll ──────────
+function GoToTopButton() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setVisible(window.scrollY > 300);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  if (!visible) return null;
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      aria-label="Back to top"
+      className="
+        fixed bottom-24 md:bottom-8 right-4 md:right-6 z-40
+        w-10 h-10 rounded-full
+        bg-violet-600 hover:bg-violet-500 active:scale-95
+        text-white shadow-lg shadow-violet-500/30
+        flex items-center justify-center
+        transition-all duration-200
+      "
+    >
+      <ChevronUp size={20} strokeWidth={2.5} />
+    </button>
+  );
+}
 
 export type RoleState =
   | 'checking'
@@ -172,6 +199,7 @@ function TrialShell() {
           </div>
         </div>
       </div>
+      <GoToTopButton />
     </div>
   );
 }
@@ -487,12 +515,6 @@ function OrgAppShell({
         />
         {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
         <div className="pt-0 md:pt-20 pb-24 md:pb-6">
-          {/*
-            All three panels are ALWAYS mounted — switching sections just
-            toggles display:none.  No re-fetching / re-initialising.
-            .section-enter plays the fade-slide animation on reveal.
-          */}
-
           {/* ── Transactions + Reports panel ── */}
           <div
             style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
@@ -518,6 +540,7 @@ function OrgAppShell({
           )}
         </div>
       </div>
+      <GoToTopButton />
     </div>
   );
 }
