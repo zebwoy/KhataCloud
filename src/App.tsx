@@ -41,7 +41,25 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
-  return fetch(url, { ...options, headers });
+
+  let res = await fetch(url, { ...options, headers });
+
+  // If 401 Unauthorized occurs, try getting a fresh Clerk token and retry once
+  if (res.status === 401 && clerkGetter) {
+    try {
+      const freshToken = await clerkGetter();
+      if (freshToken && freshToken !== token) {
+        sessionStorage.setItem('madrasah_auth_token', freshToken);
+        const retryHeaders = {
+          ...options.headers,
+          'Authorization': `Bearer ${freshToken}`,
+        };
+        res = await fetch(url, { ...options, headers: retryHeaders });
+      }
+    } catch { /* ignore retry errors */ }
+  }
+
+  return res;
 };
 
 export default function AccountingSystem({

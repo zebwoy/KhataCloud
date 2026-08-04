@@ -63,16 +63,12 @@ async function resolveOrgSlug(
   orgSlugFromToken?: string
 ): Promise<string | null> {
   // Fast path — JWT template injects org_slug from org.publicMetadata
-  // IMPORTANT: validate the value before trusting it. Clerk JWT templates that
-  // haven't resolved (e.g. no active org session) can inject the raw Handlebars
-  // placeholder "{{org.publicMetadata.slug}}" as a literal string. If we use it
-  // as-is, the table name becomes org_{{...}}.transactions → PostgreSQL 42601.
   const VALID_SLUG = /^[a-z0-9][a-z0-9-]{1,49}$/;
   if (orgSlugFromToken && VALID_SLUG.test(orgSlugFromToken)) {
     return orgSlugFromToken;
   }
 
-  // Fallback — DB lookup (used before JWT template is configured)
+  // Fallback — DB lookup by clerk_org_id
   const cs = getConnectionString();
   if (!cs) return null;
   const client = new Client({ connectionString: cs });
@@ -80,11 +76,14 @@ async function resolveOrgSlug(
     await client.connect();
     const r = await client.query<{ slug: string }>(
       `SELECT slug FROM platform.orgs
-       WHERE clerk_org_id = $1 AND status = 'approved' AND schema_provisioned = TRUE
+       WHERE clerk_org_id = $1
        LIMIT 1`,
       [clerkOrgId]
     );
     return r.rows[0]?.slug ?? null;
+  } catch (err) {
+    console.error('[authHelper] resolveOrgSlug DB lookup error:', err);
+    return null;
   } finally {
     await client.end();
   }
@@ -109,16 +108,19 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
     return { userType: legacyPayload.userType as 'admin' | 'trial' };
   }
 
+  const secretKey =
+    process.env.CLERK_SECRET_KEY ||
+    process.env.VITE_CLERK_SECRET_KEY ||
+    '';
+
   // ── 2. Clerk JWT ──────────────────────────────────────────────────────────
   try {
     const payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY || '',
+      secretKey,
     });
     const userId        = payload.sub;
     let clerkOrgId      = (payload as any).org_id   as string | undefined;
     let clerkOrgRole    = (payload as any).org_role  as string | undefined;
-    // Custom claim injected by JWT template (Clerk Dashboard → Configure → Sessions):
-    //   { "org_slug": "{{org.publicMetadata.slug}}" }
     const orgSlugFromToken = (payload as any).org_slug as string | undefined;
 
     // Super admin check (always first)
@@ -126,13 +128,10 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
     if (isSA) return { userType: 'super_admin', userId };
 
     // ── Fallback: if no active org in JWT, query Clerk for memberships ──────
-    // Clerk only puts org_id/org_role in the JWT when the user has an active org
-    // session. On first sign-in (e.g. via provisioned sign-in link), no org is
-    // active yet. We query the Backend API to find their membership.
     if (!clerkOrgId) {
       try {
         const clerkSDK = mkClerkClient({
-          secretKey: process.env.CLERK_SECRET_KEY || '',
+          secretKey,
         });
         const memberships = await clerkSDK.users.getOrganizationMembershipList({
           userId,
@@ -143,7 +142,9 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
           clerkOrgId   = m.organization.id;
           clerkOrgRole = m.role;
         }
-      } catch { /* ignore — proceed as no_org */ }
+      } catch (err) {
+        console.warn('[authHelper] Failed to fetch organization memberships for user:', userId, err);
+      }
     }
 
     // User is in a Clerk org
@@ -162,7 +163,8 @@ export async function getAuthContext(req: HttpRequest): Promise<AuthContext | nu
 
     // Authenticated but no org assigned yet
     return { userType: 'no_org', userId };
-  } catch {
+  } catch (err) {
+    console.error('[authHelper] Clerk verifyToken failed:', err);
     return null;
   }
 }
