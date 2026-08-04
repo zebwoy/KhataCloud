@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, Edit, X, SlidersHorizontal, Search } from 'lucide-react';
 import type { Transaction, TrusteeOption } from '../types';
 import { defaultColumnFilter } from '../types';
@@ -70,7 +71,9 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
     Transfer: 'bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300 font-semibold shadow-sm',
   };
 
-  return (
+  // Portal to document.body so fixed positioning is always relative to the
+  // viewport, never to any ancestor stacking/transform/overflow context.
+  return createPortal(
     <>
       {/*
         Invisible click-guard — covers only the page content area below the navbar.
@@ -280,7 +283,8 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
           </button>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
