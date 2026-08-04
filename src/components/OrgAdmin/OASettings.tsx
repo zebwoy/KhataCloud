@@ -123,7 +123,7 @@ export default function OASettings({ trialMode = false }: Props) {
           >
             <div className={`
               relative w-12 h-6 rounded-full transition-all duration-300
-              ${accepting ? 'bg-violet-600' : 'bg-gray-300 dark:bg-slate-700'}
+              ${accepting ? 'bg-emerald-600' : 'bg-gray-300 dark:bg-slate-700'}
             `}>
               <div className={`
                 absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm
@@ -131,7 +131,7 @@ export default function OASettings({ trialMode = false }: Props) {
                 ${accepting ? 'translate-x-6' : 'translate-x-0'}
               `} />
             </div>
-            <span className={`text-sm font-medium transition-colors ${accepting ? 'text-violet-600 dark:text-violet-400' : 'text-gray-500 dark:text-gray-400'}`}>
+            <span className={`text-sm font-medium transition-colors ${accepting ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}`}>
               {accepting ? 'Accepting new members' : 'Not accepting requests'}
             </span>
           </button>

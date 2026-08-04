@@ -107,7 +107,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 dark:border-slate-800/80 shrink-0 bg-white/50 dark:bg-slate-900/50">
           <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <SlidersHorizontal size={17} />
             </div>
             Filters &amp; Sort
@@ -116,7 +116,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
             {table.hasActiveFilters() && (
               <button
                 onClick={table.clearAllFilters}
-                className="text-xs text-violet-600 dark:text-violet-400 font-semibold hover:underline"
+                className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline"
               >
                 Clear all
               </button>
@@ -148,8 +148,8 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                     }}
                     className={`text-xs px-3.5 py-1.5 rounded-full border font-medium transition-all ${
                       active
-                        ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-500/25 font-semibold'
-                        : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400/60 hover:bg-violet-500/5'
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/25 font-semibold'
+                        : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-emerald-400/60 hover:bg-emerald-500/5'
                     }`}
                   >
                     {o.label}
@@ -193,7 +193,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                 <button
                   key={p.label}
                   onClick={() => setQuickPreset(p.from)}
-                  className="text-xs px-3.5 py-1.5 rounded-full border border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
+                  className="text-xs px-3.5 py-1.5 rounded-full border border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all"
                 >
                   {p.label}
                 </button>
@@ -205,7 +205,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                 <input
                   type="date" value={activeDateFrom}
                   onChange={e => table.updateFilter('date', { ...cf.date, dateFrom: e.target.value })}
-                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600 transition-all"
                 />
               </div>
               <div>
@@ -213,7 +213,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                 <input
                   type="date" value={activeDateTo}
                   onChange={e => table.updateFilter('date', { ...cf.date, dateTo: e.target.value })}
-                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600 transition-all"
                 />
               </div>
             </div>
@@ -228,7 +228,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                 <input
                   type="number" placeholder="0" value={activeAmountMin}
                   onChange={e => table.updateFilter('amount', { ...cf.amount, amountMin: e.target.value })}
-                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600 transition-all"
                 />
               </div>
               <div>
@@ -236,7 +236,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                 <input
                   type="number" placeholder="No limit" value={activeAmountMax}
                   onChange={e => table.updateFilter('amount', { ...cf.amount, amountMax: e.target.value })}
-                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600 transition-all"
                 />
               </div>
             </div>
@@ -260,8 +260,8 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                       }}
                       className={`text-xs px-3.5 py-1.5 rounded-full border font-medium transition-all ${
                         selected
-                          ? 'bg-violet-500/15 border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold shadow-sm'
-                          : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400/60'
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm'
+                          : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-emerald-400/60'
                       }`}
                     >
                       {opt}
@@ -277,7 +277,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
         <div className="px-6 py-4 border-t border-gray-200/60 dark:border-slate-800 shrink-0 bg-white/50 dark:bg-slate-900/50">
           <button
             onClick={onClose}
-            className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-500/25 active:scale-[0.99]"
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-amber-500 hover:from-emerald-500 hover:to-amber-400 text-white text-sm font-semibold transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.99]"
           >
             Done
           </button>
@@ -360,7 +360,7 @@ export default function TransactionTable({
             placeholder="Search transactions… (Press /)"
             value={table.searchQuery}
             onChange={e => table.setSearchQuery(e.target.value)}
-            className="pl-9 pr-9 py-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all shadow-sm"
+            className="pl-9 pr-9 py-2.5 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600 text-sm transition-all shadow-sm"
           />
           {table.searchQuery && (
             <button
@@ -380,7 +380,7 @@ export default function TransactionTable({
             relative flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium
             transition-all duration-150 shrink-0
             ${ filterCount > 0
-              ? 'bg-violet-50 border-violet-300 text-violet-700 dark:bg-violet-950/30 dark:border-violet-700 dark:text-violet-300'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-300'
               : 'border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700'
             }
           `}
@@ -390,7 +390,7 @@ export default function TransactionTable({
           {filterCount > 0 && (
             <span className="
               min-w-[20px] h-5 px-1 rounded-full
-              bg-violet-600 text-white text-[10px] font-bold
+              bg-gradient-to-r from-emerald-600 to-amber-500 text-white text-[10px] font-bold
               flex items-center justify-center
             ">
               {filterCount}
@@ -420,7 +420,7 @@ export default function TransactionTable({
       {filterCount > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {(table.columnFilters.category?.selectedValues ?? []).map(cat => (
-            <span key={cat} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+            <span key={cat} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
               {cat}
               <button onClick={() => {
                 const next = (table.columnFilters.category?.selectedValues ?? []).filter(v => v !== cat);
@@ -429,13 +429,13 @@ export default function TransactionTable({
             </span>
           ))}
           {(table.columnFilters.date?.dateFrom || table.columnFilters.date?.dateTo) && (
-            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
               {table.columnFilters.date?.dateFrom || '*'} → {table.columnFilters.date?.dateTo || '*'}
               <button onClick={() => table.updateFilter('date', { ...defaultColumnFilter })}><X size={11} /></button>
             </span>
           )}
           {(table.columnFilters.custodian?.selectedValues ?? []).map(c => (
-            <span key={c} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+            <span key={c} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
               {c}
               <button onClick={() => {
                 const next = (table.columnFilters.custodian?.selectedValues ?? []).filter(v => v !== c);
@@ -444,7 +444,7 @@ export default function TransactionTable({
             </span>
           ))}
           {(table.columnFilters.amount?.amountMin || table.columnFilters.amount?.amountMax) && (
-            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
               ₹{table.columnFilters.amount?.amountMin || '0'} – ₹{table.columnFilters.amount?.amountMax || '∞'}
               <button onClick={() => table.updateFilter('amount', { ...defaultColumnFilter })}><X size={11} /></button>
             </span>

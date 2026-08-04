@@ -37,7 +37,7 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
           flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
           transition-all duration-150 w-full text-left
           ${transactionSubView === 'view'
-            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
+            ? 'bg-gradient-to-r from-emerald-600 to-amber-500 text-white shadow-lg shadow-emerald-500/20'
             : 'text-slate-300 hover:text-white hover:bg-white/8'}
         `}
       >
@@ -53,7 +53,7 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
           flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
           transition-all duration-150 w-full text-left
           ${transactionSubView === 'add'
-            ? 'bg-violet-600/90 text-white shadow-lg shadow-violet-500/20'
+            ? 'bg-gradient-to-r from-emerald-600 to-amber-500 text-white shadow-lg shadow-emerald-500/20'
             : 'text-slate-300 hover:text-white hover:bg-white/8'}
         `}
       >
@@ -143,11 +143,14 @@ export default function FloatingNavBar({
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
   const trialUserRef = useRef<HTMLDivElement>(null);
 
-  // Default trial sign-out: clear session and go to /auth
+  // Default trial sign-out: close popover first, then defer navigation so React
+  // can commit the state update before the page unloads.
   const handleTrialSignOut = onTrialSignOut ?? (() => {
+    setShowTrialUserPopover(false);
     sessionStorage.removeItem('kc_auth_token');
     sessionStorage.removeItem('kc_user_type');
-    window.location.replace('/auth');
+    // Defer by one tick so the popover state update flushes before navigation
+    setTimeout(() => { window.location.href = '/auth'; }, 0);
   });
 
   // Poll pending requests count every 60 s (org admins only)
@@ -264,7 +267,7 @@ export default function FloatingNavBar({
                   relative flex items-center gap-2.5 rounded-xl
                   text-sm font-medium transition-all duration-200
                   ${isActive
-                      ? 'px-6 py-1 bg-violet-600/90 text-white shadow-lg shadow-violet-500/25'
+                      ? 'px-6 py-1 bg-gradient-to-r from-emerald-600 to-amber-500 text-white shadow-lg shadow-emerald-500/25'
                       : 'px-4 py-1 text-slate-400 hover:text-white hover:bg-white/8'
                     }
                 `}
@@ -369,7 +372,7 @@ export default function FloatingNavBar({
                 py-2.5 px-3 rounded-xl text-sm font-medium
                 transition-all duration-150
                 ${transactionSubView === 'view'
-                  ? 'bg-violet-600 text-white'
+                  ? 'bg-gradient-to-r from-emerald-600 to-amber-500 text-white'
                   : 'text-slate-300 hover:text-white hover:bg-white/8'}
               `}
             >
@@ -386,7 +389,7 @@ export default function FloatingNavBar({
                 py-2.5 px-3 rounded-xl text-sm font-medium
                 transition-all duration-150
                 ${transactionSubView === 'add'
-                  ? 'bg-violet-600 text-white'
+                  ? 'bg-gradient-to-r from-emerald-600 to-amber-500 text-white'
                   : 'text-slate-300 hover:text-white hover:bg-white/8'}
               `}
             >
@@ -416,12 +419,12 @@ export default function FloatingNavBar({
                 className={`
                   relative flex flex-col items-center gap-1 px-4 py-2 rounded-xl
                   transition-all duration-200 min-w-[60px]
-                  ${isActive ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'}
+                  ${isActive ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-300'}
                 `}
               >
                 <div className={`
                   relative p-1.5 rounded-xl transition-all
-                  ${isActive ? 'bg-violet-600/20' : ''}
+                  ${isActive ? 'bg-emerald-600/20' : ''}
                 `}>
                   <Icon size={20} />
                   {hasBadge && (
