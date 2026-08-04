@@ -121,7 +121,6 @@ function TrialShell() {
             className={activeSection !== 'admin' ? 'section-enter' : ''}
           >
             <AccountingSystem
-              saasMode
               initialTab={appTab}
               navStyle={navStyle}
               onReady={handleAppReady}
