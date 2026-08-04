@@ -55,26 +55,25 @@ export default function OrgAdminApp({ orgSlug, trialMode = false }: Props) {
 
   return (
     <div className="max-w-5xl mx-auto px-4">
-      {/* Demo Banner */}
-      {trialMode && (
-        <div className="mb-6 p-3.5 rounded-xl bg-violet-950/40 border border-violet-500/20 text-violet-300 text-xs flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold text-[10px] uppercase tracking-wide">
+      {/* Header */}
+      <div className="mb-6 pt-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
+          {trialMode && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-semibold animate-pulse">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
               Demo Mode
             </span>
-            <span>
-              Exploring Admin Capabilities — Member actions are read-only; Customization is fully interactive!
-            </span>
-          </div>
+          )}
         </div>
-      )}
-
-      {/* Header */}
-      <div className="mb-6 pt-2">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Panel</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Manage members, approve requests, and configure your organisation.
         </p>
+        {trialMode && (
+          <p className="text-xs font-medium text-amber-600/90 dark:text-amber-400/90 mt-2.5 flex items-center gap-1.5 animate-pulse">
+            <span>✨</span> Exploring Admin Capabilities — Member actions are read-only; Customization is fully interactive!
+          </p>
+        )}
       </div>
 
       {/* Tab bar */}
