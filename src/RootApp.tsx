@@ -45,8 +45,8 @@ function GoToTopButton() {
       className="
         fixed bottom-24 md:bottom-8 right-4 md:right-6 z-40
         w-10 h-10 rounded-full
-        bg-gradient-to-br from-emerald-600 to-amber-500 hover:from-emerald-500 hover:to-amber-400 active:scale-95
-        text-white      shadow-lg shadow-emerald-500/30
+        bg-violet-600 hover:bg-violet-500 active:scale-95
+        text-white shadow-lg shadow-violet-500/30
         flex items-center justify-center
         transition-all duration-200
       "

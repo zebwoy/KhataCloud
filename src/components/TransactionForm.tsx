@@ -60,9 +60,9 @@ function getSelectStyles(isDark: boolean) {
     option: (base: object, state: { isSelected: boolean; isFocused: boolean }) => ({
       ...base,
       backgroundColor: state.isSelected
-        ? '#059669'   // emerald-600
+        ? '#7c3aed'   // violet-600
         : state.isFocused
-        ? (isDark ? '#1e293b' : '#f0fdf4') // emerald-50 on light
+        ? (isDark ? '#1e293b' : '#f5f3ff') // violet-50 on light
         : 'transparent',
       color: state.isSelected ? '#ffffff' : (isDark ? '#f1f5f9' : '#111827'),
     }),
@@ -78,7 +78,7 @@ const inputClass = [
   'border border-gray-200 dark:border-slate-700',
   'bg-gray-50 dark:bg-slate-800',
   'text-gray-900 dark:text-white',
-  'focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-600',
+  'focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500',
   'transition-all',
 ].join(' ');
 
@@ -306,7 +306,7 @@ export default function TransactionForm({
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                     isLabelInRemarks
                       ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed line-through'
-                      : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 hover:scale-105 active:scale-95 shadow-sm'
+                      : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/50 hover:scale-105 active:scale-95 shadow-sm'
                   }`}
                   title={isLabelInRemarks ? 'Label already added' : `Add ${label}`}
                 >
