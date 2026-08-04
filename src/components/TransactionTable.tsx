@@ -71,19 +71,35 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end items-stretch pt-20 pb-6 md:pt-24 md:pb-8 pl-4 pr-4 md:pr-6 pointer-events-none">
-      {/* Click-outside backdrop — no blur, clear view of underlying table results */}
+    <>
+      {/*
+        Invisible click-guard — covers only the page content area below the navbar.
+        Starts at top-16 (below the floating navbar band) so it never sits on top
+        of the navbar at all, which prevents the glass navbar from picking up any
+        tint/overlay colour from this div.
+      */}
       <div
-        className="fixed inset-0 bg-black/10 transition-opacity pointer-events-auto"
+        className="fixed inset-x-0 bottom-0 top-16 z-40 pointer-events-auto"
         onClick={onClose}
       />
 
-      {/* Floating Right Drawer Panel */}
+      {/*
+        Drawer card — fixed directly, not inside a full-viewport flex wrapper.
+        top-20 / md:top-24 clears the navbar pill (64px + breathing room).
+        bottom-4 / md:bottom-6 gives symmetric breathing room at the bottom.
+        right-4 / md:right-6 keeps it off the edge.
+        z-40 keeps it below the navbar z-50 so it can never paint over it.
+      */}
       <div className="
-        relative z-10 w-full max-w-sm md:w-96 h-full max-h-full
-        bg-white dark:bg-slate-900 shadow-2xl shadow-black/30
+        fixed z-40
+        top-20 bottom-4 right-4
+        md:top-24 md:bottom-6 md:right-6
+        w-[min(22rem,calc(100vw-2rem))]
+        bg-white dark:bg-slate-900
         rounded-3xl border border-gray-200/80 dark:border-slate-800
-        flex flex-col overflow-hidden animate-slide-in-right pointer-events-auto
+        shadow-2xl shadow-black/25
+        flex flex-col overflow-hidden
+        animate-slide-in-right pointer-events-auto
       ">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 dark:border-slate-800/80 shrink-0 bg-white/50 dark:bg-slate-900/50">
@@ -264,7 +280,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
