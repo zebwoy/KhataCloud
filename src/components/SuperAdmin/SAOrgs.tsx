@@ -712,13 +712,13 @@ export default function SAOrgs() {
               ...f, name: v,
               slug: f.slug === autoSlug(f.name) ? autoSlug(v) : f.slug,
             }))}
-            placeholder="Al-Madrasah Al-Quraniyyah"
+            placeholder="Acme Enterprise"
           />
           <Field
             label="Slug"
             value={createForm.slug}
             onChange={v => setCreateForm(f => ({ ...f, slug: v.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-            placeholder="al-madrasah"
+            placeholder="acme-org"
             hint="Lowercase letters, numbers, hyphens. Cannot be changed later."
           />
           <Field

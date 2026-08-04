@@ -23,7 +23,7 @@ interface Props {
 
 const DEMO_SETTINGS: OrgSettings = {
   id: 'demo-org-101',
-  name: 'Demo Organisation / Madrasah',
+  name: 'Demo Organisation',
   slug: 'demo',
   plan: 'Enterprise (Demo)',
   contact_email: 'demo@khata.cloud',

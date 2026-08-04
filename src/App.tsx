@@ -36,7 +36,7 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
   if (clerkGetter) {
     try { token = await clerkGetter(); } catch { /* fall through */ }
   }
-  if (!token) token = sessionStorage.getItem('madrasah_auth_token');
+  if (!token) token = sessionStorage.getItem('kc_auth_token');
   const headers = {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -49,7 +49,7 @@ const apiFetch = async (url: string, options: RequestInit = {}) => {
     try {
       const freshToken = await clerkGetter();
       if (freshToken && freshToken !== token) {
-        sessionStorage.setItem('madrasah_auth_token', freshToken);
+        sessionStorage.setItem('kc_auth_token', freshToken);
         const retryHeaders = {
           ...options.headers,
           'Authorization': `Bearer ${freshToken}`,
@@ -131,8 +131,8 @@ export default function AccountingSystem({
     if (saasMode) return true;
     const isTrialPending =
       window.location.pathname === '/trial' &&
-      !sessionStorage.getItem('madrasah_auth_token');
-    return isTrialPending || sessionStorage.getItem('madrasah_logged_in') === 'true';
+      !sessionStorage.getItem('kc_auth_token');
+    return isTrialPending || sessionStorage.getItem('kc_logged_in') === 'true';
   });
 
   
@@ -165,7 +165,7 @@ export default function AccountingSystem({
     setIsLoadingData(true);
     setDataError('');
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       const response = await apiFetch(`/api/transactions?userType=${currentUserType}`);
       if (!response.ok) {
         throw new Error('Unable to load transactions from the server.');
@@ -183,7 +183,7 @@ export default function AccountingSystem({
 
   const fetchEntities = useCallback(async () => {
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       
       // Fetch trustees for custodian dropdown
       const trusteesResponse = await apiFetch(`/api/entities?userType=${currentUserType}&entityType=trustee`);
@@ -523,7 +523,7 @@ export default function AccountingSystem({
     };
 
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'POST',
         headers: {
@@ -583,7 +583,7 @@ export default function AccountingSystem({
     setIsSyncing(true);
     setDataError('');
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       const response = await apiFetch(`/api/transactions?id=${id}&userType=${currentUserType}`, {
         method: 'DELETE',
       });
@@ -655,7 +655,7 @@ export default function AccountingSystem({
     };
 
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'PUT',
         headers: {
@@ -712,7 +712,7 @@ export default function AccountingSystem({
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `madrasah_accounts_${dateRangeStr}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `khata_accounts_${dateRangeStr}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 

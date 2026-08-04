@@ -90,8 +90,8 @@ function TrialShell() {
     // Clear any Clerk token getter left over from authenticated sessions
     delete (window as any).__getClerkToken;
 
-    const currentType = sessionStorage.getItem('madrasah_user_type');
-    const currentToken = sessionStorage.getItem('madrasah_auth_token');
+    const currentType = sessionStorage.getItem('kc_user_type');
+    const currentToken = sessionStorage.getItem('kc_auth_token');
 
     if (currentToken && currentType === 'trial') {
       setTrialReady(true);
@@ -99,7 +99,7 @@ function TrialShell() {
     }
 
     // Force set user type to 'trial' and fetch a fresh trial JWT
-    sessionStorage.setItem('madrasah_user_type', 'trial');
+    sessionStorage.setItem('kc_user_type', 'trial');
     fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -108,8 +108,8 @@ function TrialShell() {
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          sessionStorage.setItem('madrasah_auth_token', data.token);
-          sessionStorage.setItem('madrasah_user_type', 'trial');
+          sessionStorage.setItem('kc_auth_token', data.token);
+          sessionStorage.setItem('kc_user_type', 'trial');
         }
       })
       .catch((err) => console.error('[TrialShell] Auth error:', err))
@@ -415,8 +415,8 @@ function OrgAppShell({
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
 
   const handleSignOut = async () => {
-    sessionStorage.removeItem('madrasah_auth_token');
-    sessionStorage.removeItem('madrasah_user_type');
+    sessionStorage.removeItem('kc_auth_token');
+    sessionStorage.removeItem('kc_user_type');
     await signOut();
   };
 
@@ -440,8 +440,8 @@ function OrgAppShell({
       try {
         const token = await getToken();
         if (token && !cancelled) {
-          sessionStorage.setItem('madrasah_auth_token', token);
-          sessionStorage.setItem('madrasah_user_type', 'org_member');
+          sessionStorage.setItem('kc_auth_token', token);
+          sessionStorage.setItem('kc_user_type', 'org_member');
         }
       } finally {
         if (!cancelled) setBridged(true);
@@ -454,7 +454,7 @@ function OrgAppShell({
     // global is not called (Clerk tokens expire after ~60 seconds)
     const interval = setInterval(async () => {
       const fresh = await getToken().catch(() => null);
-      if (fresh) sessionStorage.setItem('madrasah_auth_token', fresh);
+      if (fresh) sessionStorage.setItem('kc_auth_token', fresh);
     }, 45_000);
     return () => {
       cancelled = true;

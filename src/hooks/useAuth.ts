@@ -7,7 +7,7 @@
  * and sets isLoggedIn=true — AccountingSystem renders without user interaction.
  *
  * For Clerk-authenticated org members: RootApp writes the Clerk JWT to
- * sessionStorage.madrasah_auth_token before rendering AccountingSystem,
+ * sessionStorage.kc_auth_token before rendering AccountingSystem,
  * so isLoggedIn is already true on mount.
  */
 import { useState, useEffect } from 'react';
@@ -33,15 +33,15 @@ export interface UseAuthReturn extends AuthState {
 
 export default function useAuth(): UseAuthReturn {
   const [isLoggedIn, setIsLoggedIn] = useState(() =>
-    !!sessionStorage.getItem('madrasah_auth_token')
+    !!sessionStorage.getItem('kc_auth_token')
   );
 
   const [userType, setUserType] = useState<UserType>(() =>
-    (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial'
+    (sessionStorage.getItem('kc_user_type') as UserType) || 'trial'
   );
 
   const [displayTitle, setDisplayTitle] = useState<string>(() => {
-    const saved = (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial';
+    const saved = (sessionStorage.getItem('kc_user_type') as UserType) || 'trial';
     return saved === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud';
   });
 
@@ -70,8 +70,8 @@ export default function useAuth(): UseAuthReturn {
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          sessionStorage.setItem('madrasah_auth_token', data.token);
-          sessionStorage.setItem('madrasah_user_type', 'trial');
+          sessionStorage.setItem('kc_auth_token', data.token);
+          sessionStorage.setItem('kc_user_type', 'trial');
           setIsLoggedIn(true);
           setDisplayTitle('Trial account for Demo Purpose');
           // Clean the URL so a refresh doesn't re-trigger
@@ -120,8 +120,8 @@ export default function useAuth(): UseAuthReturn {
 
       if (response.ok) {
         const data = await response.json();
-        sessionStorage.setItem('madrasah_auth_token', data.token);
-        sessionStorage.setItem('madrasah_user_type', userType);
+        sessionStorage.setItem('kc_auth_token', data.token);
+        sessionStorage.setItem('kc_user_type', userType);
         setIsLoggedIn(true);
         setDisplayTitle(
           userType === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud'
@@ -139,8 +139,8 @@ export default function useAuth(): UseAuthReturn {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('madrasah_auth_token');
-    sessionStorage.removeItem('madrasah_logged_in');
+    sessionStorage.removeItem('kc_auth_token');
+    sessionStorage.removeItem('kc_logged_in');
     // Navigate first — state update becomes irrelevant once the page changes.
     // This also prevents the /trial infinite-spinner (the LoadingScreen guard
     // in App.tsx is only for initial JWT fetch, not post-logout).
