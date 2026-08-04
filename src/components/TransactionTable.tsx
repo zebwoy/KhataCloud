@@ -65,57 +65,59 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
   ];
 
   const catColors: Record<string, string> = {
-    Income:   'bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400',
-    Expense:  'bg-rose-100 border-rose-300 text-rose-700 dark:bg-rose-900/30 dark:border-rose-700 dark:text-rose-400',
-    Transfer: 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-400',
+    Income:   'bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 font-semibold shadow-sm',
+    Expense:  'bg-rose-500/15 border-rose-500/40 text-rose-700 dark:text-rose-300 font-semibold shadow-sm',
+    Transfer: 'bg-blue-500/15 border-blue-500/40 text-blue-700 dark:text-blue-300 font-semibold shadow-sm',
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-start md:justify-end">
+    <div className="fixed inset-0 z-[100] flex items-end md:items-stretch md:justify-end pt-16 md:pt-20">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-md transition-opacity"
         onClick={onClose}
       />
 
       {/* Panel */}
       <div className="
-        relative z-10 w-full md:w-96 max-h-[92vh] md:max-h-screen md:h-full
-        bg-white dark:bg-slate-900
-        rounded-t-3xl md:rounded-none md:border-l md:border-slate-800
-        flex flex-col shadow-2xl shadow-black/30
-        overflow-hidden
+        relative z-10 w-full md:w-96 max-h-[85vh] md:max-h-full md:h-full
+        bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl
+        rounded-t-3xl md:rounded-none md:border-l border-gray-200/80 dark:border-slate-800
+        flex flex-col shadow-2xl shadow-black/40
+        overflow-hidden transition-all duration-300
       ">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 shrink-0">
-          <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <SlidersHorizontal size={16} className="text-violet-500" />
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 dark:border-slate-800/80 shrink-0 bg-white/50 dark:bg-slate-900/50">
+          <h3 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
+              <SlidersHorizontal size={17} />
+            </div>
             Filters &amp; Sort
           </h3>
           <div className="flex items-center gap-3">
             {table.hasActiveFilters() && (
               <button
                 onClick={table.clearAllFilters}
-                className="text-xs text-violet-600 dark:text-violet-400 font-medium hover:underline"
+                className="text-xs text-violet-600 dark:text-violet-400 font-semibold hover:underline"
               >
                 Clear all
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400"
+              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Scrollable body with scrollbars hidden */}
+        <div className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden space-y-1">
 
           {/* Sort */}
-          <section className="px-6 py-4 border-b border-gray-50 dark:border-slate-800/60">
-            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Sort</h4>
+          <section className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/60">
+            <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Sort By</h4>
             <div className="flex flex-wrap gap-2">
               {sortOptions.map(o => {
                 const active = table.sortColumn === o.col && table.sortDirection === o.dir;
@@ -126,10 +128,10 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                       table.setSortColumn(o.col);
                       table.setSortDirection(o.dir);
                     }}
-                    className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
+                    className={`text-xs px-3.5 py-1.5 rounded-full border font-medium transition-all ${
                       active
-                        ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
-                        : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-violet-400'
+                        ? 'bg-violet-600 border-violet-600 text-white shadow-md shadow-violet-500/25 font-semibold'
+                        : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400/60 hover:bg-violet-500/5'
                     }`}
                   >
                     {o.label}
@@ -140,8 +142,8 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
           </section>
 
           {/* Category */}
-          <section className="px-6 py-4 border-b border-gray-50 dark:border-slate-800/60">
-            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Category</h4>
+          <section className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/60">
+            <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Category</h4>
             <div className="flex flex-wrap gap-2">
               {(['Income', 'Expense', 'Transfer'] as const).map(cat => {
                 const selected = activeCategories.includes(cat);
@@ -154,8 +156,8 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                         : [...activeCategories, cat];
                       table.updateFilter('category', { ...cf.category, selectedValues: next });
                     }}
-                    className={`text-xs px-4 py-1.5 rounded-full border font-medium transition-all ${
-                      selected ? catColors[cat] : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
+                    className={`text-xs px-4 py-1.5 rounded-full border transition-all ${
+                      selected ? catColors[cat] : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-slate-600'
                     }`}
                   >
                     {cat}
@@ -166,57 +168,57 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
           </section>
 
           {/* Date range */}
-          <section className="px-6 py-4 border-b border-gray-50 dark:border-slate-800/60">
-            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Date Range</h4>
+          <section className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/60">
+            <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Date Range</h4>
             <div className="flex flex-wrap gap-2 mb-3">
               {getPresets().map(p => (
                 <button
                   key={p.label}
                   onClick={() => setQuickPreset(p.from)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-violet-400 transition-all"
+                  className="text-xs px-3.5 py-1.5 rounded-full border border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-all"
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">From</label>
+                <label className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">From</label>
                 <input
                   type="date" value={activeDateFrom}
                   onChange={e => table.updateFilter('date', { ...cf.date, dateFrom: e.target.value })}
-                  className="w-full text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">To</label>
+                <label className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">To</label>
                 <input
                   type="date" value={activeDateTo}
                   onChange={e => table.updateFilter('date', { ...cf.date, dateTo: e.target.value })}
-                  className="w-full text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
                 />
               </div>
             </div>
           </section>
 
           {/* Amount */}
-          <section className="px-6 py-4 border-b border-gray-50 dark:border-slate-800/60">
-            <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Amount Range (₹)</h4>
-            <div className="grid grid-cols-2 gap-2">
+          <section className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/60">
+            <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Amount Range (₹)</h4>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Min</label>
+                <label className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">Min</label>
                 <input
                   type="number" placeholder="0" value={activeAmountMin}
                   onChange={e => table.updateFilter('amount', { ...cf.amount, amountMin: e.target.value })}
-                  className="w-full text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Max</label>
+                <label className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1 block">Max</label>
                 <input
                   type="number" placeholder="No limit" value={activeAmountMax}
                   onChange={e => table.updateFilter('amount', { ...cf.amount, amountMax: e.target.value })}
-                  className="w-full text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/80 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
                 />
               </div>
             </div>
@@ -225,7 +227,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
           {/* Custodian */}
           {custodianOptions.length > 0 && (
             <section className="px-6 py-4">
-              <h4 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3">Custodian</h4>
+              <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Custodian</h4>
               <div className="flex flex-wrap gap-2">
                 {custodianOptions.map(opt => {
                   const selected = activeCustodians.includes(opt);
@@ -238,10 +240,10 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                           : [...activeCustodians, opt];
                         table.updateFilter('custodian', { ...cf.custodian, selectedValues: next });
                       }}
-                      className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
+                      className={`text-xs px-3.5 py-1.5 rounded-full border font-medium transition-all ${
                         selected
-                          ? 'bg-violet-100 border-violet-300 text-violet-700 dark:bg-violet-900/30 dark:border-violet-700 dark:text-violet-400'
-                          : 'border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 hover:border-violet-400'
+                          ? 'bg-violet-500/15 border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold shadow-sm'
+                          : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400/60'
                       }`}
                     >
                       {opt}
@@ -254,10 +256,10 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
         </div>
 
         {/* Footer CTA */}
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-800 shrink-0">
+        <div className="px-6 py-4 border-t border-gray-200/60 dark:border-slate-800 shrink-0 bg-white/50 dark:bg-slate-900/50">
           <button
             onClick={onClose}
-            className="w-full py-2.5 px-4 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-colors shadow-lg shadow-violet-500/20"
+            className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold transition-all shadow-lg shadow-violet-500/25 active:scale-[0.99]"
           >
             Done
           </button>
