@@ -71,20 +71,20 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end md:items-stretch md:justify-end pt-16 md:pt-20">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[100] flex justify-start items-stretch pt-20 pb-6 md:pt-24 md:pb-8 pl-4 md:pl-6 pr-4 pointer-events-none">
+      {/* Click-outside backdrop — no blur, clear view of underlying table results */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-md transition-opacity"
+        className="fixed inset-0 bg-black/10 transition-opacity pointer-events-auto"
         onClick={onClose}
       />
 
-      {/* Panel */}
+      {/* Floating Left Drawer Panel */}
       <div className="
-        relative z-10 w-full md:w-96 max-h-[85vh] md:max-h-full md:h-full
+        relative z-10 w-full max-w-sm md:w-96 h-full
         bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl
-        rounded-t-3xl md:rounded-none md:border-l border-gray-200/80 dark:border-slate-800
-        flex flex-col shadow-2xl shadow-black/40
-        overflow-hidden transition-all duration-300
+        rounded-3xl border border-gray-200/80 dark:border-slate-800
+        flex flex-col shadow-2xl shadow-black/20
+        overflow-hidden animate-slide-in-left pointer-events-auto
       ">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60 dark:border-slate-800/80 shrink-0 bg-white/50 dark:bg-slate-900/50">
