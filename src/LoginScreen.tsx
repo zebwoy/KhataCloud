@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { SignIn } from '@clerk/react';
 import { BookOpen, BarChart3, Shield, ArrowRight } from 'lucide-react';
+import { initWaterRipples } from './utils/waterRipples';
 
 const FEATURES = [
   { icon: BookOpen,  label: 'Khata & Ledger',     sub: 'Track every rupee in and out' },
@@ -12,68 +13,14 @@ export default function LoginScreen() {
   const rippleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    let dropInterval: ReturnType<typeof setInterval> | null = null;
-
-    const loadScript = (src: string) => {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
-          resolve(true);
-          return;
-        }
-        const s = document.createElement('script');
-        s.src = src;
-        s.onload = () => resolve(true);
-        s.onerror = reject;
-        document.body.appendChild(s);
-      });
-    };
-
-    const initRipples = async () => {
-      try {
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js');
-        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery.ripples/0.5.4/jquery.ripples.min.js');
-
-        if (!isMounted || !rippleRef.current) return;
-        const $ = (window as any).jQuery || (window as any).$;
-        if (!$) return;
-
-        const $el = $(rippleRef.current);
-        if ($el && typeof $el.ripples === 'function') {
-          $el.ripples({
-            resolution: 512,
-            dropRadius: 22,
-            perturbance: 0.04,
-          });
-
-          // Periodic gentle ambient water drops
-          dropInterval = setInterval(() => {
-            if (!rippleRef.current || !isMounted) return;
-            const w = rippleRef.current.clientWidth || window.innerWidth;
-            const h = rippleRef.current.clientHeight || window.innerHeight;
-            const x = Math.random() * w;
-            const y = Math.random() * h;
-            try {
-              $el.ripples('drop', x, y, 18, 0.03);
-            } catch { /* ignore */ }
-          }, 3500);
-        }
-      } catch (err) {
-        console.warn('[WaterRipples] Skip WebGL initialization:', err);
-      }
-    };
-
-    initRipples();
-
+    if (!rippleRef.current) return;
+    const instance = initWaterRipples(rippleRef.current, '/auth-bg.png', {
+      resolution: 256,
+      perturbance: 0.04,
+      radius: 0.035,
+    });
     return () => {
-      isMounted = false;
-      if (dropInterval) clearInterval(dropInterval);
-      const $ = (window as any).jQuery || (window as any).$;
-      if ($ && rippleRef.current) {
-        try {
-          $(rippleRef.current).ripples('destroy');
-        } catch { /* ignore */ }
-      }
+      instance.destroy();
     };
   }, []);
 
