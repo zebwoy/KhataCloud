@@ -168,15 +168,17 @@ export default function LoginScreen() {
           <SignIn
             routing="hash"
             /**
-             * forceRedirectUrl   — always redirect here after sign-in (highest priority)
-             * fallbackRedirectUrl — used when no other redirect is in context
-             * afterSignInUrl      — legacy compat, same intent
+             * Sign-in redirects → /auth (router resolves role → /app or /admin)
+             * Sign-up redirects → /app  (new users skip /auth role-check loop;
+             *   the RootApp state machine at /app handles org selection / pending)
              *
-             * Together these cover every Clerk sign-in path:
-             *   email+password, Google OAuth, magic link, SSO
+             * signUpForceRedirectUrl covers first-time Google OAuth sign-ups
+             * which go through the sign-up flow embedded in this SignIn widget.
              */
             forceRedirectUrl="/auth"
             fallbackRedirectUrl="/auth"
+            signUpForceRedirectUrl="/app"
+            signUpFallbackRedirectUrl="/app"
             appearance={{
               variables: {
                 colorPrimary:        '#7c3aed',
