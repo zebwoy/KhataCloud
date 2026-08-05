@@ -16,8 +16,9 @@ export default function LoginScreen() {
     if (!rippleRef.current) return;
     const instance = initWaterRipples(rippleRef.current, '/auth-bg.png', {
       resolution: 256,
-      perturbance: 0.04,
-      radius: 0.035,
+      perturbance: 0.03,
+      dropRadius: 0.04,
+      damping: 0.985,
     });
     return () => {
       instance.destroy();
