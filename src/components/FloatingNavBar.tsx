@@ -273,7 +273,7 @@ export default function FloatingNavBar({
             <button
               type="button"
               onClick={handleTrialSignOut}
-              className="flex items-center gap-2 px-4 py-0.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:text-white text-xs font-semibold transition-all shadow-sm whitespace-nowrap active:scale-95"
+              className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:text-white text-xs font-semibold transition-all shadow-sm whitespace-nowrap active:scale-95"
               title="Sign Out to /auth"
             >
               <LogOut size={14} />
