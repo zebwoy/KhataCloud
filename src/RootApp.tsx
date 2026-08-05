@@ -180,7 +180,7 @@ function TrialShell() {
             window.location.href = '/auth';
           }}
         />
-        <div style={{ paddingTop: '4rem' }}>
+        <div className="pt-0 md:pt-16 pb-24 md:pb-6">
           {/* ── Transactions + Reports panel ── */}
           <div
             style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}
@@ -525,7 +525,7 @@ function OrgAppShell({
           }}
         />
         {/* pt-0 on mobile (bottom nav), pt-20 on desktop (top pill nav) */}
-        <div style={{ paddingTop: "4rem" }} >
+        <div className="pt-0 md:pt-16 pb-24 md:pb-6">
           {/* ── Transactions + Reports panel ── */}
           <div
             style={{ display: activeSection !== 'admin' ? 'block' : 'none' }}

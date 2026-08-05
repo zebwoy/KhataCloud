@@ -82,22 +82,21 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
         tint/overlay colour from this div.
       */}
       <div
-        className="fixed inset-x-0 bottom-0 top-16 z-40 pointer-events-auto"
+        className="fixed inset-0 z-40 pointer-events-auto bg-black/20 dark:bg-black/40 md:bg-transparent"
         onClick={onClose}
       />
 
       {/*
         Drawer card — fixed directly, not inside a full-viewport flex wrapper.
-        top-20 / md:top-24 clears the navbar pill (64px + breathing room).
-        bottom-4 / md:bottom-6 gives symmetric breathing room at the bottom.
-        right-4 / md:right-6 keeps it off the edge.
+        Mobile (< md): top-4 bottom-24 left-4 right-4 (clears bottom nav bar, symmetric margin at top)
+        Desktop (md): top-24 bottom-6 right-6 left-auto (clears top navbar pill)
         z-40 keeps it below the navbar z-50 so it can never paint over it.
       */}
       <div className="
         fixed z-40
-        top-20 bottom-4 right-4
-        md:top-24 md:bottom-6 md:right-6
-        w-[min(22rem,calc(100vw-2rem))]
+        top-4 bottom-24 left-4 right-4
+        md:top-24 md:bottom-6 md:right-6 md:left-auto
+        md:w-[min(22rem,calc(100vw-2rem))]
         bg-white dark:bg-slate-900
         rounded-3xl border border-gray-200/80 dark:border-slate-800
         shadow-2xl shadow-black/25
