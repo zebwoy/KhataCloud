@@ -1,13 +1,4 @@
-/**
- * LoginScreen.tsx — KhataCloud unified login (mounted at /auth)
- *
- * Split layout:
- *   Left  — Brand panel (violet gradient, logo, features, Demo CTA → /trial)
- *   Right — Clerk <SignIn /> component with matching dark appearance
- *
- * After sign-in Clerk redirects to /admin (forceRedirectUrl).
- * "Open Demo Account" links to /trial which auto-authenticates as trial user.
- */
+import { useEffect, useRef } from 'react';
 import { SignIn } from '@clerk/react';
 import { BookOpen, BarChart3, Shield, ArrowRight } from 'lucide-react';
 
@@ -18,15 +9,92 @@ const FEATURES = [
 ];
 
 export default function LoginScreen() {
+  const rippleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    let dropInterval: ReturnType<typeof setInterval> | null = null;
+
+    const loadScript = (src: string) => {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) {
+          resolve(true);
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = src;
+        s.onload = () => resolve(true);
+        s.onerror = reject;
+        document.body.appendChild(s);
+      });
+    };
+
+    const initRipples = async () => {
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jquery.ripples/0.5.4/jquery.ripples.min.js');
+
+        if (!isMounted || !rippleRef.current) return;
+        const $ = (window as any).jQuery || (window as any).$;
+        if (!$) return;
+
+        const $el = $(rippleRef.current);
+        if ($el && typeof $el.ripples === 'function') {
+          $el.ripples({
+            resolution: 512,
+            dropRadius: 22,
+            perturbance: 0.04,
+          });
+
+          // Periodic gentle ambient water drops
+          dropInterval = setInterval(() => {
+            if (!rippleRef.current || !isMounted) return;
+            const w = rippleRef.current.clientWidth || window.innerWidth;
+            const h = rippleRef.current.clientHeight || window.innerHeight;
+            const x = Math.random() * w;
+            const y = Math.random() * h;
+            try {
+              $el.ripples('drop', x, y, 18, 0.03);
+            } catch { /* ignore */ }
+          }, 3500);
+        }
+      } catch (err) {
+        console.warn('[WaterRipples] Skip WebGL initialization:', err);
+      }
+    };
+
+    initRipples();
+
+    return () => {
+      isMounted = false;
+      if (dropInterval) clearInterval(dropInterval);
+      const $ = (window as any).jQuery || (window as any).$;
+      if ($ && rippleRef.current) {
+        try {
+          $(rippleRef.current).ripples('destroy');
+        } catch { /* ignore */ }
+      }
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Ambient glow */}
+    <div className="relative min-h-screen bg-slate-950 flex items-center justify-center p-4 overflow-hidden">
+      {/* ── Interactive WebGL Water Ripple Background (outside container) ── */}
       <div
-        className="pointer-events-none fixed inset-0"
-        style={{ background: 'radial-gradient(ellipse 80% 60% at 20% 50%, rgba(109,40,217,0.18) 0%, transparent 60%)' }}
+        ref={rippleRef}
+        className="absolute inset-0 z-0 bg-cover bg-center cursor-pointer"
+        style={{
+          backgroundImage:
+            "radial-gradient(ellipse 85% 65% at 20% 50%, rgba(124, 58, 237, 0.35) 0%, rgba(15, 23, 42, 0.85) 75%), url('/auth-bg.png')",
+        }}
       />
 
-      <div className="relative w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl shadow-black/50 flex min-h-[560px]">
+      {/* Ambient glow overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 bg-slate-950/20 backdrop-blur-[1px]"
+      />
+
+      <div className="relative z-10 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl shadow-black/80 flex min-h-[560px]">
 
         {/* ── LEFT BRAND PANEL ─────────────────────────────────────────── */}
         <div
