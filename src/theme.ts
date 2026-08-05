@@ -1,5 +1,5 @@
 // ============================================================
-// Theme utility functions for HisaabKitaab
+// Theme utility functions for KhataCloud
 // Eliminates the 50+ inline palette ternary chains
 // ============================================================
 
