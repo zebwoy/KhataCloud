@@ -1,7 +1,17 @@
+/**
+ * LoginScreen.tsx — KhataCloud unified login (mounted at /auth)
+ *
+ * Split layout:
+ *   Left  — Brand panel (violet gradient, logo, features, Demo CTA → /trial)
+ *   Right — Clerk <SignIn /> component with matching dark appearance
+ *
+ * Water ripple effect: jquery.ripples (sirxemic) loaded from local /vendor/
+ * scripts to avoid CDN/CSP issues. Runs on the full-screen background div
+ * sitting behind the auth card (z-0), so the card is never affected.
+ */
 import { useEffect, useRef } from 'react';
 import { SignIn } from '@clerk/react';
 import { BookOpen, BarChart3, Shield, ArrowRight } from 'lucide-react';
-import { initWaterRipples } from './utils/waterRipples';
 
 const FEATURES = [
   { icon: BookOpen,  label: 'Khata & Ledger',     sub: 'Track every rupee in and out' },
@@ -9,39 +19,87 @@ const FEATURES = [
   { icon: Shield,    label: 'Multi-org ready',     sub: 'Separate books per organisation' },
 ];
 
+/** Dynamically append a <script> tag; resolves when loaded, rejects on error. */
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[data-ripple-vendor="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = src;
+    s.setAttribute('data-ripple-vendor', src);
+    s.onload  = () => resolve();
+    s.onerror = (e) => reject(e);
+    document.body.appendChild(s);
+  });
+}
+
 export default function LoginScreen() {
-  const rippleRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!rippleRef.current) return;
-    const instance = initWaterRipples(rippleRef.current, '/auth-bg.png', {
-      resolution: 256,
-      perturbance: 0.03,
-      dropRadius: 0.04,
-      damping: 0.985,
-    });
+    let destroyed = false;
+
+    (async () => {
+      try {
+        // Load jQuery then the ripples plugin from our own /vendor/ folder
+        // (avoids CDN network failures and Content-Security-Policy blocks)
+        await loadScript('/vendor/jquery.min.js');
+        await loadScript('/vendor/jquery.ripples.js');
+
+        if (destroyed || !bgRef.current) return;
+
+        const $ = (window as any).jQuery;
+        if (!$ || !$.fn.ripples) return;
+
+        $(bgRef.current).ripples({
+          imageUrl: '/auth-bg.png',   // explicit URL per the docs
+          dropRadius: 20,             // pixels
+          perturbance: 0.03,          // refraction strength
+          resolution: 512,
+          interactive: true,          // mouse hover/move generates ripples
+        });
+      } catch (err) {
+        // WebGL unavailable or script load failed — page works fine without it
+        console.warn('[Ripples] init skipped:', err);
+      }
+    })();
+
     return () => {
-      instance.destroy();
+      destroyed = true;
+      const $ = (window as any).jQuery;
+      if ($ && bgRef.current) {
+        try { $(bgRef.current).ripples('destroy'); } catch { /* ignore */ }
+      }
     };
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-slate-950 flex items-center justify-center p-4 overflow-hidden">
-      {/* ── Interactive WebGL Water Ripple Background (outside container) ── */}
+    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+
+      {/* ── Full-screen ripple background (z-0, behind the card) ── */}
+      {/*
+        IMPORTANT: jquery.ripples reads the element's computed background-image
+        to create its WebGL texture. We must set a plain background-image URL
+        (no CSS gradients — the plugin doesn't support multi-value backgrounds).
+        The violet ambient tint is achieved via the overlay div below.
+      */}
       <div
-        ref={rippleRef}
-        className="absolute inset-0 z-0 bg-cover bg-center cursor-pointer"
+        ref={bgRef}
+        className="absolute inset-0 z-0"
+        style={{ backgroundImage: "url('/auth-bg.png')", backgroundSize: 'cover', backgroundPosition: 'center' }}
+      />
+
+      {/* Violet tint + subtle dark overlay on top of the ripple canvas */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[1]"
         style={{
-          backgroundImage:
-            "radial-gradient(ellipse 85% 65% at 20% 50%, rgba(124, 58, 237, 0.35) 0%, rgba(15, 23, 42, 0.85) 75%), url('/auth-bg.png')",
+          background: 'radial-gradient(ellipse 85% 65% at 20% 50%, rgba(109,40,217,0.38) 0%, rgba(15,23,42,0.55) 100%)',
         }}
       />
 
-      {/* Ambient glow overlay */}
-      <div
-        className="pointer-events-none absolute inset-0 z-0 bg-slate-950/20 backdrop-blur-[1px]"
-      />
-
+      {/* ── Auth card (z-10, pointer-events captured here, not on the bg) ── */}
       <div className="relative z-10 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl shadow-black/80 flex min-h-[560px]">
 
         {/* ── LEFT BRAND PANEL ─────────────────────────────────────────── */}
