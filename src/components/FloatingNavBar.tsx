@@ -273,11 +273,11 @@ export default function FloatingNavBar({
             <button
               type="button"
               onClick={handleTrialSignOut}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:text-white text-xs font-semibold transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-2 px-4 py-0.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:text-white text-xs font-semibold transition-all shadow-sm whitespace-nowrap active:scale-95"
               title="Sign Out to /auth"
             >
               <LogOut size={14} />
-              <span>Sign Out</span>
+              <span className="whitespace-nowrap">Sign Out</span>
             </button>
           </div>
         )}
@@ -410,11 +410,11 @@ export default function FloatingNavBar({
             <button
               type="button"
               onClick={handleTrialSignOut}
-              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors min-w-[60px] active:scale-95"
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors whitespace-nowrap active:scale-95"
               title="Sign Out"
             >
-              <LogOut size={18} />
-              <span className="text-[10px] font-medium">Sign Out</span>
+              <LogOut size={14} />
+              <span className="text-xs font-semibold whitespace-nowrap">Sign Out</span>
             </button>
           )}
         </div>
