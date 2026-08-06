@@ -5,6 +5,7 @@ import type { Transaction, TrusteeOption } from '../types';
 import { defaultColumnFilter } from '../types';
 import useTableState from '../hooks/useTableState';
 import { formatCurrency, formatDisplayDate } from '../utils/formatters';
+import { exportTransactionsToCSV } from '../utils/exportUtils';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -14,7 +15,7 @@ interface TransactionTableProps {
   isAdmin?: boolean;
   onEditTransaction: (transaction: Transaction) => void;
   onDeleteTransaction: (id: number) => void;
-  onExportCSV: () => void;
+  onExportCSV?: () => void;
 }
 
 // ── Unified Filter Drawer ─────────────────────────────────────────────────────
@@ -345,7 +346,6 @@ export default function TransactionTable({
   isAdmin = false,
   onEditTransaction,
   onDeleteTransaction,
-  onExportCSV,
 }: TransactionTableProps) {
   const table = useTableState({ transactions, trusteeOptions });
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -436,7 +436,33 @@ export default function TransactionTable({
 
         {/* Export CSV */}
         <button
-          onClick={onExportCSV}
+          onClick={() => {
+            const cf = table.columnFilters;
+            let dateRangeStr = '';
+            if (cf.date?.dateFrom || cf.date?.dateTo) {
+              dateRangeStr = `${cf.date.dateFrom || 'Start'} to ${cf.date.dateTo || 'End'}`;
+            }
+
+            let amountRangeStr = '';
+            if (cf.amount?.amountMin || cf.amount?.amountMax) {
+              amountRangeStr = `₹${cf.amount.amountMin || '0'} to ₹${cf.amount.amountMax || '∞'}`;
+            }
+
+            exportTransactionsToCSV({
+              transactions: table.filteredTransactions,
+              filenamePrefix: 'Transaction_Ledger_Export',
+              isAdmin,
+              activeFilters: {
+                dateRange: dateRangeStr || 'All Time',
+                categories: cf.category?.selectedValues,
+                custodians: cf.custodian?.selectedValues,
+                enteredBy: cf.entered_by?.selectedValues,
+                amountRange: amountRangeStr,
+                searchQuery: table.searchQuery,
+              },
+              orgName: 'KhataCloud',
+            });
+          }}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shrink-0 shadow-sm"
         >
           <Download size={15} />

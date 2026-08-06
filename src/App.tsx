@@ -22,6 +22,7 @@ import useTheme from './hooks/useTheme';
 import useAuth from './hooks/useAuth';
 import { formatCurrency, formatDisplayDateShort } from './utils/formatters';
 import { calculateStats } from './utils/calculations';
+import { exportTransactionsToCSV } from './utils/exportUtils';
 import {
   getSubcategoryOptions, getFieldLabels,
   getDateRangeForMode,
@@ -691,29 +692,16 @@ export default function AccountingSystem({
 
   const exportToCSV = () => {
     const filteredTrans = getFilteredTransactions();
-    const headers = isAdmin
-      ? ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks', 'Entered By']
-      : ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
-    const rows = filteredTrans.map(t =>
-      isAdmin
-        ? [t.date, t.category, t.subcategory || '', t.custodian, t.counterparty, t.amount, t.remarks || '', t.entered_by || '']
-        : [t.date, t.category, t.subcategory || '', t.custodian, t.counterparty, t.amount, t.remarks || '']
-    );
-
-    const dateRangeStr = dateFilterMode === 'custom'
-      ? `${dateRange.fromDate}_to_${dateRange.toDate}`
-      : dateFilterMode;
-
-    const csv = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `khata_accounts_${dateRangeStr}_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    exportTransactionsToCSV({
+      transactions: filteredTrans,
+      filenamePrefix: `Khata_Accounts_${dateFilterMode}`,
+      isAdmin,
+      activeFilters: {
+        dateRange: formatPeriodLabel(),
+        custodians: trusteeFilter ? [trusteeFilter] : undefined,
+      },
+      orgName: 'KhataCloud',
+    });
   };
 
   // Memoized filtered transactions and stats for Financial Reports tab
