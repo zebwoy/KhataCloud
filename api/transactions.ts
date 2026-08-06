@@ -133,13 +133,18 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           entered_by    VARCHAR(255)
         );
       `);
-      // Add column to existing trial table if it was created before this migration
-      await runQuery(`ALTER TABLE trial_transactions ADD COLUMN IF NOT EXISTS entered_by VARCHAR(255)`);
     }
 
     // Ensure org schema tables exist on first access (auto-heals failed migrations)
     if (userType === 'org_member' && auth.orgSlug) {
       await ensureOrgSchema(auth.orgSlug, runQuery);
+    }
+
+    // Auto-heal: Ensure entered_by column exists on whatever schema table is active (org_*, public, trial)
+    try {
+      await runQuery(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS entered_by VARCHAR(255)`);
+    } catch (err) {
+      console.warn(`[transactions] Failed to auto-add entered_by to ${tableName}:`, err);
     }
 
     // ── GET ─────────────────────────────────────────────────────────────────
