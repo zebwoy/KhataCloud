@@ -15,6 +15,7 @@ export interface Transaction {
   counterparty: string;
   remarks: string;
   amount: number;
+  entered_by?: string;
   created_at?: string;
   modifieddate?: string;
 }

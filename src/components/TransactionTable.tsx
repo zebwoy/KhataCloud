@@ -11,6 +11,7 @@ interface TransactionTableProps {
   trusteeOptions: TrusteeOption[];
   isLoadingData: boolean;
   isSyncing: boolean;
+  isAdmin?: boolean;
   onEditTransaction: (transaction: Transaction) => void;
   onDeleteTransaction: (id: number) => void;
   onExportCSV: () => void;
@@ -22,9 +23,10 @@ interface DrawerProps {
   onClose: () => void;
   table: ReturnType<typeof useTableState>;
   trusteeOptions: TrusteeOption[];
+  isAdmin?: boolean;
 }
 
-function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
+function FilterDrawer({ isOpen, onClose, table, trusteeOptions, isAdmin }: DrawerProps) {
   if (!isOpen) return null;
 
   const cf = table.columnFilters;
@@ -36,8 +38,11 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
   const activeAmountMin  = cf.amount?.amountMin ?? '';
   const activeAmountMax  = cf.amount?.amountMax ?? '';
   const activeCustodians = cf.custodian?.selectedValues ?? [];
+  const activeEnteredBy  = cf.entered_by?.selectedValues ?? [];
 
   const custodianOptions = trusteeOptions.map(o => o.value).sort();
+  // Derive unique entered_by values from transactions via table state
+  const enteredByOptions = table.getUniqueColumnValues('entered_by' as any).filter(Boolean);
 
   const setQuickPreset = (from: string) => {
     table.updateFilter('date', { ...cf.date, dateFrom: from, dateTo: '' });
@@ -243,7 +248,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
 
           {/* Custodian */}
           {custodianOptions.length > 0 && (
-            <section className="px-6 py-4">
+            <section className="px-6 py-4 border-b border-gray-100 dark:border-slate-800/60">
               <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Custodian</h4>
               <div className="flex flex-wrap gap-2">
                 {custodianOptions.map(opt => {
@@ -261,6 +266,36 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
                         selected
                           ? 'bg-violet-500/15 border-violet-500/40 text-violet-700 dark:text-violet-300 font-semibold shadow-sm'
                           : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-violet-400/60'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Entered By — admin only */}
+          {isAdmin && enteredByOptions.length > 0 && (
+            <section className="px-6 py-4">
+              <h4 className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Entered By</h4>
+              <div className="flex flex-wrap gap-2">
+                {enteredByOptions.map(opt => {
+                  const selected = activeEnteredBy.includes(opt);
+                  return (
+                    <button
+                      key={opt}
+                      onClick={() => {
+                        const next = selected
+                          ? activeEnteredBy.filter(v => v !== opt)
+                          : [...activeEnteredBy, opt];
+                        table.updateFilter('entered_by', { ...cf.entered_by, selectedValues: next });
+                      }}
+                      className={`text-xs px-3.5 py-1.5 rounded-full border font-medium transition-all ${
+                        selected
+                          ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-700 dark:text-indigo-300 font-semibold shadow-sm'
+                          : 'border-gray-200 dark:border-slate-700/80 text-gray-600 dark:text-gray-300 hover:border-indigo-400/60'
                       }`}
                     >
                       {opt}
@@ -288,7 +323,7 @@ function FilterDrawer({ isOpen, onClose, table, trusteeOptions }: DrawerProps) {
 }
 
 // ── Count active filters for badge ────────────────────────────────────────────
-function countActiveFilters(table: ReturnType<typeof useTableState>): number {
+function countActiveFilters(table: ReturnType<typeof useTableState>, isAdmin?: boolean): number {
   const cf = table.columnFilters;
   let n = 0;
   if (table.searchQuery.trim()) n++;
@@ -297,6 +332,7 @@ function countActiveFilters(table: ReturnType<typeof useTableState>): number {
   if (cf.amount?.amountMin || cf.amount?.amountMax) n++;
   if ((cf.custodian?.selectedValues ?? []).length > 0) n++;
   if (cf.counterparty?.textFilter) n++;
+  if (isAdmin && (cf.entered_by?.selectedValues ?? []).length > 0) n++;
   return n;
 }
 
@@ -306,6 +342,7 @@ export default function TransactionTable({
   trusteeOptions,
   isLoadingData,
   isSyncing,
+  isAdmin = false,
   onEditTransaction,
   onDeleteTransaction,
   onExportCSV,
@@ -333,7 +370,7 @@ export default function TransactionTable({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filterCount = countActiveFilters(table);
+  const filterCount = countActiveFilters(table, isAdmin);
 
   return (
     <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
@@ -413,6 +450,7 @@ export default function TransactionTable({
         onClose={() => setDrawerOpen(false)}
         table={table}
         trusteeOptions={trusteeOptions}
+        isAdmin={isAdmin}
       />
 
       {/* ── Active filter summary chips (lightweight, dismissible) ── */}
@@ -448,6 +486,16 @@ export default function TransactionTable({
               <button onClick={() => table.updateFilter('amount', { ...defaultColumnFilter })}><X size={11} /></button>
             </span>
           )}
+          {/* Entered By chips — admin only */}
+          {isAdmin && (table.columnFilters.entered_by?.selectedValues ?? []).map(eb => (
+            <span key={eb} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              👤 {eb}
+              <button onClick={() => {
+                const next = (table.columnFilters.entered_by?.selectedValues ?? []).filter(v => v !== eb);
+                table.updateFilter('entered_by', { ...table.columnFilters.entered_by, selectedValues: next });
+              }}><X size={11} /></button>
+            </span>
+          ))}
           <button
             onClick={table.clearAllFilters}
             className="text-xs text-red-500 dark:text-red-400 font-medium hover:underline ml-1"
@@ -476,6 +524,7 @@ export default function TransactionTable({
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Counterparty</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Amount</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Remarks</th>
+                  {isAdmin && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Entered By</th>}
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
@@ -490,6 +539,7 @@ export default function TransactionTable({
                       <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-28" /></td>
                       <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-16 ml-auto" /></td>
                       <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-32" /></td>
+                      {isAdmin && <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-24" /></td>}
                       <td className="px-4 py-4"><div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-20 mx-auto" /></td>
                     </tr>
                   ))
@@ -523,6 +573,17 @@ export default function TransactionTable({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{t.remarks || '-'}</td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                          {t.entered_by ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
+                              👤 {t.entered_by}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300 dark:text-gray-600 italic text-xs">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-3">
                           <button
@@ -603,6 +664,14 @@ export default function TransactionTable({
                       <span className="text-gray-400 block">Counterparty</span>
                       <span className="text-gray-800 dark:text-gray-200 font-medium">{t.counterparty}</span>
                     </div>
+                    {isAdmin && t.entered_by && (
+                      <div className="col-span-2">
+                        <span className="text-gray-400 block">Entered By</span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-medium">
+                          👤 {t.entered_by}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {t.remarks && (

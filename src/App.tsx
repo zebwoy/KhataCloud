@@ -68,12 +68,14 @@ export default function AccountingSystem({
   initialTab,
   navStyle = 'pill',
   onReady,
+  isAdmin = false,
 }: {
   saasMode?:   boolean;
   onSignOut?:  () => void;
   initialTab?: string;           // 'view' | 'add' | 'report' — from FloatingNavBar
   navStyle?:   'pill' | 'classic'; // 'pill' = sub-menu handles view/add; 'classic' = inline toggle
   onReady?:    () => void;       // called once when initial data fetch completes
+  isAdmin?:    boolean;          // org admin — unlocks 'Entered By' column + filter
 } = {}) {
   // Auth state + handlers (login, logout, user type selection)
   const {
@@ -689,18 +691,16 @@ export default function AccountingSystem({
 
   const exportToCSV = () => {
     const filteredTrans = getFilteredTransactions();
-    const headers = ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
-    const rows = filteredTrans.map(t => [
-      t.date,
-      t.category,
-      t.subcategory || '',
-      t.custodian,
-      t.counterparty,
-      t.amount,
-      t.remarks || ''
-    ]);
+    const headers = isAdmin
+      ? ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks', 'Entered By']
+      : ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
+    const rows = filteredTrans.map(t =>
+      isAdmin
+        ? [t.date, t.category, t.subcategory || '', t.custodian, t.counterparty, t.amount, t.remarks || '', t.entered_by || '']
+        : [t.date, t.category, t.subcategory || '', t.custodian, t.counterparty, t.amount, t.remarks || '']
+    );
 
-    const dateRangeStr = dateFilterMode === 'custom' 
+    const dateRangeStr = dateFilterMode === 'custom'
       ? `${dateRange.fromDate}_to_${dateRange.toDate}`
       : dateFilterMode;
 
@@ -999,6 +999,7 @@ export default function AccountingSystem({
             trusteeOptions={trusteeOptions}
             isLoadingData={isLoadingData}
             isSyncing={isSyncing}
+            isAdmin={isAdmin}
             onEditTransaction={handleEditTransaction}
             onDeleteTransaction={handleDeleteTransaction}
             onExportCSV={exportToCSV}

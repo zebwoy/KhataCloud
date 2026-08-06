@@ -190,6 +190,7 @@ function TrialShell() {
               saasMode
               initialTab={appTab}
               navStyle={navStyle}
+              isAdmin={true}
               onReady={handleAppReady}
             />
           </div>
@@ -536,6 +537,7 @@ function OrgAppShell({
               onSignOut={handleSignOut}
               initialTab={appTab}
               navStyle={navStyle}
+              isAdmin={isAdmin}
               onReady={handleAppReady}
             />
           </div>

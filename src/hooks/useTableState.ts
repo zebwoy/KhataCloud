@@ -16,6 +16,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
     counterparty: { ...defaultColumnFilter },
     amount: { ...defaultColumnFilter },
     remarks: { ...defaultColumnFilter },
+    entered_by: { ...defaultColumnFilter },
   });
   const [openFilterPopup, setOpenFilterPopup] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string>('date');
@@ -55,7 +56,8 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
           String(t.custodian || '').toLowerCase().includes(lowerQuery) ||
           String(t.counterparty || '').toLowerCase().includes(lowerQuery) ||
           String(t.remarks || '').toLowerCase().includes(lowerQuery) ||
-          String(t.amount || '').toLowerCase().includes(lowerQuery)
+          String(t.amount || '').toLowerCase().includes(lowerQuery) ||
+          String(t.entered_by || '').toLowerCase().includes(lowerQuery)
         );
       });
     }
@@ -192,6 +194,7 @@ export default function useTableState({ transactions, trusteeOptions }: UseTable
       counterparty: { ...defaultColumnFilter },
       amount: { ...defaultColumnFilter },
       remarks: { ...defaultColumnFilter },
+      entered_by: { ...defaultColumnFilter },
     });
     setSearchQuery('');
     setCurrentPage(1);

@@ -14,9 +14,24 @@
  *   super_admin→ public.transactions   (read-only by convention)
  */
 import { Client, QueryResultRow } from 'pg';
+import { createClerkClient } from '@clerk/backend';
 import { getAuthContext } from '../lib/authHelper.js';
 import { setCors, qp } from '../lib/vercel-handler.js';
 import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
+
+/** Resolve a human-readable display name for a Clerk user ID. */
+async function resolveDisplayName(userId: string): Promise<string | null> {
+  const secretKey = process.env.CLERK_SECRET_KEY || process.env.VITE_CLERK_SECRET_KEY || '';
+  if (!secretKey || !userId) return null;
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const user  = await clerk.users.getUser(userId);
+    const name  = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return name || user.emailAddresses?.[0]?.emailAddress || userId;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Module-level cache: tracks which org slugs have been confirmed-provisioned
@@ -114,9 +129,12 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           amount        DECIMAL(15,2) NOT NULL,
           created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
           ModifiedDate  TIMESTAMP,
-          IsDeleted     CHAR(1)       DEFAULT 'N'
+          IsDeleted     CHAR(1)       DEFAULT 'N',
+          entered_by    VARCHAR(255)
         );
       `);
+      // Add column to existing trial table if it was created before this migration
+      await runQuery(`ALTER TABLE trial_transactions ADD COLUMN IF NOT EXISTS entered_by VARCHAR(255)`);
     }
 
     // Ensure org schema tables exist on first access (auto-heals failed migrations)
@@ -143,7 +161,8 @@ export default async function handler(req: VercelReq, res: VercelRes) {
         `SELECT id, date, category, subcategory, sender, receiver,
                 COALESCE(custodian, receiver)    AS custodian,
                 COALESCE(counterparty, sender)   AS counterparty,
-                remarks, amount, created_at, ModifiedDate AS modifieddate
+                remarks, amount, created_at, ModifiedDate AS modifieddate,
+                entered_by
          FROM ${tableName}
          ${whereClause}
          ORDER BY date DESC, created_at DESC`,
@@ -167,14 +186,17 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       const sender: string   = payload.counterparty;
       const receiver: string = payload.custodian;
 
+      // Resolve the display name of the user making this entry (admin users only)
+      const enteredBy = auth.userId ? await resolveDisplayName(auth.userId) : null;
+
       const result = await runQuery(
         `INSERT INTO ${tableName}
-           (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, IsDeleted)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'N')
-         RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at`,
+           (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, IsDeleted, entered_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'N',$10)
+         RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at, entered_by`,
         [payload.date, payload.category, payload.subcategory || null,
          sender, receiver, payload.custodian, payload.counterparty,
-         payload.remarks, payload.amount]
+         payload.remarks, payload.amount, enteredBy]
       );
       return res.status(201).json(result.rows[0]);
     }
@@ -213,15 +235,22 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           [Number(id)]
         );
 
+        // Preserve entered_by from the original row being edited
+        const origRow = await client.query<{ entered_by: string | null }>(
+          `SELECT entered_by FROM ${tableName} WHERE id = $1 LIMIT 1`,
+          [Number(id)]
+        );
+        const origEnteredBy = origRow.rows[0]?.entered_by ?? null;
+
         const insertResult = await client.query(
           `INSERT INTO ${tableName}
-             (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, ModifiedDate)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamp)
+             (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, ModifiedDate, entered_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamp,$11)
            RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty,
-                     remarks, amount, created_at, ModifiedDate AS modifieddate`,
+                     remarks, amount, created_at, ModifiedDate AS modifieddate, entered_by`,
           [txData.date, txData.category, txData.subcategory || null,
            sender, receiver, txData.custodian, txData.counterparty,
-           txData.remarks, txData.amount, ts]
+           txData.remarks, txData.amount, ts, origEnteredBy]
         );
 
         await client.query('COMMIT');
