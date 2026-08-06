@@ -332,3 +332,26 @@ body {
 .animate-slide-in-right {
   animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ── Clerk Overrides (Elevation + Full Transparency) ──────────────────── */
+.cl-card,
+.cl-footer,
+.cl-footerAction,
+.cl-footerPages,
+.cl-main,
+[class*="cl-footer"],
+[class*="cl-card"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.cl-cardBox {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(124, 58, 237, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1.5rem !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 8px !important;
+}
