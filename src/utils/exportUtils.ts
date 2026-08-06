@@ -1,14 +1,15 @@
 /**
- * exportUtils.ts — Premium Formatted Excel (.xls) & CSV Export Utility for KhataCloud
+ * exportUtils.ts — Executive Export Engine for KhataCloud
  *
- * Features:
- *   1. Generates an HTML-based Excel spreadsheet (.xls) with full CSS styling.
- *   2. Native Colors: Deep violet headers (#4c1d95), emerald green for Income, rose red for Expense, blue for Net Position.
- *   3. Fixed Column Widths: Custom widths defined for each column so no text is clipped.
- *   4. Text Wrapping: `white-space: normal; word-wrap: break-word` so long remarks/counterparties wrap neatly without stretching columns.
- *   5. Applied Filters Header: Clearly displays selected Date Range, Categories, Custodians, Amount Range, Search Keyword, and Entered By.
- *   6. Executive Summary Cards: Displays Total Inflow, Outflow, and Net Position with colored indicator cards.
- *   7. Grand Total Row: Summary row at bottom calculating exact totals.
+ * Supports:
+ *   1. `exportTransactionsToExcelXML`: Official Excel SpreadsheetML (XML) export.
+ *      - Zero format mismatch warning when opened in Microsoft Excel!
+ *      - Full rich inline styling: Deep Violet headers (#4C1D95), Green for Income, Red for Expense.
+ *      - Fixed Column Widths: Exact column widths defined in Excel XML schema.
+ *      - Text Wrapping: `ss:WrapText="1"` on cells so long remarks & counterparties wrap neatly.
+ *      - Executive Summary Cards & Applied Filters block.
+ *
+ *   2. `exportTransactionsToCSV`: Universal UTF-8 CSV with Byte-Order Mark (\uFEFF).
  */
 
 import type { Transaction } from '../types';
@@ -31,7 +32,10 @@ export interface ExportOptions {
   orgName?: string;
 }
 
-export function exportTransactionsToCSV({
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. EXCEL SPREADSHEETML (XML) EXPORT — ZERO EXCEL WARNINGS, FULL STYLING
+// ─────────────────────────────────────────────────────────────────────────────
+export function exportTransactionsToExcelXML({
   transactions,
   filenamePrefix = 'Khata_Account_Statement',
   isAdmin = false,
@@ -62,354 +66,415 @@ export function exportTransactionsToCSV({
   const amountRangeText = activeFilters.amountRange || 'All Amounts';
   const dateRangeText = activeFilters.dateRange || 'All Time';
 
+  const escapeXML = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return String(val)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
+
   const netPositionLabel = stats.balance >= 0 ? 'SURPLUS' : 'DEFICIT';
-  const netPositionColor = stats.balance >= 0 ? '#1d4ed8' : '#c2410c';
 
-  // Construct styled HTML table that Excel/Google Sheets open natively with full formatting
-  const htmlContent = `
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<!--[if gte mso 9]>
-<xml>
- <x:ExcelWorkbook>
-  <x:ExcelWorksheets>
-   <x:ExcelWorksheet>
-    <x:Name>Statement</x:Name>
-    <x:WorksheetOptions>
-     <x:DisplayGridlines/>
-    </x:WorksheetOptions>
-   </x:ExcelWorksheet>
-  </x:ExcelWorksheets>
- </x:ExcelWorkbook>
-</xml>
-<![endif]-->
-<style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    font-size: 12px;
-    color: #1e293b;
-    background-color: #ffffff;
-  }
-  .banner-title {
-    background-color: #4c1d95;
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: bold;
-    padding: 12px 16px;
-    text-align: left;
-  }
-  .sub-banner {
-    background-color: #5b21b6;
-    color: #ede9fe;
-    font-size: 11px;
-    padding: 6px 16px;
-  }
-  .section-header {
-    background-color: #f3e8ff;
-    color: #6b21a8;
-    font-size: 13px;
-    font-weight: bold;
-    padding: 8px 12px;
-    border: 1px solid #d8b4fe;
-    margin-top: 15px;
-  }
-  .filter-table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-bottom: 15px;
-    font-size: 12px;
-  }
-  .filter-table td {
-    padding: 6px 10px;
-    border: 1px solid #e9d5ff;
-    vertical-align: top;
-  }
-  .filter-label {
-    font-weight: bold;
-    color: #581c87;
-    width: 160px;
-    background-color: #faf5ff;
-  }
-  .filter-val {
-    color: #1e1b4b;
-  }
-  
-  .summary-grid {
-    margin-bottom: 20px;
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .summary-card {
-    padding: 10px 14px;
-    border-radius: 6px;
-    text-align: center;
-    border: 1px solid #cbd5e1;
-  }
-  .card-inflow {
-    background-color: #ecfdf5;
-    border-color: #a7f3d0;
-    color: #047857;
-  }
-  .card-outflow {
-    background-color: #fff1f2;
-    border-color: #fecdd3;
-    color: #be123c;
-  }
-  .card-net {
-    background-color: #eff6ff;
-    border-color: #bfdbfe;
-    color: #1d4ed8;
-  }
-  .card-val {
-    font-size: 16px;
-    font-weight: bold;
-    margin-top: 4px;
-  }
-  .card-lbl {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
+  // Excel SpreadsheetML Schema
+  const xmlString = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Author>${escapeXML(orgName)}</Author>
+  <Created>${now.toISOString()}</Created>
+ </DocumentProperties>
+ <Styles>
+  <!-- Base Style -->
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#1E293B"/>
+  </Style>
+  <!-- Header Banner -->
+  <Style ss:ID="Banner">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="14" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#4C1D95" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="SubBanner">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Color="#EDE9FE"/>
+   <Interior ss:Color="#5B21B6" ss:Pattern="Solid"/>
+  </Style>
+  <!-- Section Title -->
+  <Style ss:ID="SectionHeader">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#6B21A8"/>
+   <Interior ss:Color="#F3E8FF" ss:Pattern="Solid"/>
+  </Style>
+  <!-- Filter Label & Value -->
+  <Style ss:ID="FilterLabel">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Top"/>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#581C87"/>
+   <Interior ss:Color="#FAF5FF" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="FilterVal">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Top" ss:WrapText="1"/>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Color="#1E1B4B"/>
+  </Style>
+  <!-- Cards -->
+  <Style ss:ID="CardTitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#475569"/>
+   <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardInflow">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#047857"/>
+   <Interior ss:Color="#ECFDF5" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardOutflow">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#BE123C"/>
+   <Interior ss:Color="#FFF1F2" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardNet">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#1D4ED8"/>
+   <Interior ss:Color="#EFF6FF" ss:Pattern="Solid"/>
+  </Style>
+  <!-- Table Header -->
+  <Style ss:ID="TableHeader">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="TableHeaderCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="TableHeaderRight">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center" ss:WrapText="1"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+  </Style>
+  <!-- Table Cells -->
+  <Style ss:ID="CellText">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Top" ss:WrapText="1"/>
+  </Style>
+  <Style ss:ID="CellCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Top"/>
+  </Style>
+  <Style ss:ID="CellIncome">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#047857"/>
+   <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+  </Style>
+  <Style ss:ID="CellExpense">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#BE123C"/>
+   <NumberFormat ss:Format="&#34;-₹&#34;#,##0.00"/>
+  </Style>
+  <Style ss:ID="CellTransfer">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#1D4ED8"/>
+   <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+  </Style>
+  <!-- Footer Totals -->
+  <Style ss:ID="FooterLabel">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#0F172A"/>
+   <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="FooterNet">
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#1D4ED8"/>
+   <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+   <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Statement">
+  <Table ss:ExpandedColumnCount="${isAdmin ? 9 : 8}">
+   <!-- EXPLICIT COLUMN WIDTHS -->
+   <Column ss:Width="50"/>   <!-- S.No -->
+   <Column ss:Width="95"/>   <!-- Date -->
+   <Column ss:Width="95"/>   <!-- Category -->
+   <Column ss:Width="140"/>  <!-- Subcategory -->
+   <Column ss:Width="140"/>  <!-- Custodian -->
+   <Column ss:Width="180"/>  <!-- Counterparty -->
+   <Column ss:Width="115"/>  <!-- Amount -->
+   <Column ss:Width="240"/>  <!-- Remarks -->
+   ${isAdmin ? '<Column ss:Width="130"/>' : ''} <!-- Entered By -->
 
-  .data-table {
-    border-collapse: collapse;
-    width: 100%;
-    table-layout: fixed;
-    font-size: 12px;
-  }
-  .data-table th {
-    background-color: #6d28d9;
-    color: #ffffff;
-    font-weight: 600;
-    padding: 10px 8px;
-    border: 1px solid #5b21b6;
-    text-align: left;
-    vertical-align: middle;
-  }
-  .data-table td {
-    padding: 8px 10px;
-    border: 1px solid #cbd5e1;
-    vertical-align: top;
-    white-space: normal !important;
-    word-wrap: break-word !important;
-  }
-  .row-even {
-    background-color: #f8fafc;
-  }
-  .row-odd {
-    background-color: #ffffff;
-  }
-  
-  .text-center { text-align: center; }
-  .text-right { text-align: right; }
-  .text-left { text-align: left; }
+   <!-- BANNER ROW -->
+   <Row ss:Height="28">
+    <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="Banner">
+     <Data ss:Type="String">${escapeXML(orgName.toUpperCase())} — FINANCIAL ACCOUNT STATEMENT</Data>
+    </Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SubBanner">
+     <Data ss:Type="String">Report Generated: ${dateStamp} at ${timeStamp} | Context: ${escapeXML(filenamePrefix.replace(/_/g, ' '))}</Data>
+    </Cell>
+   </Row>
+   <Row ss:Height="10"/>
 
-  .badge-income {
-    color: #047857;
-    font-weight: bold;
-    background-color: #d1fae5;
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  .badge-expense {
-    color: #be123c;
-    font-weight: bold;
-    background-color: #ffe4e6;
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  .badge-transfer {
-    color: #1d4ed8;
-    font-weight: bold;
-    background-color: #dbeafe;
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
+   <!-- APPLIED FILTERS HEADER -->
+   <Row ss:Height="20">
+    <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SectionHeader">
+     <Data ss:Type="String">APPLIED FILTERS AT EXPORT TIME</Data>
+    </Cell>
+   </Row>
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Date Filter Period:</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(dateRangeText)}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Categories:</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(categoryText)}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Custodians / Trustees:</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(custodianText)}</Data></Cell>
+   </Row>
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Amount Range:</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(amountRangeText)}</Data></Cell>
+   </Row>
+   ${isAdmin ? `
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Entered By User(s):</Data></Cell>
+    <Cell ss:MergeAcross="7" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(enteredByText)}</Data></Cell>
+   </Row>
+   ` : ''}
+   <Row>
+    <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Search Term / Keyword:</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(searchKeywordText)}</Data></Cell>
+   </Row>
+   <Row ss:Height="10"/>
 
-  .amt-income {
-    color: #047857;
-    font-weight: bold;
-  }
-  .amt-expense {
-    color: #be123c;
-    font-weight: bold;
-  }
-  .amt-transfer {
-    color: #1d4ed8;
-    font-weight: bold;
-  }
+   <!-- EXECUTIVE FINANCIAL SUMMARY CARDS -->
+   <Row ss:Height="20">
+    <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SectionHeader">
+     <Data ss:Type="String">FINANCIAL SUMMARY (EXACT EXPORTED RECORDS)</Data>
+    </Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Records Exported</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Income (Inflow)</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Expenses (Outflow)</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 2 : 1}" ss:StyleID="CardTitle"><Data ss:Type="String">Net Position (${netPositionLabel})</Data></Cell>
+   </Row>
+   <Row ss:Height="24">
+    <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="Number">${transactions.length}</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CardInflow"><Data ss:Type="Number">${stats.income}</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CardOutflow"><Data ss:Type="Number">${stats.expenses}</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 2 : 1}" ss:StyleID="CardNet"><Data ss:Type="Number">${stats.balance}</Data></Cell>
+   </Row>
+   <Row ss:Height="12"/>
 
-  .footer-summary td {
-    background-color: #f1f5f9;
-    font-weight: bold;
-    border-top: 2px solid #475569;
-    padding: 10px;
-    color: #0f172a;
-  }
-</style>
-</head>
-<body>
+   <!-- DATA TABLE HEADERS -->
+   <Row ss:Height="24">
+    <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">S.No.</Data></Cell>
+    <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">Date</Data></Cell>
+    <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">Category</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Subcategory</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Custodian</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Counterparty</Data></Cell>
+    <Cell ss:StyleID="TableHeaderRight"><Data ss:Type="String">Amount (₹)</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Remarks</Data></Cell>
+    ${isAdmin ? '<Cell ss:StyleID="TableHeader"><Data ss:Type="String">Entered By</Data></Cell>' : ''}
+   </Row>
 
-  <!-- BANNER HEADER -->
-  <table width="100%" cellPadding="0" cellSpacing="0" style="margin-bottom: 12px;">
-    <tr>
-      <td class="banner-title" colSpan="${isAdmin ? 9 : 8}">
-        ${orgName.toUpperCase()} — FINANCIAL ACCOUNT STATEMENT
-      </td>
-    </tr>
-    <tr>
-      <td class="sub-banner" colSpan="${isAdmin ? 9 : 8}">
-        Report Generated: ${dateStamp} at ${timeStamp} | Context: ${filenamePrefix.replace(/_/g, ' ')}
-      </td>
-    </tr>
-  </table>
+   <!-- DATA ROWS -->
+   ${transactions.map((t, idx) => {
+     const rawAmt = Number(t.amount) || 0;
+     const isExp = t.category === 'Expense';
+     const isInc = t.category === 'Income';
+     const amtStyle = isInc ? 'CellIncome' : isExp ? 'CellExpense' : 'CellTransfer';
+     const valAmt = isExp ? -Math.abs(rawAmt) : rawAmt;
 
-  <!-- SECTION: APPLIED FILTERS SUMMARY -->
-  <div class="section-header">APPLIED FILTERS AT EXPORT TIME</div>
-  <table class="filter-table">
-    <tr>
-      <td class="filter-label">Date Filter Period:</td>
-      <td class="filter-val" colSpan="${isAdmin ? 8 : 7}">${dateRangeText}</td>
-    </tr>
-    <tr>
-      <td class="filter-label">Categories Selected:</td>
-      <td class="filter-val" colSpan="${isAdmin ? 8 : 7}">${categoryText}</td>
-    </tr>
-    <tr>
-      <td class="filter-label">Custodians / Trustees:</td>
-      <td class="filter-val" colSpan="${isAdmin ? 8 : 7}">${custodianText}</td>
-    </tr>
-    <tr>
-      <td class="filter-label">Amount Range:</td>
-      <td class="filter-val" colSpan="${isAdmin ? 8 : 7}">${amountRangeText}</td>
-    </tr>
-    ${isAdmin ? `
-    <tr>
-      <td class="filter-label">Entered By User(s):</td>
-      <td class="filter-val" colSpan="8">${enteredByText}</td>
-    </tr>
-    ` : ''}
-    <tr>
-      <td class="filter-label">Search Term / Keyword:</td>
-      <td class="filter-val" colSpan="${isAdmin ? 8 : 7}">${searchKeywordText}</td>
-    </tr>
-  </table>
+     return `
+   <Row>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${idx + 1}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${escapeXML(t.date)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${escapeXML(t.category)}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXML(t.subcategory || '-')}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXML(t.custodian || '-')}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXML(t.counterparty || '-')}</Data></Cell>
+    <Cell ss:StyleID="${amtStyle}"><Data ss:Type="Number">${valAmt}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXML(t.remarks || '-')}</Data></Cell>
+    ${isAdmin ? `<Cell ss:StyleID="CellText"><Data ss:Type="String">${escapeXML(t.entered_by || '-')}</Data></Cell>` : ''}
+   </Row>`;
+   }).join('')}
 
-  <!-- SECTION: EXECUTIVE FINANCIAL SUMMARY CARDS -->
-  <div class="section-header">FINANCIAL SUMMARY (EXACT EXPORTED RECORDS)</div>
-  <table class="summary-grid">
-    <tr>
-      <td width="25%">
-        <div class="summary-card card-inflow">
-          <div class="card-lbl">Total Records</div>
-          <div class="card-val">${transactions.length}</div>
-        </div>
-      </td>
-      <td width="25%">
-        <div class="summary-card card-inflow">
-          <div class="card-lbl">Total Inflow (Income)</div>
-          <div class="card-val">₹ ${stats.income.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
-      </td>
-      <td width="25%">
-        <div class="summary-card card-outflow">
-          <div class="card-lbl">Total Outflow (Expense)</div>
-          <div class="card-val">₹ ${stats.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        </div>
-      </td>
-      <td width="25%">
-        <div class="summary-card card-net">
-          <div class="card-lbl">Net Position (${netPositionLabel})</div>
-          <div class="card-val" style="color: ${netPositionColor};">
-            ₹ ${stats.balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-      </td>
-    </tr>
-  </table>
+   <!-- GRAND TOTALS FOOTER -->
+   <Row ss:Height="12"/>
+   <Row ss:Height="24">
+    <Cell ss:MergeAcross="1" ss:StyleID="FooterLabel"><Data ss:Type="String">GRAND TOTALS</Data></Cell>
+    <Cell ss:MergeAcross="3" ss:StyleID="FooterLabel"><Data ss:Type="String">Records Exported: ${transactions.length}</Data></Cell>
+    <Cell ss:StyleID="FooterNet"><Data ss:Type="Number">${stats.balance}</Data></Cell>
+    <Cell ss:MergeAcross="${isAdmin ? 1 : 0}" ss:StyleID="FooterLabel">
+     <Data ss:Type="String">Inflow: +₹${stats.income.toFixed(2)} | Outflow: -₹${stats.expenses.toFixed(2)}</Data>
+    </Cell>
+   </Row>
 
-  <!-- SECTION: TRANSACTION LEDGER TABLE WITH EXPLICIT COLUMN WIDTHS & TEXT WRAP -->
-  <div class="section-header">TRANSACTION LEDGER DETAILS</div>
-  <table class="data-table">
-    <colgroup>
-      <col style="width: 55px;" />   <!-- S.No -->
-      <col style="width: 105px;" />  <!-- Date -->
-      <col style="width: 105px;" />  <!-- Category -->
-      <col style="width: 150px;" />  <!-- Subcategory -->
-      <col style="width: 150px;" />  <!-- Custodian -->
-      <col style="width: 190px;" />  <!-- Counterparty -->
-      <col style="width: 125px;" />  <!-- Amount -->
-      <col style="width: 260px;" />  <!-- Remarks -->
-      ${isAdmin ? '<col style="width: 135px;" />' : ''} <!-- Entered By -->
-    </colgroup>
-    <thead>
-      <tr>
-        <th class="text-center">S.No.</th>
-        <th class="text-center">Date</th>
-        <th class="text-center">Category</th>
-        <th class="text-left">Subcategory</th>
-        <th class="text-left">Custodian</th>
-        <th class="text-left">Counterparty</th>
-        <th class="text-right">Amount (₹)</th>
-        <th class="text-left">Remarks</th>
-        ${isAdmin ? '<th class="text-left">Entered By</th>' : ''}
-      </tr>
-    </thead>
-    <tbody>
-      ${transactions.map((t, idx) => {
-        const rawAmt = Number(t.amount) || 0;
-        const isExp = t.category === 'Expense';
-        const isInc = t.category === 'Income';
-        
-        const badgeClass = isInc ? 'badge-income' : isExp ? 'badge-expense' : 'badge-transfer';
-        const amtClass   = isInc ? 'amt-income'   : isExp ? 'amt-expense'   : 'amt-transfer';
-        const amtSign    = isInc ? '+' : isExp ? '-' : '↔';
+  </Table>
+  <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+   <PageSetup>
+    <Header x:Margin="0.3"/>
+    <Footer x:Margin="0.3"/>
+   </PageSetup>
+   <Selected/>
+   <Panes>
+    <Pane>
+     <Number>3</Number>
+     <ActiveRow>1</ActiveRow>
+    </Pane>
+   </Panes>
+   <ProtectObjects>False</ProtectObjects>
+   <ProtectScenarios>False</ProtectScenarios>
+  </WorksheetOptions>
+ </Worksheet>
+</Workbook>`;
 
-        const displayAmt = `${amtSign} ₹ ${rawAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        const rowClass = idx % 2 === 0 ? 'row-even' : 'row-odd';
-
-        return `
-        <tr class="${rowClass}">
-          <td class="text-center">${idx + 1}</td>
-          <td class="text-center">${t.date}</td>
-          <td class="text-center"><span class="${badgeClass}">${t.category}</span></td>
-          <td class="text-left">${t.subcategory || '-'}</td>
-          <td class="text-left">${t.custodian || '-'}</td>
-          <td class="text-left">${t.counterparty || '-'}</td>
-          <td class="text-right ${amtClass}">${displayAmt}</td>
-          <td class="text-left">${t.remarks || '-'}</td>
-          ${isAdmin ? `<td class="text-left">${t.entered_by || '-'}</td>` : ''}
-        </tr>
-        `;
-      }).join('')}
-    </tbody>
-    <tfoot>
-      <tr class="footer-summary">
-        <td class="text-center" colSpan="2">GRAND TOTALS</td>
-        <td class="text-center" colSpan="4">Records Exported: ${transactions.length}</td>
-        <td class="text-right" style="color: ${netPositionColor};">
-          ₹ ${stats.balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </td>
-        <td colSpan="${isAdmin ? 2 : 1}">
-          Inflow: +₹${stats.income.toLocaleString('en-IN')} | Outflow: -₹${stats.expenses.toLocaleString('en-IN')}
-        </td>
-      </tr>
-    </tfoot>
-  </table>
-
-</body>
-</html>
-  `;
-
-  // Create downloadable Excel blob (.xls extension) which Excel & Google Sheets open natively with full styles
-  const blob = new Blob(['\uFEFF' + htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  // Create downloadable Excel file (.xml) — opens in Microsoft Excel & Google Sheets without warnings
+  const blob = new Blob([xmlString], { type: 'application/vnd.ms-excel' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   
   const cleanPrefix = filenamePrefix.replace(/[^a-zA-Z0-9_-]/g, '_');
-  link.setAttribute('download', `${cleanPrefix}_${dateStamp}.xls`);
+  link.setAttribute('download', `${cleanPrefix}_${dateStamp}.xml`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. UNIVERSAL STANDARD CSV EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
+export function exportTransactionsToCSV({
+  transactions,
+  filenamePrefix = 'Khata_Account_Statement',
+  isAdmin = false,
+  activeFilters = {},
+  orgName = 'KhataCloud',
+}: ExportOptions) {
+  const stats = calculateStats(transactions);
+  const now = new Date();
+  const dateStamp = now.toISOString().split('T')[0];
+  const timeStamp = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const lines: string[] = [];
+
+  const escapeCell = (val: any): string => {
+    if (val === null || val === undefined) return '""';
+    const str = String(val).replace(/"/g, '""');
+    return `"${str}"`;
+  };
+
+  lines.push([orgName.toUpperCase() + ' — FINANCIAL ACCOUNT STATEMENT'].map(escapeCell).join(','));
+  lines.push(['Generated On:', `${dateStamp} at ${timeStamp}`].map(escapeCell).join(','));
+  lines.push(['Export Context:', filenamePrefix.replace(/_/g, ' ')].map(escapeCell).join(','));
+  lines.push('');
+
+  lines.push(['=== APPLIED FILTERS SUMMARY ==='].map(escapeCell).join(','));
+  lines.push(['Date Filter:', activeFilters.dateRange || 'All Time'].map(escapeCell).join(','));
+
+  const categoryText = activeFilters.categories?.length
+    ? activeFilters.categories.join(', ')
+    : 'All Categories (Income, Expense, Transfer)';
+  lines.push(['Categories:', categoryText].map(escapeCell).join(','));
+
+  const custodianText = activeFilters.custodians?.length
+    ? activeFilters.custodians.join(', ')
+    : 'All Custodians / Trustees';
+  lines.push(['Custodians / Trustees:', custodianText].map(escapeCell).join(','));
+
+  if (activeFilters.amountRange) {
+    lines.push(['Amount Range:', activeFilters.amountRange].map(escapeCell).join(','));
+  }
+  if (activeFilters.enteredBy?.length) {
+    lines.push(['Entered By:', activeFilters.enteredBy.join(', ')].map(escapeCell).join(','));
+  }
+  if (activeFilters.searchQuery?.trim()) {
+    lines.push(['Search Keyword:', `"${activeFilters.searchQuery.trim()}"`].map(escapeCell).join(','));
+  }
+
+  lines.push('');
+
+  lines.push(['=== FINANCIAL SUMMARY (EXPORTED RECORDS) ==='].map(escapeCell).join(','));
+  lines.push(['Total Records Exported:', transactions.length].map(escapeCell).join(','));
+  lines.push(['Total Income (Inflow):', `₹ ${stats.income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`].map(escapeCell).join(','));
+  lines.push(['Total Expenses (Outflow):', `₹ ${stats.expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`].map(escapeCell).join(','));
+  
+  const netLabel = stats.balance >= 0 ? 'SURPLUS' : 'DEFICIT';
+  lines.push(['Net Position:', `${netLabel}: ₹ ${stats.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`].map(escapeCell).join(','));
+  lines.push('');
+
+  lines.push(['=== TRANSACTION LEDGER DETAILS ==='].map(escapeCell).join(','));
+  const headers = [
+    'S.No.',
+    'Date',
+    'Category',
+    'Subcategory',
+    'Custodian',
+    'Counterparty',
+    'Amount (₹)',
+    'Remarks',
+  ];
+  if (isAdmin) {
+    headers.push('Entered By');
+  }
+  lines.push(headers.map(escapeCell).join(','));
+
+  transactions.forEach((t, idx) => {
+    const rawAmt = Number(t.amount) || 0;
+    const formattedAmt = t.category === 'Expense' ? -Math.abs(rawAmt) : rawAmt;
+    const row = [
+      idx + 1,
+      t.date,
+      t.category,
+      t.subcategory || '-',
+      t.custodian || '-',
+      t.counterparty || '-',
+      formattedAmt.toFixed(2),
+      t.remarks || '-',
+    ];
+    if (isAdmin) {
+      row.push(t.entered_by || '-');
+    }
+    lines.push(row.map(escapeCell).join(','));
+  });
+
+  lines.push('');
+  const summaryRow = [
+    'GRAND TOTALS',
+    `Records: ${transactions.length}`,
+    '',
+    '',
+    '',
+    'NET BALANCE:',
+    stats.balance.toFixed(2),
+    `Inflow: +${stats.income.toFixed(2)} | Outflow: -${stats.expenses.toFixed(2)}`,
+  ];
+  if (isAdmin) {
+    summaryRow.push('');
+  }
+  lines.push(summaryRow.map(escapeCell).join(','));
+
+  const csvString = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  
+  const cleanPrefix = filenamePrefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+  link.setAttribute('download', `${cleanPrefix}_${dateStamp}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

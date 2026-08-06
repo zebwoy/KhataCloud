@@ -5,7 +5,7 @@ import type { Transaction, TrusteeOption } from '../types';
 import { defaultColumnFilter } from '../types';
 import useTableState from '../hooks/useTableState';
 import { formatCurrency, formatDisplayDate } from '../utils/formatters';
-import { exportTransactionsToCSV } from '../utils/exportUtils';
+import ExportOptionsModal from './ExportOptionsModal';
 
 interface TransactionTableProps {
   transactions: Transaction[];
@@ -350,6 +350,7 @@ export default function TransactionTable({
   const table = useTableState({ transactions, trusteeOptions });
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   // Keyboard shortcut to focus search
   useEffect(() => {
@@ -434,41 +435,47 @@ export default function TransactionTable({
           )}
         </button>
 
-        {/* Export CSV */}
+        {/* Export CSV / Excel */}
         <button
-          onClick={() => {
-            const cf = table.columnFilters;
-            let dateRangeStr = '';
-            if (cf.date?.dateFrom || cf.date?.dateTo) {
-              dateRangeStr = `${cf.date.dateFrom || 'Start'} to ${cf.date.dateTo || 'End'}`;
-            }
-
-            let amountRangeStr = '';
-            if (cf.amount?.amountMin || cf.amount?.amountMax) {
-              amountRangeStr = `₹${cf.amount.amountMin || '0'} to ₹${cf.amount.amountMax || '∞'}`;
-            }
-
-            exportTransactionsToCSV({
-              transactions: table.filteredTransactions,
-              filenamePrefix: 'Transaction_Ledger_Export',
-              isAdmin,
-              activeFilters: {
-                dateRange: dateRangeStr || 'All Time',
-                categories: cf.category?.selectedValues,
-                custodians: cf.custodian?.selectedValues,
-                enteredBy: cf.entered_by?.selectedValues,
-                amountRange: amountRangeStr,
-                searchQuery: table.searchQuery,
-              },
-              orgName: 'KhataCloud',
-            });
-          }}
+          onClick={() => setExportModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors shrink-0 shadow-sm"
         >
           <Download size={15} />
-          <span className="hidden sm:inline">Export CSV</span>
+          <span className="hidden sm:inline">Export</span>
         </button>
       </div>
+
+      {/* ── Export Options Modal ── */}
+      {(() => {
+        const cf = table.columnFilters;
+        let dateRangeStr = '';
+        if (cf.date?.dateFrom || cf.date?.dateTo) {
+          dateRangeStr = `${cf.date.dateFrom || 'Start'} to ${cf.date.dateTo || 'End'}`;
+        }
+        let amountRangeStr = '';
+        if (cf.amount?.amountMin || cf.amount?.amountMax) {
+          amountRangeStr = `₹${cf.amount.amountMin || '0'} to ₹${cf.amount.amountMax || '∞'}`;
+        }
+
+        return (
+          <ExportOptionsModal
+            isOpen={exportModalOpen}
+            onClose={() => setExportModalOpen(false)}
+            transactions={table.filteredTransactions}
+            isAdmin={isAdmin}
+            filenamePrefix="Transaction_Ledger_Export"
+            activeFiltersContext={{
+              dateRange: dateRangeStr || 'All Time',
+              categories: cf.category?.selectedValues,
+              custodians: cf.custodian?.selectedValues,
+              enteredBy: cf.entered_by?.selectedValues,
+              amountRange: amountRangeStr,
+              searchQuery: table.searchQuery,
+            }}
+            orgName="KhataCloud"
+          />
+        );
+      })()}
 
       {/* ── Filter Drawer ── */}
       <FilterDrawer
