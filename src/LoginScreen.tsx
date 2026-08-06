@@ -100,12 +100,12 @@ export default function LoginScreen() {
       />
 
       {/* ── Auth card (z-10, pointer-events captured here, not on the bg) ── */}
-      <div className="relative z-10 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl shadow-black/80 flex min-h-[560px]">
+      <div className="relative z-10 w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl shadow-black/90 border border-white/15 backdrop-blur-xl flex min-h-[490px]">
 
-        {/* ── LEFT BRAND PANEL ─────────────────────────────────────────── */}
+        {/* ── LEFT BRAND PANEL (semi-transparent violet glass) ────────────────── */}
         <div
-          className="hidden md:flex md:w-[46%] flex-col justify-between p-10 text-white relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #4c1d95 0%, #6d28d9 45%, #7c3aed 100%)' }}
+          className="hidden md:flex md:w-[44%] flex-col justify-between p-8 text-white relative overflow-hidden backdrop-blur-md"
+          style={{ background: 'linear-gradient(135deg, rgba(76, 29, 149, 0.82) 0%, rgba(109, 40, 217, 0.82) 45%, rgba(124, 58, 237, 0.82) 100%)' }}
         >
           {/* Decorative circles */}
           <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/5" />
@@ -113,27 +113,27 @@ export default function LoginScreen() {
 
           {/* Logo */}
           <div className="relative">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-lg shadow-black/40 shrink-0">
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-black/40 shrink-0">
                 <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
               </div>
-              <span className="text-2xl font-bold tracking-tight">KhataCloud</span>
+              <span className="text-xl font-bold tracking-tight">KhataCloud</span>
             </div>
-            <p className="text-sm text-violet-200/80 leading-relaxed">
+            <p className="text-xs text-violet-200/80 leading-relaxed">
               Smart accounting &amp; reporting for educational institutions
             </p>
           </div>
 
           {/* Features */}
-          <div className="relative space-y-5">
+          <div className="relative space-y-4">
             {FEATURES.map(({ icon: Icon, label, sub }) => (
-              <div key={label} className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
-                  <Icon size={15} />
+              <div key={label} className="flex items-start gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
+                  <Icon size={14} />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold leading-snug">{label}</p>
-                  <p className="text-xs text-violet-200/70 mt-0.5">{sub}</p>
+                  <p className="text-xs font-semibold leading-snug">{label}</p>
+                  <p className="text-[11px] text-violet-200/70 mt-0.5">{sub}</p>
                 </div>
               </div>
             ))}
@@ -141,28 +141,28 @@ export default function LoginScreen() {
 
           {/* Demo CTA */}
           <div className="relative">
-            <div className="h-px bg-white/15 mb-5" />
-            <p className="text-xs text-violet-200/60 mb-3">Want to explore before signing up?</p>
+            <div className="h-px bg-white/15 mb-4" />
+            <p className="text-[11px] text-violet-200/60 mb-2">Want to explore before signing up?</p>
             <button
               onClick={() => { window.location.href = '/trial'; }}
-              className="group flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white transition-colors"
+              className="group flex items-center gap-2 text-xs font-semibold text-white/90 hover:text-white transition-colors"
             >
-              <span className="w-7 h-7 rounded-lg bg-white/15 group-hover:bg-white/25 flex items-center justify-center transition-colors">
-                <ArrowRight size={13} />
+              <span className="w-6 h-6 rounded-lg bg-white/15 group-hover:bg-white/25 flex items-center justify-center transition-colors">
+                <ArrowRight size={12} />
               </span>
               Open Demo Account
             </button>
           </div>
         </div>
 
-        {/* ── RIGHT SIGN-IN PANEL ───────────────────────────────────────── */}
-        <div className="flex-1 bg-slate-900 flex flex-col items-center justify-center px-6 py-10">
+        {/* ── RIGHT SIGN-IN PANEL (semi-transparent dark glass) ─────────────── */}
+        <div className="flex-1 bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-center px-6 py-8">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-8 md:hidden">
-            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
+          <div className="flex items-center gap-2.5 mb-6 md:hidden">
+            <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
               <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
             </div>
-            <span className="text-base font-bold text-white tracking-tight">KhataCloud</span>
+            <span className="text-sm font-bold text-white tracking-tight">KhataCloud</span>
           </div>
 
           <SignIn
