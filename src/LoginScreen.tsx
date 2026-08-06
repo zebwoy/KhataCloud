@@ -100,11 +100,11 @@ export default function LoginScreen() {
       />
 
       {/* ── Auth card (z-10, pointer-events captured here, not on the bg) ── */}
-      <div className="relative z-10 w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl shadow-black/90 border border-white/15 backdrop-blur-xl flex min-h-[490px]">
+      <div className="relative z-10 w-full max-w-5xl rounded-3xl overflow-hidden shadow-2xl shadow-black/90 backdrop-blur-none flex min-h-[440px]">
 
-        {/* ── LEFT BRAND PANEL (semi-transparent violet glass) ────────────────── */}
+        {/* ── LEFT BRAND PANEL (transparent violet tint, no blur) ─────────────── */}
         <div
-          className="hidden md:flex md:w-[44%] flex-col justify-between p-8 text-white relative overflow-hidden backdrop-blur-md"
+          className="hidden md:flex md:w-[44%] flex-col justify-between p-7 text-white relative overflow-hidden backdrop-blur-none"
           style={{ background: 'linear-gradient(135deg, rgba(76, 29, 149, 0.82) 0%, rgba(109, 40, 217, 0.82) 45%, rgba(124, 58, 237, 0.82) 100%)' }}
         >
           {/* Decorative circles */}
@@ -113,8 +113,8 @@ export default function LoginScreen() {
 
           {/* Logo */}
           <div className="relative">
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-black/40 shrink-0">
+            <div className="flex items-center gap-2.5 mb-1.5">
+              <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-black/40 shrink-0">
                 <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
               </div>
               <span className="text-xl font-bold tracking-tight">KhataCloud</span>
@@ -125,7 +125,7 @@ export default function LoginScreen() {
           </div>
 
           {/* Features */}
-          <div className="relative space-y-4">
+          <div className="relative space-y-3.5 my-2">
             {FEATURES.map(({ icon: Icon, label, sub }) => (
               <div key={label} className="flex items-start gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-white/15 flex items-center justify-center shrink-0 mt-0.5">
@@ -141,8 +141,8 @@ export default function LoginScreen() {
 
           {/* Demo CTA */}
           <div className="relative">
-            <div className="h-px bg-white/15 mb-4" />
-            <p className="text-[11px] text-violet-200/60 mb-2">Want to explore before signing up?</p>
+            <div className="h-px bg-white/15 mb-3" />
+            <p className="text-[11px] text-violet-200/60 mb-1.5">Want to explore before signing up?</p>
             <button
               onClick={() => { window.location.href = '/trial'; }}
               className="group flex items-center gap-2 text-xs font-semibold text-white/90 hover:text-white transition-colors"
@@ -155,10 +155,10 @@ export default function LoginScreen() {
           </div>
         </div>
 
-        {/* ── RIGHT SIGN-IN PANEL (semi-transparent dark glass) ─────────────── */}
-        <div className="flex-1 bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-center px-6 py-8">
+        {/* ── RIGHT SIGN-IN PANEL (transparent dark slate, no blur) ──────────── */}
+        <div className="flex-1 bg-slate-900/85 backdrop-blur-none flex flex-col items-center justify-center px-6 py-6">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2.5 mb-6 md:hidden">
+          <div className="flex items-center gap-2.5 mb-5 md:hidden">
             <div className="w-8 h-8 rounded-xl overflow-hidden shadow-md shadow-black/30 shrink-0">
               <img src="/logo.png" alt="KhataCloud" className="w-full h-full object-cover scale-[1.18]" />
             </div>
