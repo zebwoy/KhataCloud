@@ -1,65 +1,101 @@
 /**
- * useAuth — manages authentication state, user type selection,
- * login/logout handlers, and animated title transitions.
+ * useAuth.ts — manages auth state, user type selection, login/logout,
+ * and animated title transitions for AccountingSystem.
  *
- * onLoginSuccess is called after a successful server response so
- * the caller can kick off data-fetching without coupling the hook
- * to data-fetch logic.
+ * Auto-trial mode: fires when the user navigates to /trial (the demo route).
+ * Calls /api/auth with userType='trial', stores the JWT in sessionStorage,
+ * and sets isLoggedIn=true — AccountingSystem renders without user interaction.
+ *
+ * For Clerk-authenticated org members: RootApp writes the Clerk JWT to
+ * sessionStorage.kc_auth_token before rendering AccountingSystem,
+ * so isLoggedIn is already true on mount.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SingleValue } from 'react-select';
 import type { UserTypeOption } from '../types';
 
-export type UserType = 'admin' | 'trial';
+export type UserType = 'admin' | 'trial' | 'org_member' | 'super_admin';
 
 export interface AuthState {
-  isLoggedIn: boolean;
-  userType: UserType;
-  displayTitle: string;
+  isLoggedIn:       boolean;
+  userType:         UserType;
+  displayTitle:     string;
   isTitleAnimating: boolean;
   isAuthenticating: boolean;
-  authError: string;
+  authError:        string;
 }
 
 export interface UseAuthReturn extends AuthState {
   handleUserTypeChange: (option: SingleValue<UserTypeOption>) => void;
-  handleLogin: (password: string, onSuccess: () => Promise<void>) => Promise<void>;
+  handleLogin:  (password: string, onSuccess: () => Promise<void>) => Promise<void>;
   handleLogout: () => void;
 }
 
 export default function useAuth(): UseAuthReturn {
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return !!sessionStorage.getItem('madrasah_auth_token');
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(() =>
+    !!sessionStorage.getItem('kc_auth_token')
+  );
 
-  const [userType, setUserType] = useState<UserType>(() => {
-    return (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial';
-  });
+  const [userType, setUserType] = useState<UserType>(() =>
+    (sessionStorage.getItem('kc_user_type') as UserType) || 'trial'
+  );
 
   const [displayTitle, setDisplayTitle] = useState<string>(() => {
-    const saved = (sessionStorage.getItem('madrasah_user_type') as UserType) || 'trial';
-    return saved === 'trial' ? 'Trial account for Demo Purpose' : 'Millat Quran Learning Centre';
+    const saved = (sessionStorage.getItem('kc_user_type') as UserType) || 'trial';
+    return saved === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud';
   });
 
   const [isTitleAnimating, setIsTitleAnimating] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const [authError, setAuthError]               = useState('');
+
+  /**
+   * Auto trial mode — fires when user arrives at /trial
+   * (linked from the KhataCloud login screen's "Open Demo Account" button).
+   * Also accepts the legacy ?trial=1 param for backward compat.
+   */
+  useEffect(() => {
+    const isTrialRoute = window.location.pathname === '/trial';
+    const isTrialParam = new URLSearchParams(window.location.search).get('trial') === '1';
+    if ((!isTrialRoute && !isTrialParam) || isLoggedIn) return;
+
+    setIsAuthenticating(true);
+    setUserType('trial');
+
+    fetch('/api/auth', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ password: '', userType: 'trial' }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          sessionStorage.setItem('kc_auth_token', data.token);
+          sessionStorage.setItem('kc_user_type', 'trial');
+          setIsLoggedIn(true);
+          setDisplayTitle('Trial account for Demo Purpose');
+          // Clean the URL so a refresh doesn't re-trigger
+          if (isTrialParam) window.history.replaceState({}, '', '/trial');
+        } else {
+          setAuthError('Could not start demo. Please try again.');
+        }
+      })
+      .catch(() => setAuthError('Network error. Please try again.'))
+      .finally(() => setIsAuthenticating(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUserTypeChange = (option: SingleValue<UserTypeOption>) => {
-    const newUserType = option?.value ?? 'admin';
-    if (newUserType !== userType) {
+    const newType = option?.value ?? 'admin';
+    if (newType !== userType) {
       setIsTitleAnimating(true);
       setTimeout(() => {
-        const newTitle =
-          newUserType === 'trial'
-            ? 'Trial account for Demo Purpose'
-            : 'Millat Quran Learning Centre';
-        setDisplayTitle(newTitle);
-        setUserType(newUserType as UserType);
+        const title = newType === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud';
+        setDisplayTitle(title);
+        setUserType(newType as UserType);
         setTimeout(() => setIsTitleAnimating(false), 200);
       }, 200);
     } else {
-      setUserType(newUserType as UserType);
+      setUserType(newType as UserType);
     }
   };
 
@@ -76,22 +112,20 @@ export default function useAuth(): UseAuthReturn {
     setAuthError('');
 
     try {
-      const response = await fetch('/.netlify/functions/auth', {
-        method: 'POST',
+      const response = await fetch('/api/auth', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, userType }),
+        body:    JSON.stringify({ password, userType }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        sessionStorage.setItem('madrasah_auth_token', data.token);
-        sessionStorage.setItem('madrasah_user_type', userType);
+        sessionStorage.setItem('kc_auth_token', data.token);
+        sessionStorage.setItem('kc_user_type', userType);
         setIsLoggedIn(true);
-        const title =
-          userType === 'trial'
-            ? 'Trial account for Demo Purpose'
-            : 'Millat Quran Learning Centre';
-        setDisplayTitle(title);
+        setDisplayTitle(
+          userType === 'trial' ? 'Trial account for Demo Purpose' : 'KhataCloud'
+        );
         await onSuccess();
       } else {
         const data = await response.json().catch(() => null);
@@ -105,21 +139,17 @@ export default function useAuth(): UseAuthReturn {
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    sessionStorage.removeItem('madrasah_auth_token');
-    sessionStorage.removeItem('madrasah_logged_in');
-    // Keep madrasah_user_type in sessionStorage to maintain userType selection
+    sessionStorage.removeItem('kc_auth_token');
+    sessionStorage.removeItem('kc_logged_in');
+    // Navigate first — state update becomes irrelevant once the page changes.
+    // This also prevents the /trial infinite-spinner (the LoadingScreen guard
+    // in App.tsx is only for initial JWT fetch, not post-logout).
+    window.location.replace('/auth');
   };
 
   return {
-    isLoggedIn,
-    userType,
-    displayTitle,
-    isTitleAnimating,
-    isAuthenticating,
-    authError,
-    handleUserTypeChange,
-    handleLogin,
-    handleLogout,
+    isLoggedIn, userType, displayTitle, isTitleAnimating,
+    isAuthenticating, authError,
+    handleUserTypeChange, handleLogin, handleLogout,
   };
 }

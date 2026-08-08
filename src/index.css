@@ -1,14 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── Scrollbar utilities ───────────────────────────────────────────────── */
+/* Hide native scrollbar while keeping scroll functionality.               */
+/* Standard for premium dark UIs (Linear, Vercel, Notion, Figma).         */
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Section panel transition ──────────────────────────────────────────── */
+/* Applied to a panel when it becomes visible (display none → block).     */
+/* Browsers start @keyframes fresh when an element goes display:none→block */
+@keyframes sectionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-enter {
+  animation: sectionFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+
+/* ── KhataCloud Design Tokens ──────────────────────────────────────────── */
+:root {
+  --kc-brand: #7c3aed;
+  /* violet-600 */
+  --kc-brand-dark: #6d28d9;
+  /* violet-700 */
+  --kc-brand-light: #8b5cf6;
+  /* violet-500 */
+  --kc-surface: #ffffff;
+  --kc-surface-dark: #020617;
+  /* slate-950  */
+  --kc-radius: 0.75rem;
+}
+
+/* Apply Inter globally */
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
 }
 
 /* React DatePicker Light Mode Styling */
@@ -87,6 +134,7 @@ body {
     transform: translateY(1rem) scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: translateY(0) scale(1);
     opacity: 1;
@@ -103,23 +151,28 @@ body {
   font-family: inherit !important;
   background-color: transparent !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__header {
   background-color: transparent !important;
   border-bottom: none !important;
   padding-top: 0 !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__day-name,
 .react-datepicker-inline-container .react-datepicker__day {
   width: 2.25rem !important;
   line-height: 2.25rem !important;
   margin: 0.1rem !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__navigation {
   top: 2px !important;
 }
+
 .dark .react-datepicker-inline-container .react-datepicker__navigation-icon::before {
   border-color: #9ca3af !important;
 }
+
 .react-datepicker-inline-container .react-datepicker__current-month {
   font-size: 0.875rem !important;
   font-weight: 700 !important;
@@ -132,10 +185,27 @@ body {
     background: white !important;
     color: black !important;
   }
-  header, nav, button, .no-print, input, select, .react-datepicker-wrapper, .react-datepicker, .react-datepicker__header {
+
+  header,
+  nav,
+  button,
+  .no-print,
+  input,
+  select,
+  .react-datepicker-wrapper,
+  .react-datepicker,
+  .react-datepicker__header {
     display: none !important;
   }
-  .max-w-6xl, .bg-white, .dark\:bg-black, .bg-gray-50, .shadow-xl, .shadow-2xl, .p-6, .p-4 {
+
+  .max-w-6xl,
+  .bg-white,
+  .dark\:bg-black,
+  .bg-gray-50,
+  .shadow-xl,
+  .shadow-2xl,
+  .p-6,
+  .p-4 {
     width: 100% !important;
     max-width: 100% !important;
     box-shadow: none !important;
@@ -144,8 +214,151 @@ body {
     padding: 0 !important;
     background: transparent !important;
   }
-  h1, h2, h3, h4, p, span, td, th {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  td,
+  th {
     color: black !important;
   }
 }
 
+/* ── Clerk UserButton popover — dark glass theme (single source of truth) ──── */
+/* All popover styling is here in CSS. FloatingNavBar.tsx appearance prop only
+   handles avatarBox. This eliminates the dual-layer conflict that caused the
+   recurring half-white / half-dark rendering bug. */
+
+/* 1. Outer card: dark glass */
+.cl-userButtonPopoverCard {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+  color: #f8fafc !important;
+  border-radius: 1rem !important;
+}
+
+/* 2. Internal Clerk containers — strip ALL default white fills from internal elements */
+.cl-userButtonPopoverCard div,
+.cl-userButtonPopoverCard main,
+.cl-userButtonPopoverCard section,
+.cl-userButtonPopoverCard header,
+.cl-userButtonPopoverCard footer,
+.cl-userButtonPopoverCard .cl-card,
+.cl-userButtonPopoverCard .cl-userPreview,
+.cl-userButtonPopoverCard .cl-userButtonPopoverMain,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActions,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
+.cl-userButtonPopoverCard .cl-rootBox,
+.cl-userButtonPopoverCard .cl-popoverBox {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* 3. Primary text (username, action labels) */
+.cl-userButtonPopoverCard .cl-userPreviewMainIdentifier,
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonText {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* 4. Secondary text (email, footer) */
+.cl-userButtonPopoverCard .cl-userPreviewSecondaryIdentifier {
+  color: #94a3b8 !important;
+}
+
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter,
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter * {
+  color: #64748b !important;
+}
+
+/* 5. Action buttons & hover */
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButton {
+  color: #cbd5e1 !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.15s ease !important;
+}
+
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButton:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* 6. Action button icons — violet accent */
+.cl-userButtonPopoverCard .cl-userButtonPopoverActionButtonIcon {
+  color: #a78bfa !important;
+}
+
+/* 7. Footer separator */
+.cl-userButtonPopoverCard .cl-userButtonPopoverFooter {
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+
+
+/* Mobile: center fixed container above bottom tab bar */
+@media (max-width: 767px) {
+  .cl-userButtonPopoverCard {
+    position: fixed !important;
+    top: auto !important;
+    bottom: 80px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100vw - 2rem) !important;
+    max-width: 360px !important;
+    border-radius: 1.25rem !important;
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* ── Right slide-in drawer animation for filter panel ─────────────────────── */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Clerk Overrides (Elevation + Full Transparency) ──────────────────── */
+.cl-card,
+.cl-footer,
+.cl-footerAction,
+.cl-footerPages,
+.cl-main,
+[class*="cl-footer"],
+[class*="cl-card"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.cl-cardBox {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(124, 58, 237, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 1.5rem !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 8px !important;
+}
+
+@media (max-width: 768px) {
+  .cl-cardBox {
+    display: table-cell !important;
+    vertical-align: middle !important;
+  }
+}

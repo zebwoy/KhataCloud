@@ -1,5 +1,5 @@
 /**
- * Pure formatting utilities for HisaabKitaab.
+ * Pure formatting utilities for KhataCloud.
  * No React state, no side effects — safe to import anywhere.
  */
 

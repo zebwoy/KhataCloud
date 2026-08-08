@@ -14,7 +14,7 @@ interface UseThemeReturn {
 
 export default function useTheme(): UseThemeReturn {
   const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('madrasah_theme');
+    const saved = localStorage.getItem('kc_theme') || localStorage.getItem('madrasah_theme');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -27,7 +27,7 @@ export default function useTheme(): UseThemeReturn {
 
   // Persist theme and apply to document
   useEffect(() => {
-    localStorage.setItem('madrasah_theme', JSON.stringify(theme));
+    localStorage.setItem('kc_theme', JSON.stringify(theme));
     const root = document.documentElement;
     root.classList.toggle('dark', theme.mode === 'dark');
     root.setAttribute('data-theme', theme.palette);

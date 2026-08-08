@@ -7,6 +7,7 @@ import type { Stats } from '../utils/calculations';
 import { formatCurrency } from '../utils/formatters';
 import { getCategoryBreakdown, getTransferTotal, getTrusteeLedger } from '../utils/calculations';
 import { getDateRangeForMode, type DateFilterMode, type DateRange } from '../utils/constants';
+import ExportOptionsModal from './ExportOptionsModal';
 
 interface FinancialReportsProps {
   filteredTransactions: Transaction[];
@@ -26,7 +27,7 @@ interface FinancialReportsProps {
   formatPeriodLabel: () => string;
   formatPreviousPeriodLabel: () => string;
   handleQuickFilter: (mode: DateFilterMode) => void;
-  exportToCSV: () => void;
+  exportToCSV?: () => void;
 }
 
 export default function FinancialReports({
@@ -47,8 +48,8 @@ export default function FinancialReports({
   formatPeriodLabel,
   formatPreviousPeriodLabel,
   handleQuickFilter,
-  exportToCSV,
 }: FinancialReportsProps) {
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   // Local state for draft date range selection
   const [localRange, setLocalRange] = useState<{ fromDate: string; toDate: string }>({
     fromDate: dateRange.fromDate,
@@ -128,13 +129,26 @@ export default function FinancialReports({
             <Printer size={18} /> Print Report
           </button>
           <button
-            onClick={exportToCSV}
+            onClick={() => setExportModalOpen(true)}
             className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
           >
             <Download size={18} /> Export Report
           </button>
         </div>
       </div>
+
+      <ExportOptionsModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        transactions={filteredTransactions}
+        isAdmin={true}
+        filenamePrefix={`Financial_Report_${dateFilterMode}`}
+        activeFiltersContext={{
+          dateRange: formatPeriodLabel(),
+          custodians: trusteeFilter ? [trusteeFilter] : undefined,
+        }}
+        orgName="KhataCloud"
+      />
       {isLoadingData && (
         <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Refreshing data from the server...</p>
       )}

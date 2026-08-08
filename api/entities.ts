@@ -1,34 +1,25 @@
-import { Handler } from '@netlify/functions';
-import { Client, QueryResultRow } from 'pg';
-import { getAuthContext } from './utils/authHelper.js';
-import { vercelWrapper } from './utils/vercelWrapper.js';
+/**
+ * api/entities.ts — Read org entities (trustees, donors, vendors)
+ *
+ * GET /api/entities?entityType=trustee|counterparty|donor|vendor|other
+ *
+ * Auth: Bearer token — legacy trial JWT or Clerk org_member JWT
+ * Table routing:
+ *   trial      → public.entities    (IsTrial='Y')
+ *   org_member → org_{slug}.entities
+ *   admin      → public.entities    (IsTrial='N')
+ */
+import { Client } from 'pg';
+import { getAuthContext } from '../lib/authHelper.js';
+import { setCors, qp } from '../lib/vercel-handler.js';
+import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
 
 const getConnectionString = () =>
+  process.env.DATABASE_URL ||
+  process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
-  process.env.NETLIFY_DB_URL ||
   process.env.NETLIFY_DATABASE_URL ||
   '';
-
-const runQuery = async <T extends QueryResultRow>(query: string, params: unknown[] = []) => {
-  const connectionString = getConnectionString();
-  if (!connectionString) {
-    throw new Error('Database connection string is not configured.');
-  }
-
-  const client = new Client({ connectionString });
-  try {
-    await client.connect();
-    return await client.query<T>(query, params);
-  } finally {
-    await client.end();
-  }
-};
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-};
 
 interface Entity {
   id: number;
@@ -40,81 +31,97 @@ interface Entity {
   created_at: string;
 }
 
-const handler: Handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders,
-      body: '',
-    };
+/** Module-level cache: confirmed-provisioned slugs in this Vercel instance */
+const confirmedProvisioned = new Set<string>();
+
+async function ensureOrgSchema(orgSlug: string, client: Client): Promise<void> {
+  if (confirmedProvisioned.has(orgSlug)) return;
+  const safeSlug = orgSlug.replace(/-/g, '_');
+  const check = await client.query(
+    `SELECT 1 FROM information_schema.tables
+     WHERE table_schema = $1 AND table_name = 'entities' LIMIT 1`,
+    [`org_${safeSlug}`]
+  );
+  if ((check.rowCount ?? 0) === 0) {
+    await client.query(`SELECT platform.provision_org_schema($1)`, [orgSlug]);
+    console.info(`[entities] Auto-provisioned schema for org: ${orgSlug}`);
   }
+  confirmedProvisioned.add(orgSlug);
+}
+
+export default async function handler(req: VercelReq, res: VercelRes) {
+  setCors(res, 'GET, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    // Authenticate user from JWT token
-    const auth = getAuthContext(event);
-    if (!auth) {
-      return {
-        statusCode: 401,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
+    const auth = await getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { userType } = auth;
+
+    // Reject no_org — prevents querying public.entities which doesn't exist on SaaS DB
+    if (userType === 'no_org') {
+      return res.status(403).json({
+        error: 'No organisation assigned. Please contact your administrator.',
+      });
+    }
+    if (userType === 'org_member' && !auth.orgSlug) {
+      return res.status(403).json({
+        error: 'Org schema not linked. Please ask a super-admin to complete org setup.',
+      });
     }
 
-    const userType = auth.userType;
-    const isTrial = userType === 'trial' ? 'Y' : 'N';
+    const isTrial    = userType === 'trial' ? 'Y' : 'N';
+    const entityTable = userType === 'org_member' && auth.orgSlug
+      ? `org_${auth.orgSlug.replace(/-/g, '_')}.entities`
+      : 'entities';
 
-    // Get entity type filter from query parameter (optional)
-    // Supports: 'trustee', 'donor', 'vendor', 'other', 'counterparty' (all non-trustee)
-    // Also supports legacy values: 'sender' (maps to non-trustee), 'receiver' (maps to trustee)
-    const entityType = event.queryStringParameters?.entityType;
+    if (req.method !== 'GET') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
 
-    if (event.httpMethod === 'GET') {
-      let query = `
-        SELECT id, entity_name, entity_type, IsDeleted, ModifiedDate, IsTrial, created_at
-        FROM entities
-        WHERE IsDeleted = 'N' AND IsTrial = $1
-      `;
-      const params: unknown[] = [isTrial];
 
-      // Add entity_type filter if provided
-      if (entityType) {
-        if (entityType === 'trustee' || entityType === 'receiver') {
-          // Fetch trustees (supports both new and legacy type names)
-          query += ` AND entity_type IN ('trustee', 'receiver')`;
-        } else if (entityType === 'counterparty' || entityType === 'sender') {
-          // Fetch all non-trustee entities (donors, vendors, other)
-          query += ` AND entity_type NOT IN ('trustee', 'receiver')`;
-        } else if (['donor', 'vendor', 'other'].includes(entityType)) {
-          query += ` AND entity_type = $2`;
-          params.push(entityType);
-        }
+    const entityType = qp(req.query, 'entityType');
+
+    let query = `
+      SELECT id, entity_name, entity_type, IsDeleted, ModifiedDate, IsTrial, created_at
+      FROM ${entityTable}
+      WHERE IsDeleted = 'N' AND IsTrial = $1
+    `;
+    const params: unknown[] = [isTrial];
+
+    if (entityType) {
+      if (entityType === 'trustee' || entityType === 'receiver') {
+        // Trustees (new and legacy type names)
+        query += ` AND entity_type IN ('trustee','receiver')`;
+      } else if (entityType === 'counterparty' || entityType === 'sender') {
+        // All non-trustee entities
+        query += ` AND entity_type NOT IN ('trustee','receiver')`;
+      } else if (['donor', 'vendor', 'other'].includes(entityType)) {
+        params.push(entityType);
+        query += ` AND entity_type = $${params.length}`;
       }
-
-      query += ` ORDER BY entity_name ASC`;
-
-      const result = await runQuery<Entity>(query, params);
-
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: JSON.stringify(result.rows),
-      };
     }
 
-    // Method not allowed
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-  } catch (error) {
-    console.error('Error fetching entities:', error);
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: 'Failed to fetch entities' }),
-    };
-  }
-};
+    query += ` ORDER BY entity_name ASC`;
 
-export default vercelWrapper(handler);
+    const cs = getConnectionString();
+    if (!cs) return res.status(500).json({ error: 'Database not configured.' });
+
+    const client = new Client({ connectionString: cs });
+    try {
+      await client.connect();
+      // Ensure org schema tables exist on first access (auto-heals failed migrations)
+      if (userType === 'org_member' && auth.orgSlug) {
+        await ensureOrgSchema(auth.orgSlug, client);
+      }
+      const result = await client.query<Entity>(query, params);
+      return res.status(200).json(result.rows);
+    } finally {
+      await client.end();
+    }
+  } catch (err) {
+    console.error('Error fetching entities:', err);
+    return res.status(500).json({ error: (err as Error).message });
+  }
+}

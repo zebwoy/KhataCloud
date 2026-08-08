@@ -12,16 +12,17 @@ import type {
   Entity,
 } from './types';
 import { getDefaultFormState } from './types';
-import LoginPage from './components/LoginPage';
 import LoadingScreen from './components/LoadingScreen';
 import Header from './components/Header';
 import FinancialReports from './components/FinancialReports';
 import TransactionTable from './components/TransactionTable';
 import TransactionForm from './components/TransactionForm';
+import SuperAdminDashboard from './components/SuperAdmin/SuperAdminDashboard';
 import useTheme from './hooks/useTheme';
 import useAuth from './hooks/useAuth';
 import { formatCurrency, formatDisplayDateShort } from './utils/formatters';
 import { calculateStats } from './utils/calculations';
+import { exportTransactionsToCSV } from './utils/exportUtils';
 import {
   getSubcategoryOptions, getFieldLabels,
   getDateRangeForMode,
@@ -29,32 +30,78 @@ import {
 } from './utils/constants';
 
 const apiFetch = async (url: string, options: RequestInit = {}) => {
-  const token = sessionStorage.getItem('madrasah_auth_token');
+  // Prefer a live Clerk token (exposed by OrgAppShell when in saas mode).
+  // This ensures we never send an expired JWT — Clerk tokens expire in ~60 s.
+  let token: string | null = null;
+  const clerkGetter = (window as any).__getClerkToken as (() => Promise<string | null>) | undefined;
+  if (clerkGetter) {
+    try { token = await clerkGetter(); } catch { /* fall through */ }
+  }
+  if (!token) token = sessionStorage.getItem('kc_auth_token');
   const headers = {
     ...options.headers,
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
   };
-  return fetch(url, { ...options, headers });
+
+  let res = await fetch(url, { ...options, headers });
+
+  // If 401 Unauthorized occurs, try getting a fresh Clerk token and retry once
+  if (res.status === 401 && clerkGetter) {
+    try {
+      const freshToken = await clerkGetter();
+      if (freshToken && freshToken !== token) {
+        sessionStorage.setItem('kc_auth_token', freshToken);
+        const retryHeaders = {
+          ...options.headers,
+          'Authorization': `Bearer ${freshToken}`,
+        };
+        res = await fetch(url, { ...options, headers: retryHeaders });
+      }
+    } catch { /* ignore retry errors */ }
+  }
+
+  return res;
 };
 
-export default function AccountingSystem() {
+export default function AccountingSystem({
+  saasMode = false,
+  onSignOut,
+  initialTab,
+  navStyle = 'pill',
+  onReady,
+  isAdmin = false,
+}: {
+  saasMode?:   boolean;
+  onSignOut?:  () => void;
+  initialTab?: string;           // 'view' | 'add' | 'report' — from FloatingNavBar
+  navStyle?:   'pill' | 'classic'; // 'pill' = sub-menu handles view/add; 'classic' = inline toggle
+  onReady?:    () => void;       // called once when initial data fetch completes
+  isAdmin?:    boolean;          // org admin — unlocks 'Entered By' column + filter
+} = {}) {
   // Auth state + handlers (login, logout, user type selection)
   const {
     isLoggedIn,
     userType,
     displayTitle,
-    isTitleAnimating,
-    isAuthenticating,
-    authError,
-    handleUserTypeChange,
-    handleLogin,
     handleLogout,
   } = useAuth();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<FormState>(getDefaultFormState());
-  const [activeTab, setActiveTab] = useState('add');
+  // In saasMode default to 'view'; otherwise 'add'
+  const [activeTab, setActiveTab] = useState(saasMode ? (initialTab ?? 'view') : 'add');
+
+  // Sync initialTab prop changes from FloatingNavBar / RootApp to internal activeTab
+  // NOTE: do NOT call handleCancelEdit here — it is defined at line ~605 (const, not hoisted).
+  // Calling it from this useEffect at line ~75 hits the temporal dead zone and silently
+  // aborts the effect before setActiveTab ever runs.
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [initialTab]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataError, setDataError] = useState('');
@@ -62,7 +109,8 @@ export default function AccountingSystem() {
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
-  
+  const hasCalledReady = useRef(false);
+
   interface ToastMessage {
     id: string;
     type: 'success' | 'error' | 'info';
@@ -79,8 +127,15 @@ export default function AccountingSystem() {
   const [playSoundOnSuccess, setPlaySoundOnSuccess] = useState(true);
   const [trusteeOptions, setTrusteeOptions] = useState<TrusteeOption[]>([]);
   const [isInitializing, setIsInitializing] = useState(() => {
-    // Initialize as true if user is already logged in (prevents showing old data on refresh)
-    return sessionStorage.getItem('madrasah_logged_in') === 'true';
+    // Start as initializing if:
+    // a) saasMode is true (always wait for Clerk / data fetch before ready)
+    // b) Already logged in (prevents showing stale data on page refresh), OR
+    // c) On /trial without a token — auto-trial is about to fire.
+    if (saasMode) return true;
+    const isTrialPending =
+      window.location.pathname === '/trial' &&
+      !sessionStorage.getItem('kc_auth_token');
+    return isTrialPending || sessionStorage.getItem('kc_logged_in') === 'true';
   });
 
   
@@ -113,8 +168,8 @@ export default function AccountingSystem() {
     setIsLoadingData(true);
     setDataError('');
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`);
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`);
       if (!response.ok) {
         throw new Error('Unable to load transactions from the server.');
       }
@@ -131,10 +186,10 @@ export default function AccountingSystem() {
 
   const fetchEntities = useCallback(async () => {
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
       
       // Fetch trustees for custodian dropdown
-      const trusteesResponse = await apiFetch(`/.netlify/functions/entities?userType=${currentUserType}&entityType=trustee`);
+      const trusteesResponse = await apiFetch(`/api/entities?userType=${currentUserType}&entityType=trustee`);
 
       if (trusteesResponse.ok) {
         const trustees: Entity[] = await trusteesResponse.json();
@@ -160,7 +215,7 @@ export default function AccountingSystem() {
   // Fetch saved senders from server
   const fetchSavedCounterparties = useCallback(async () => {
     try {
-      const response = await apiFetch('/.netlify/functions/saved-senders');
+      const response = await apiFetch('/api/saved-senders');
       if (!response.ok) {
         throw new Error('Unable to load saved counterparties from the server.');
       }
@@ -172,15 +227,21 @@ export default function AccountingSystem() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchTransactions();
-  }, [fetchTransactions]);
+
 
   useEffect(() => {
     if (isLoggedIn) {
       fetchSavedCounterparties();
     }
   }, [isLoggedIn, fetchSavedCounterparties]);
+
+  // In saasMode the logout button calls Clerk signOut; otherwise old flow
+  const effectiveLogout = saasMode && onSignOut ? onSignOut : handleLogout;
+
+  // Sync activeTab when FloatingNavBar switches between Transactions/Reports
+  useEffect(() => {
+    if (saasMode && initialTab) setActiveTab(initialTab);
+  }, [saasMode, initialTab]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -198,6 +259,15 @@ export default function AccountingSystem() {
       setTrusteeOptions([]);
     }
   }, [isLoggedIn, userType, fetchTransactions, fetchEntities]);
+
+  // Signal parent (OrgAppShell) that initial data load is done — fires once
+  useEffect(() => {
+    if (!isInitializing && !hasCalledReady.current) {
+      hasCalledReady.current = true;
+      onReady?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitializing]);
 
 
   // Helper function to filter transactions by date range
@@ -331,7 +401,7 @@ export default function AccountingSystem() {
     setSavedCounterparties(newSavedCounterparties);
     
     try {
-      const response = await apiFetch(`/.netlify/functions/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
+      const response = await apiFetch(`/api/saved-senders?sender=${encodeURIComponent(cpToDelete)}`, {
         method: 'DELETE',
       });
       
@@ -456,8 +526,8 @@ export default function AccountingSystem() {
     };
 
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -476,7 +546,7 @@ export default function AccountingSystem() {
       const trimmedCounterparty = formData.counterparty.trim();
       if (trimmedCounterparty && !savedCounterparties.includes(trimmedCounterparty) && formData.category !== 'Transfer') {
         try {
-          const cpResponse = await apiFetch('/.netlify/functions/saved-senders', {
+          const cpResponse = await apiFetch('/api/saved-senders', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -516,8 +586,8 @@ export default function AccountingSystem() {
     setIsSyncing(true);
     setDataError('');
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?id=${id}&userType=${currentUserType}`, {
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
+      const response = await apiFetch(`/api/transactions?id=${id}&userType=${currentUserType}`, {
         method: 'DELETE',
       });
 
@@ -588,8 +658,8 @@ export default function AccountingSystem() {
     };
 
     try {
-      const currentUserType = sessionStorage.getItem('madrasah_user_type') || 'admin';
-      const response = await apiFetch(`/.netlify/functions/transactions?userType=${currentUserType}`, {
+      const currentUserType = sessionStorage.getItem('kc_user_type') || 'admin';
+      const response = await apiFetch(`/api/transactions?userType=${currentUserType}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -622,31 +692,16 @@ export default function AccountingSystem() {
 
   const exportToCSV = () => {
     const filteredTrans = getFilteredTransactions();
-    const headers = ['Date', 'Category', 'Subcategory', 'Custodian', 'Counterparty', 'Amount', 'Remarks'];
-    const rows = filteredTrans.map(t => [
-      t.date,
-      t.category,
-      t.subcategory || '',
-      t.custodian,
-      t.counterparty,
-      t.amount,
-      t.remarks || ''
-    ]);
-
-    const dateRangeStr = dateFilterMode === 'custom' 
-      ? `${dateRange.fromDate}_to_${dateRange.toDate}`
-      : dateFilterMode;
-
-    const csv = [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `madrasah_accounts_${dateRangeStr}_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    exportTransactionsToCSV({
+      transactions: filteredTrans,
+      filenamePrefix: `Khata_Accounts_${dateFilterMode}`,
+      isAdmin,
+      activeFilters: {
+        dateRange: formatPeriodLabel(),
+        custodians: trusteeFilter ? [trusteeFilter] : undefined,
+      },
+      orgName: 'KhataCloud',
+    });
   };
 
   // Memoized filtered transactions and stats for Financial Reports tab
@@ -688,37 +743,23 @@ export default function AccountingSystem() {
   };
 
 
-  // Login Screen
-  if (!isLoggedIn) {
-    return (
-      <LoginPage
-        userType={userType}
-        displayTitle={displayTitle}
-        isTitleAnimating={isTitleAnimating}
-        onUserTypeChange={handleUserTypeChange}
-        onLogin={async (password) => {
-          setTransactions([]);
-          setTrusteeOptions([]);
-          setDataError('');
-          setIsInitializing(true);
-          await handleLogin(password, async () => {
-            try {
-              await Promise.all([fetchTransactions(), fetchEntities()]);
-            } finally {
-              setIsInitializing(false);
-            }
-          });
-        }}
-        isAuthenticating={isAuthenticating}
-        authError={authError}
-      />
-    );
+  // Not logged in → redirect to /auth
+  // Exception: /trial — show a spinner while the auto-trial JWT fetch is in
+  // progress. Once the token lands, isLoggedIn flips to true and the dashboard
+  // renders. After a logout, handleLogout() itself navigates to /auth so this
+  // branch is never reached post-logout.
+  // Not logged in — redirect to /auth (skip in saasMode; token is set by OrgAppShell)
+  if (!isLoggedIn && !saasMode) {
+    if (window.location.pathname === '/trial') {
+      return <LoadingScreen label="Preparing demo account…" />;
+    }
+    window.location.replace('/auth');
+    return null;
   }
 
-  // Show loader while initializing after login or userType change
-  if (isInitializing) {
-    return <LoadingScreen />;
-  }
+  if (isInitializing) return <LoadingScreen label="Loading your data…" />;
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -738,13 +779,16 @@ export default function AccountingSystem() {
         </div>
       )}
 
-      <Header
-        displayTitle={displayTitle}
-        userType={userType}
-        theme={theme}
-        onThemeChange={setTheme}
-        onLogout={handleLogout}
-      />
+      {/* Old header — hidden in saasMode (FloatingNavBar handles navigation + logout) */}
+      {!saasMode && (
+        <Header
+          displayTitle={displayTitle}
+          userType={userType}
+          theme={theme}
+          onThemeChange={setTheme}
+          onLogout={effectiveLogout}
+        />
+      )}
 
       <div className="max-w-6xl mx-auto p-4">
         {/* Dashboard Stats - All Time */}
@@ -786,12 +830,49 @@ export default function AccountingSystem() {
                  theme.palette === 'emerald' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
                  'border-rose-200 bg-rose-50 text-rose-700')
           }`}>
-            Syncing with Netlify DB...
+            Syncing...
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        {/* ── Tab controls ── */}
+        {saasMode ? (
+          /* saasMode pill: FloatingNavBar sub-menu controls view/add; nothing rendered here.
+             saasMode classic: show the inline pill toggle so users can switch view/add. */
+          navStyle === 'classic' && activeTab !== 'report' && (
+            <div className="flex mb-6" style={{ background: 'none' }}>
+              <div className="inline-flex bg-slate-900 border border-white/10 rounded-2xl p-1 gap-1 shadow-xl">
+                <button
+                  id="tab-view"
+                  onClick={() => { handleCancelEdit(); setActiveTab('view'); }}
+                  className={`
+                    px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+                    ${ activeTab === 'view'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }
+                  `}
+                >
+                  All Transactions
+                </button>
+                <button
+                  id="tab-add"
+                  onClick={() => { if (activeTab !== 'add') handleCancelEdit(); setActiveTab('add'); }}
+                  className={`
+                    flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
+                    ${ activeTab === 'add'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }
+                  `}
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          /* Legacy mode: original 3 tab buttons */
+          <div className="flex flex-wrap gap-2 mb-6">
           <button
             onClick={() => {
               if (activeTab !== 'add') {
@@ -851,7 +932,23 @@ export default function AccountingSystem() {
           >
             Financial Reports
           </button>
-        </div>
+          {/* Super-admin tab — only visible to super_admin users */}
+          {userType === 'super_admin' && (
+            <button
+              onClick={() => { handleCancelEdit(); setActiveTab('superadmin'); }}
+              className={`px-4 py-2 rounded-lg font-semibold ${
+                activeTab === 'superadmin'
+                  ? (theme.mode === 'dark'
+                      ? 'bg-gray-900 border border-gray-800 text-white'
+                      : 'bg-indigo-600 text-white')
+                  : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-50 dark:hover:bg-gray-900'
+              }`}
+            >
+              ⚙️ Super Admin
+            </button>
+          )}
+          </div>
+        )}
 
 
         {/* Add Transaction Tab */}
@@ -890,6 +987,7 @@ export default function AccountingSystem() {
             trusteeOptions={trusteeOptions}
             isLoadingData={isLoadingData}
             isSyncing={isSyncing}
+            isAdmin={isAdmin}
             onEditTransaction={handleEditTransaction}
             onDeleteTransaction={handleDeleteTransaction}
             onExportCSV={exportToCSV}
@@ -920,6 +1018,11 @@ export default function AccountingSystem() {
             handleQuickFilter={handleQuickFilter}
             exportToCSV={exportToCSV}
           />
+        )}
+
+        {/* Super-Admin Tab */}
+        {activeTab === 'superadmin' && userType === 'super_admin' && (
+          <SuperAdminDashboard />
         )}
       </div>
 

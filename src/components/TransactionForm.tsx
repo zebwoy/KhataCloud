@@ -38,6 +38,50 @@ interface TransactionFormProps {
   onSubmit: () => void;
 }
 
+// ── Shared react-select styles ───────────────────────────────────────────────
+// Single source of truth — avoids copy-pasting the same style object 4 times.
+function getSelectStyles(isDark: boolean) {
+  return {
+    control: (base: object) => ({
+      ...base,
+      borderRadius: 12,
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+      minHeight: '38px',
+      backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+      boxShadow: 'none',
+    }),
+    menu: (base: object) => ({
+      ...base,
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#334155' : '#e2e8f0',
+      borderRadius: 12,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    }),
+    option: (base: object, state: { isSelected: boolean; isFocused: boolean }) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#7c3aed'   // violet-600
+        : state.isFocused
+        ? (isDark ? '#1e293b' : '#f5f3ff') // violet-50 on light
+        : 'transparent',
+      color: state.isSelected ? '#ffffff' : (isDark ? '#f1f5f9' : '#111827'),
+    }),
+    singleValue: (base: object) => ({ ...base, color: isDark ? '#f1f5f9' : '#111827' }),
+    input:       (base: object) => ({ ...base, color: isDark ? '#f1f5f9' : '#111827' }),
+    placeholder: (base: object) => ({ ...base, color: isDark ? '#94a3b8' : '#6b7280' }),
+  };
+}
+
+// ── Shared input className ────────────────────────────────────────────────────
+const inputClass = [
+  'w-full px-4 py-2 text-sm rounded-xl',
+  'border border-gray-200 dark:border-slate-700',
+  'bg-gray-50 dark:bg-slate-800',
+  'text-gray-900 dark:text-white',
+  'focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500',
+  'transition-all',
+].join(' ');
+
 export default function TransactionForm({
   formData,
   setFormData,
@@ -81,15 +125,7 @@ export default function TransactionForm({
                 });
               }}
               dateFormat="yyyy-MM-dd"
-              className={`w-full px-3 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                theme.mode === 'dark' 
-                  ? 'focus:ring-gray-700' 
-                  : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                     theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                     theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                     theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                     'focus:ring-rose-500')
-              } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
+              className={inputClass}
               placeholderText="Select date"
             />
             {formErrors.date && (
@@ -104,44 +140,7 @@ export default function TransactionForm({
               onChange={onCategorySelect}
               classNamePrefix="hk-select"
               className="text-sm"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderRadius: 8,
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                  minHeight: '36px',
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  backgroundColor: state.isSelected
-                    ? (theme.mode === 'dark' 
-                        ? '#1f2937' 
-                        : (theme.palette === 'indigo' ? '#4f46e5' :
-                           theme.palette === 'blue' ? '#2563eb' :
-                           theme.palette === 'purple' ? '#9333ea' :
-                           theme.palette === 'emerald' ? '#059669' :
-                           '#e11d48'))
-                    : state.isFocused
-                    ? (theme.mode === 'dark' ? '#1f2937' : '#f3f4f6')
-                    : 'transparent',
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                singleValue: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                input: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-              }}
+              styles={getSelectStyles(theme.mode === 'dark')}
             />
             {formErrors.category && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.category}</p>
@@ -159,43 +158,7 @@ export default function TransactionForm({
               onChange={onSubcategorySelect}
               classNamePrefix="hk-select"
               className="text-sm"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderRadius: 8,
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                  minHeight: '36px',
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  backgroundColor: state.isSelected
-                    ? (theme.mode === 'dark' 
-                        ? '#1f2937' 
-                        : (theme.palette === 'indigo' ? '#4f46e5' :
-                           theme.palette === 'blue' ? '#2563eb' :
-                           theme.palette === 'purple' ? '#9333ea' :
-                           theme.palette === 'emerald' ? '#059669' :
-                           '#e11d48'))
-                    : state.isFocused
-                    ? (theme.mode === 'dark' ? '#1f2937' : '#f3f4f6')
-                    : 'transparent',
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                singleValue: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                input: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-              }}
+              styles={getSelectStyles(theme.mode === 'dark')}
             />
             {formErrors.subcategory && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.subcategory}</p>
@@ -210,15 +173,7 @@ export default function TransactionForm({
               placeholder="0.00"
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-              className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                theme.mode === 'dark' 
-                  ? 'focus:ring-gray-700' 
-                  : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                     theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                     theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                     theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                     'focus:ring-rose-500')
-              } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100`}
+              className={inputClass}
             />
             {formErrors.amount && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.amount}</p>
@@ -239,47 +194,7 @@ export default function TransactionForm({
               classNamePrefix="hk-select"
               className="text-sm"
               placeholder={fieldLabels.custodianPlaceholder}
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  borderRadius: 8,
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                  minHeight: '36px',
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                }),
-                menu: (base) => ({
-                  ...base,
-                  backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                  borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                }),
-                option: (base, state) => ({
-                  ...base,
-                  backgroundColor: state.isSelected
-                    ? (theme.mode === 'dark' 
-                        ? '#1f2937' 
-                        : (theme.palette === 'indigo' ? '#4f46e5' :
-                           theme.palette === 'blue' ? '#2563eb' :
-                           theme.palette === 'purple' ? '#9333ea' :
-                           theme.palette === 'emerald' ? '#059669' :
-                           '#e11d48'))
-                    : state.isFocused
-                    ? (theme.mode === 'dark' ? '#1f2937' : '#f3f4f6')
-                    : 'transparent',
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                singleValue: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                input: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                }),
-                placeholder: (base) => ({
-                  ...base,
-                  color: theme.mode === 'dark' ? '#9ca3af' : '#6b7280',
-                }),
-              }}
+              styles={getSelectStyles(theme.mode === 'dark')}
             />
             {formErrors.custodian && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.custodian}</p>
@@ -300,47 +215,7 @@ export default function TransactionForm({
                   classNamePrefix="hk-select"
                   className="text-sm"
                   placeholder={fieldLabels.counterpartyPlaceholder}
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderRadius: 8,
-                      borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                      minHeight: '36px',
-                      backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                    }),
-                    menu: (base) => ({
-                      ...base,
-                      backgroundColor: theme.mode === 'dark' ? '#000000' : '#ffffff',
-                      borderColor: theme.mode === 'dark' ? '#1f2937' : '#d1d5db',
-                    }),
-                    option: (base, state) => ({
-                      ...base,
-                      backgroundColor: state.isSelected
-                        ? (theme.mode === 'dark' 
-                            ? '#1f2937' 
-                            : (theme.palette === 'indigo' ? '#4f46e5' :
-                               theme.palette === 'blue' ? '#2563eb' :
-                               theme.palette === 'purple' ? '#9333ea' :
-                               theme.palette === 'emerald' ? '#059669' :
-                               '#e11d48'))
-                        : state.isFocused
-                        ? (theme.mode === 'dark' ? '#1f2937' : '#f3f4f6')
-                        : 'transparent',
-                      color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                    }),
-                    singleValue: (base) => ({
-                      ...base,
-                      color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                    }),
-                    input: (base) => ({
-                      ...base,
-                      color: theme.mode === 'dark' ? '#f3f4f6' : '#111827',
-                    }),
-                    placeholder: (base) => ({
-                      ...base,
-                      color: theme.mode === 'dark' ? '#9ca3af' : '#6b7280',
-                    }),
-                  }}
+                  styles={getSelectStyles(theme.mode === 'dark')}
                 />
               </>
             ) : (
@@ -361,15 +236,7 @@ export default function TransactionForm({
                   onBlur={() => {
                     setTimeout(() => setShowCounterpartyDropdown(false), 200);
                   }}
-                  className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-                    theme.mode === 'dark' 
-                      ? 'focus:ring-gray-700' 
-                      : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                         theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                         theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                         theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                         'focus:ring-rose-500')
-                  } text-sm bg-white dark:bg-black dark:border-gray-900 text-gray-900 dark:text-gray-100`}
+                  className={inputClass}
                 />
                 
                 {/* Saved Counterparties Dropdown */}
@@ -439,13 +306,7 @@ export default function TransactionForm({
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                     isLabelInRemarks
                       ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed line-through'
-                      : theme.mode === 'dark'
-                        ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 hover:scale-105 active:scale-95 shadow-sm'
-                        : (theme.palette === 'indigo' ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200' :
-                           theme.palette === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                           theme.palette === 'purple' ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
-                           theme.palette === 'emerald' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
-                           'bg-rose-100 text-rose-700 hover:bg-rose-200') + ' hover:scale-105 active:scale-95 shadow-sm'
+                      : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/50 hover:scale-105 active:scale-95 shadow-sm'
                   }`}
                   title={isLabelInRemarks ? 'Label already added' : `Add ${label}`}
                 >
@@ -460,15 +321,7 @@ export default function TransactionForm({
             value={formData.remarks}
             onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
             rows={3}
-            className={`w-full px-4 py-2 border border-gray-300 dark:border-gray-900 rounded-lg focus:outline-none focus:ring-2 ${
-              theme.mode === 'dark' 
-                ? 'focus:ring-gray-700' 
-                : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                   theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                   theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                   theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                   'focus:ring-rose-500')
-            } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100`}
+            className={inputClass}
           />
           {formErrors.remarks && (
             <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.remarks}</p>

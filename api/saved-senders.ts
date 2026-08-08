@@ -1,178 +1,108 @@
-import { Handler } from '@netlify/functions';
+/**
+ * api/saved-senders.ts — Saved counterparty autocomplete store
+ *
+ * GET    /api/saved-senders           → list all senders
+ * POST   /api/saved-senders           → upsert a sender
+ * DELETE /api/saved-senders?sender=x  → delete a sender
+ *
+ * Auth: Bearer token — legacy trial JWT or Clerk org_member JWT
+ * Table routing:
+ *   trial      → public.trial_saved_senders
+ *   org_member → org_{slug}.saved_senders
+ *   admin      → public.saved_senders
+ */
 import { Client, QueryResultRow } from 'pg';
-import { getAuthContext } from './utils/authHelper.js';
-import { vercelWrapper } from './utils/vercelWrapper.js';
+import { getAuthContext } from '../lib/authHelper.js';
+import { setCors, qp } from '../lib/vercel-handler.js';
+import type { VercelReq, VercelRes } from '../lib/vercel-handler.js';
 
 const getConnectionString = () =>
+  process.env.DATABASE_URL ||
+  process.env.NEON_POOLED_CONNECTION_STRING ||
   process.env.NEON_CONNECTION_STRING ||
-  process.env.NETLIFY_DB_URL ||
   process.env.NETLIFY_DATABASE_URL ||
   '';
 
-const runQuery = async <T extends QueryResultRow>(query: string, params: unknown[] = []): Promise<{ rows: T[] }> => {
+const runQuery = async <T extends QueryResultRow = any>(
+  query: string,
+  params: unknown[] = []
+): Promise<{ rows: T[] }> => {
   const client = new Client({ connectionString: getConnectionString() });
   try {
     await client.connect();
-    const result = await client.query<T>(query, params);
-    return result;
+    return await client.query<T>(query, params);
   } finally {
     await client.end();
   }
 };
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-};
+export default async function handler(req: VercelReq, res: VercelRes) {
+  setCors(res, 'GET, POST, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-const handler: Handler = async (event) => {
   try {
-    // Handle OPTIONS request for CORS
-    if (event.httpMethod === 'OPTIONS') {
-      return {
-        statusCode: 200,
-        headers: corsHeaders,
-        body: '',
-      };
-    }
+    const auth = await getAuthContext(req);
+    if (!auth) return res.status(401).json({ error: 'Unauthorized' });
 
-    // Authenticate user from JWT token
-    const auth = getAuthContext(event);
-    if (!auth) {
-      return {
-        statusCode: 401,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
-    }
+    const { userType } = auth;
+    const tableName =
+      userType === 'trial'
+        ? 'trial_saved_senders'
+        : userType === 'org_member' && auth.orgSlug
+          ? `org_${auth.orgSlug.replace(/-/g, '_')}.saved_senders`
+          : 'saved_senders';
 
-    const userType = auth.userType;
-    const tableName = userType === 'trial' ? 'trial_saved_senders' : 'saved_senders';
-
-    // GET - Fetch all saved senders
-    if (event.httpMethod === 'GET') {
+    // ── GET ─────────────────────────────────────────────────────────────────
+    if (req.method === 'GET') {
       try {
         const result = await runQuery<{ sender: string }>(
           `SELECT DISTINCT sender FROM ${tableName} ORDER BY sender ASC`
         );
-        
-        const senders = result.rows.map(row => row.sender);
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify(senders),
-        };
-      } catch (error) {
-        // If table doesn't exist, return empty array
-        // The table will be created on first POST
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify([]),
-        };
+        return res.status(200).json(result.rows.map(r => r.sender));
+      } catch {
+        // Table doesn't exist yet — return empty (will be created on first POST)
+        return res.status(200).json([]);
       }
     }
 
-    // POST - Add a new sender (if it doesn't exist)
-    if (event.httpMethod === 'POST') {
-      if (!event.body) {
-        return {
-          statusCode: 400,
-          headers: corsHeaders,
-          body: JSON.stringify({ error: 'Request body is required.' }),
-        };
-      }
-
-      const payload = JSON.parse(event.body);
-      const { sender } = payload;
-
+    // ── POST ─────────────────────────────────────────────────────────────────
+    if (req.method === 'POST') {
+      const { sender } = req.body ?? {};
       if (!sender || typeof sender !== 'string' || !sender.trim()) {
-        return {
-          statusCode: 400,
-          headers: corsHeaders,
-          body: JSON.stringify({ error: 'Sender is required and must be a non-empty string.' }),
-        };
+        return res.status(400).json({ error: 'sender must be a non-empty string.' });
       }
+      const trimmed = sender.trim();
 
-      const trimmedSender = sender.trim();
-
-      try {
-        // Create table if it doesn't exist
-        await runQuery(`
-          CREATE TABLE IF NOT EXISTS ${tableName} (
-            id SERIAL PRIMARY KEY,
-            sender VARCHAR(255) UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-
-        // Try to insert the sender (will fail if already exists due to UNIQUE constraint)
-        await runQuery(
-          `INSERT INTO ${tableName} (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING`,
-          [trimmedSender]
-        );
-
-        return {
-          statusCode: 201,
-          headers: corsHeaders,
-          body: JSON.stringify({ message: 'Sender saved successfully.', sender: trimmedSender }),
-        };
-      } catch (error) {
-        // If it's a unique constraint violation, that's fine - sender already exists
-        if ((error as Error).message.includes('duplicate key') || (error as Error).message.includes('UNIQUE')) {
-          return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Sender already exists.', sender: trimmedSender }),
-          };
-        }
-        throw error;
-      }
+      // Create table if needed, then upsert
+      await runQuery(`
+        CREATE TABLE IF NOT EXISTS ${tableName} (
+          id         SERIAL PRIMARY KEY,
+          sender     VARCHAR(255) UNIQUE NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await runQuery(
+        `INSERT INTO ${tableName} (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING`,
+        [trimmed]
+      );
+      return res.status(201).json({ message: 'Sender saved.', sender: trimmed });
     }
 
-    // DELETE - Remove a sender
-    if (event.httpMethod === 'DELETE') {
-      const sender = event.queryStringParameters?.sender;
-      
-      if (!sender) {
-        return {
-          statusCode: 400,
-          headers: corsHeaders,
-          body: JSON.stringify({ error: 'Sender parameter is required.' }),
-        };
-      }
+    // ── DELETE ───────────────────────────────────────────────────────────────
+    if (req.method === 'DELETE') {
+      const sender = qp(req.query, 'sender');
+      if (!sender) return res.status(400).json({ error: 'sender query param is required.' });
 
       try {
         await runQuery(`DELETE FROM ${tableName} WHERE sender = $1`, [sender.trim()]);
-        
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify({ message: 'Sender deleted successfully.' }),
-        };
-      } catch (error) {
-        // If table doesn't exist, that's fine - nothing to delete
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify({ message: 'Sender deleted successfully.' }),
-        };
+      } catch {
+        // Table doesn't exist — nothing to delete, that's fine
       }
+      return res.status(200).json({ message: 'Sender deleted.' });
     }
 
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: 'Method not allowed.' }),
-    };
-  } catch (error) {
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: (error as Error).message }),
-    };
+    return res.status(405).json({ error: 'Method not allowed.' });
+  } catch (err) {
+    return res.status(500).json({ error: (err as Error).message });
   }
-};
-
-export default vercelWrapper(handler);
+}

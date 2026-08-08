@@ -1,5 +1,5 @@
 // ============================================================
-// Shared types & interfaces for HisaabKitaab
+// Shared types & interfaces for KhataCloud
 // ============================================================
 
 export type TransactionCategory = 'Income' | 'Expense' | 'Transfer';
@@ -15,6 +15,7 @@ export interface Transaction {
   counterparty: string;
   remarks: string;
   amount: number;
+  entered_by?: string;
   created_at?: string;
   modifieddate?: string;
 }

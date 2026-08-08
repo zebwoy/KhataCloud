@@ -1,4 +1,4 @@
-﻿# HisaabKitaab – Accounting & Financial Reporting
+# KhataCloud – Accounting & Financial Reporting
 
 ## What this is
 A focused accounting and reconciliation tool for small teams and NGOs to record transactions, monitor cashflow, and produce clear, audit-friendly reports without heavy ERP overhead.
