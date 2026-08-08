@@ -355,3 +355,10 @@ body {
   -webkit-backdrop-filter: none !important;
   padding: 8px !important;
 }
+
+@media (max-width: 768px) {
+  .cl-cardBox {
+    display: table-cell !important;
+    vertical-align: middle !important;
+  }
+}
