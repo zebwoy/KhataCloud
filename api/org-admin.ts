@@ -497,6 +497,11 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
 
 // ─── POST session-start ──────────────────────────────────────────────────────
 async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const role = (ctx.orgRole ?? ctx.userType ?? '').toLowerCase();
+  if (role === 'org:admin' || role === 'org_admin' || role === 'super_admin' || role === 'admin') {
+    return ok({ success: true });
+  }
+
   const { sessionId, initialTrail } = req.body ?? {};
   if (!sessionId) return ok({ success: true });
 
@@ -540,6 +545,11 @@ async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promi
 // Called periodically by the frontend (every 60s).
 // Updates the page_trail on the user's active session audit entry.
 async function postHeartbeat(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const role = (ctx.orgRole ?? ctx.userType ?? '').toLowerCase();
+  if (role === 'org:admin' || role === 'org_admin' || role === 'super_admin' || role === 'admin') {
+    return ok({ success: true });
+  }
+
   const { sessionId, pageTrail } = req.body ?? {};
   if (typeof pageTrail !== 'string' || !pageTrail.trim()) return ok({ success: true });
 
@@ -568,6 +578,11 @@ async function postHeartbeat(ctx: any, req: VercelReq, client: Client): Promise<
 
 // ─── POST session-end ────────────────────────────────────────────────────────
 async function postSessionEnd(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const role = (ctx.orgRole ?? ctx.userType ?? '').toLowerCase();
+  if (role === 'org:admin' || role === 'org_admin' || role === 'super_admin' || role === 'admin') {
+    return ok({ success: true });
+  }
+
   const { sessionId, pageTrail } = req.body ?? {};
   const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
 
