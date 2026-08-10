@@ -64,6 +64,10 @@ CREATE INDEX IF NOT EXISTS audit_log_created_at_idx
 
 -- ── Step 4: Update platform.provision_org_schema for future orgs ─────────────
 -- So every new org schema automatically gets these columns from day one.
+-- Must DROP first because PostgreSQL won't allow changing a function's return type
+-- via CREATE OR REPLACE alone.
+
+DROP FUNCTION IF EXISTS platform.provision_org_schema(TEXT);
 
 CREATE OR REPLACE FUNCTION platform.provision_org_schema(p_slug TEXT)
 RETURNS void LANGUAGE plpgsql AS $$
