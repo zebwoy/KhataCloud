@@ -117,14 +117,14 @@ export default function ExportOptionsModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop guard */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity pointer-events-auto"
         onClick={onClose}
       />
 
       {/* Modal Container */}
       <div className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col pointer-events-auto animate-scale-in">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50">
           <div className="flex items-center gap-3">
@@ -136,7 +136,7 @@ export default function ExportOptionsModal({
               <p className="text-xs text-gray-500 dark:text-gray-400">Customize record range &amp; format before downloading</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
           >
@@ -146,7 +146,7 @@ export default function ExportOptionsModal({
 
         {/* Modal Body */}
         <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-          
+
           {/* Section 1: Record Limit / Scope */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3 block flex items-center gap-1.5">
@@ -166,11 +166,10 @@ export default function ExportOptionsModal({
                     key={opt.id}
                     type="button"
                     onClick={() => setRecordMode(opt.id as RecordLimitMode)}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
-                      active
+                    className={`p-3 rounded-2xl border text-left transition-all ${active
                         ? 'bg-violet-600/10 border-violet-600 text-violet-700 dark:text-violet-300 font-semibold ring-2 ring-violet-500/20'
                         : 'border-gray-200 dark:border-slate-800 text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-slate-700'
-                    }`}
+                      }`}
                   >
                     <div className="text-xs font-bold flex items-center justify-between">
                       {opt.label}
@@ -218,11 +217,10 @@ export default function ExportOptionsModal({
               <button
                 type="button"
                 onClick={() => setFormatMode('excel')}
-                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all ${
-                  formatMode === 'excel'
+                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all ${formatMode === 'excel'
                     ? 'bg-emerald-500/10 border-emerald-500 text-emerald-800 dark:text-emerald-300 font-semibold ring-2 ring-emerald-500/20'
                     : 'border-gray-200 dark:border-slate-800 text-gray-700 dark:text-gray-300 hover:border-emerald-300 dark:hover:border-slate-700'
-                }`}
+                  }`}
               >
                 <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shrink-0">
                   <FileSpreadsheet size={20} />
@@ -232,7 +230,7 @@ export default function ExportOptionsModal({
                     Excel Spreadsheet
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-600 text-white font-semibold">Recommended</span>
                   </div>
-                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-normal">
+                  <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-normal pr-4">
                     Includes colors, custom column widths, word-wrap, &amp; executive summary cards. No warnings.
                   </p>
                 </div>
@@ -242,11 +240,10 @@ export default function ExportOptionsModal({
               <button
                 type="button"
                 onClick={() => setFormatMode('csv')}
-                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all ${
-                  formatMode === 'csv'
+                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all ${formatMode === 'csv'
                     ? 'bg-violet-500/10 border-violet-500 text-violet-800 dark:text-violet-300 font-semibold ring-2 ring-violet-500/20'
                     : 'border-gray-200 dark:border-slate-800 text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-slate-700'
-                }`}
+                  }`}
               >
                 <div className="p-2 rounded-xl bg-violet-500/20 text-violet-600 dark:text-violet-400 shrink-0">
                   <FileText size={20} />
