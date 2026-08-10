@@ -453,9 +453,32 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
 }
 
 // ─── POST logout ─────────────────────────────────────────────────────────────
+// Called two ways:
+//  1. Via explicit fetch() with Authorization header (trial sign-out button)
+//  2. Via navigator.sendBeacon() — no header support, so token is in the body
 async function postLogout(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
-  const { pageTrail } = req.body ?? {};
+  const { pageTrail, loginTs } = req.body ?? {};
+
+  // Compute human-readable session duration
+  let durationStr: string | undefined;
+  if (typeof loginTs === 'string') {
+    const ms = Date.now() - new Date(loginTs).getTime();
+    if (!isNaN(ms) && ms > 0) {
+      const totalMins = Math.round(ms / 60_000);
+      if (totalMins < 1)         durationStr = 'less than a minute';
+      else if (totalMins < 60)   durationStr = `${totalMins} min`;
+      else {
+        const h = Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        durationStr = m > 0 ? `${h}h ${m}m` : `${h}h`;
+      }
+    }
+  }
+
   const actor = await resolveActor(ctx);
+  const summaryParts = [`${actor.name ?? 'User'} signed out`];
+  if (durationStr) summaryParts.push(`(session: ${durationStr})`);
+
   await logAudit(client, {
     orgSlug:   ctx.orgSlug,
     userId:    ctx.userId!,
@@ -463,11 +486,12 @@ async function postLogout(ctx: any, req: VercelReq, client: Client): Promise<Sub
     action:    'user_logout',
     userName:  actor.name,
     userEmail: actor.email,
-    pageTrail: typeof pageTrail === 'string' ? pageTrail : undefined,
-    summary:   `${actor.name ?? 'User'} signed out`,
+    pageTrail: typeof pageTrail === 'string' && pageTrail.trim() ? pageTrail : undefined,
+    summary:   summaryParts.join(' '),
   });
   return ok({ success: true });
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
@@ -479,11 +503,30 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   const action = qp(req.query, 'action');
   if (!action) return res.status(400).json({ error: 'Missing ?action=' });
 
+  // ── sendBeacon compatibility: no Authorization header support ──────────────
+  // navigator.sendBeacon sends the Clerk JWT in the body under `token`.
+  // Inject it as the Authorization header so getAuthContext works normally.
+  if (action === 'logout' && !req.headers['authorization']) {
+    const bodyToken = (req.body as any)?.token;
+    if (typeof bodyToken === 'string') {
+      (req.headers as any)['authorization'] = `Bearer ${bodyToken}`;
+    }
+  }
+
   const client = new Client({ connectionString: getCS() });
   try {
     await client.connect();
     const ctx = await getAuthContext(req);
 
+    // ── logout: any org member may log out (not just admins) ─────────────────
+    if (action === 'logout') {
+      if (!ctx || ctx.userType !== 'org_member')
+        return res.status(403).json({ error: 'Forbidden' });
+      const result = await postLogout(ctx, req, client);
+      return res.status(result.statusCode).send(result.body);
+    }
+
+    // All other actions: org admin only
     if (!ctx || ctx.userType !== 'org_member' || ctx.orgRole !== 'org:admin')
       return res.status(403).json({ error: 'Forbidden — org admin only' });
 
@@ -500,7 +543,6 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       case 'member-role':   result = await patchMemberRole(ctx, req, client); break;
       case 'settings-save': result = await patchSettings(ctx, req, client); break;
       case 'member':        result = await deleteMember(ctx, req, client); break;
-      case 'logout':        result = await postLogout(ctx, req, client); break;
       default:              result = err(`Unknown action '${action}'`);
     }
 
@@ -512,3 +554,4 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     await client.end();
   }
 }
+

@@ -119,11 +119,14 @@ function TrailChips({ trail }: { trail: string }) {
   );
 }
 
-// ── Display name helper ────────────────────────────────────────────────────────
+// ── Display name helpers ──────────────────────────────────────────────────────
 function actorLabel(e: AuditEntry): string {
-  if (e.user_name) return e.user_name;
+  if (e.user_name)  return e.user_name;
   if (e.user_email) return e.user_email;
-  return e.user_id.slice(0, 12) + '…';
+  // Historical rows before v2 migration — show role-based label, never raw Clerk ID
+  if (e.user_role === 'super_admin') return 'Super Admin';
+  if (e.user_role === 'org:admin')   return 'Admin';
+  return 'Member';
 }
 function roleLabel(role: string): string {
   if (role === 'super_admin') return 'SA';
@@ -222,37 +225,51 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
                   const isSession = e.action === 'user_login' || e.action === 'user_logout';
 
                   return (
-                    <li key={e.id} className="flex items-start justify-between gap-4 px-5 py-3.5">
-                      <div className="flex-1 min-w-0">
-                        {/* Top row: badge + actor + role */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant={meta?.variant ?? 'neutral'} size="sm">
-                            <span className="flex items-center gap-1">
-                              <Icon size={10} />
-                              {meta?.label ?? e.action}
+                    <li key={e.id} className="px-5 py-3.5">
+                      {/* Main row */}
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          {/* Event badge + actor name */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant={meta?.variant ?? 'neutral'} size="sm">
+                              <span className="flex items-center gap-1">
+                                <Icon size={10} />
+                                {meta?.label ?? e.action}
+                              </span>
+                            </Badge>
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                              {actorLabel(e)}
                             </span>
-                          </Badge>
-                          <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                            {actorLabel(e)}
-                          </span>
-                          <Badge variant="neutral" size="sm">
-                            {roleLabel(e.user_role)}
-                          </Badge>
+                          </div>
+                          {/* Summary (non-session events only) */}
+                          {e.summary && !isSession && (
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+                              {e.summary}
+                            </p>
+                          )}
+                          {/* Logout: session duration + page trail */}
+                          {e.action === 'user_logout' && (
+                            <>
+                              {e.summary && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  {e.summary}
+                                </p>
+                              )}
+                              {e.page_trail && (
+                                <div className="mt-2">
+                                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Session path</p>
+                                  <TrailChips trail={e.page_trail} />
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-
-                        {/* Summary */}
-                        {e.summary && !isSession && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                            {e.summary}
-                          </p>
-                        )}
-
-                        {/* Page trail for logout entries */}
-                        {e.action === 'user_logout' && e.page_trail && (
-                          <TrailChips trail={e.page_trail} />
-                        )}
+                        {/* Right side: date + role pill */}
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{date}</span>
+                          <Badge variant="neutral" size="sm">{roleLabel(e.user_role)}</Badge>
+                        </div>
                       </div>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap shrink-0">{date}</span>
                     </li>
                   );
                 })}
