@@ -153,8 +153,42 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
     ),
   ]);
 
+  // ── Compute session duration for login entries ───────────────────────────
+  // For each user_login row, find the NEXT login from the same user to estimate
+  // how long this session lasted. Much more reliable than trying to catch logout.
+  const entries = rows.rows.map((e: any) => ({ ...e }));  // shallow copy
+  for (const entry of entries) {
+    if (entry.action !== 'user_login') continue;
+    // Find next login from the same user that happened AFTER this one
+    // (entries are DESC sorted, so we search forward = earlier entries)
+    // We need a DB lookup for this
+  }
+  // Batch lookup: for all login entries on this page, get the next login time
+  const loginEntries = entries.filter((e: any) => e.action === 'user_login');
+  if (loginEntries.length > 0) {
+    const durations = await Promise.all(
+      loginEntries.map(async (e: any) => {
+        const next = await client.query<{ created_at: string }>(
+          `SELECT created_at FROM ${schemaName}.audit_log
+           WHERE user_id = $1 AND action = 'user_login' AND created_at > $2
+           ORDER BY created_at ASC LIMIT 1`,
+          [e.user_id, e.created_at]
+        );
+        if (next.rows.length > 0) {
+          const ms = new Date(next.rows[0].created_at).getTime() - new Date(e.created_at).getTime();
+          return { id: e.id, duration_ms: ms };
+        }
+        return { id: e.id, duration_ms: null }; // most recent login, still active
+      })
+    );
+    for (const d of durations) {
+      const entry = entries.find((e: any) => e.id === d.id);
+      if (entry) entry.session_duration_ms = d.duration_ms;
+    }
+  }
+
   return ok({
-    entries:    rows.rows,
+    entries,
     total:      parseInt(total.rows[0]?.count ?? '0'),
     page,
     totalPages: Math.ceil(parseInt(total.rows[0]?.count ?? '0') / limit),
@@ -452,43 +486,24 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
   return ok({ success: true });
 }
 
-// ─── POST logout ─────────────────────────────────────────────────────────────
-// Called two ways:
-//  1. Via explicit fetch() with Authorization header (trial sign-out button)
-//  2. Via navigator.sendBeacon() — no header support, so token is in the body
-async function postLogout(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
-  const { pageTrail, loginTs } = req.body ?? {};
+// ─── POST heartbeat ──────────────────────────────────────────────────────────
+// Called periodically by the frontend (every 2 min) and on explicit sign-out.
+// Updates the page_trail on the user's most recent user_login audit entry.
+async function postHeartbeat(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const { pageTrail } = req.body ?? {};
+  if (typeof pageTrail !== 'string' || !pageTrail.trim()) return ok({ success: true });
 
-  // Compute human-readable session duration
-  let durationStr: string | undefined;
-  if (typeof loginTs === 'string') {
-    const ms = Date.now() - new Date(loginTs).getTime();
-    if (!isNaN(ms) && ms > 0) {
-      const totalMins = Math.round(ms / 60_000);
-      if (totalMins < 1)         durationStr = 'less than a minute';
-      else if (totalMins < 60)   durationStr = `${totalMins} min`;
-      else {
-        const h = Math.floor(totalMins / 60);
-        const m = totalMins % 60;
-        durationStr = m > 0 ? `${h}h ${m}m` : `${h}h`;
-      }
-    }
-  }
-
-  const actor = await resolveActor(ctx);
-  const summaryParts = [`${actor.name ?? 'User'} signed out`];
-  if (durationStr) summaryParts.push(`(session: ${durationStr})`);
-
-  await logAudit(client, {
-    orgSlug:   ctx.orgSlug,
-    userId:    ctx.userId!,
-    userRole:  ctx.orgRole ?? 'org:member',
-    action:    'user_logout',
-    userName:  actor.name,
-    userEmail: actor.email,
-    pageTrail: typeof pageTrail === 'string' && pageTrail.trim() ? pageTrail : undefined,
-    summary:   summaryParts.join(' '),
-  });
+  const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
+  await client.query(
+    `UPDATE ${schemaName}.audit_log
+     SET page_trail = $1
+     WHERE id = (
+       SELECT id FROM ${schemaName}.audit_log
+       WHERE user_id = $2 AND action = 'user_login'
+       ORDER BY created_at DESC LIMIT 1
+     )`,
+    [pageTrail.trim(), ctx.userId!]
+  );
   return ok({ success: true });
 }
 
@@ -503,26 +518,16 @@ export default async function handler(req: VercelReq, res: VercelRes) {
   const action = qp(req.query, 'action');
   if (!action) return res.status(400).json({ error: 'Missing ?action=' });
 
-  // ── sendBeacon compatibility: no Authorization header support ──────────────
-  // navigator.sendBeacon sends the Clerk JWT in the body under `token`.
-  // Inject it as the Authorization header so getAuthContext works normally.
-  if (action === 'logout' && !req.headers['authorization']) {
-    const bodyToken = (req.body as any)?.token;
-    if (typeof bodyToken === 'string') {
-      (req.headers as any)['authorization'] = `Bearer ${bodyToken}`;
-    }
-  }
-
   const client = new Client({ connectionString: getCS() });
   try {
     await client.connect();
     const ctx = await getAuthContext(req);
 
-    // ── logout: any org member may log out (not just admins) ─────────────────
-    if (action === 'logout') {
+    // ── heartbeat: any org member may heartbeat (not just admins) ────────────
+    if (action === 'heartbeat') {
       if (!ctx || ctx.userType !== 'org_member')
         return res.status(403).json({ error: 'Forbidden' });
-      const result = await postLogout(ctx, req, client);
+      const result = await postHeartbeat(ctx, req, client);
       return res.status(result.statusCode).send(result.body);
     }
 

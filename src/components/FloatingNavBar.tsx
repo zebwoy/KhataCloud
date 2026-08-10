@@ -19,8 +19,7 @@ export interface FloatingNavBarProps {
 }
 
 // ── Page trail tracking ──────────────────────────────────────────────────────
-const TRAIL_KEY           = '__kc_trail';
-const TRAIL_LOGIN_TIME_KEY = '__kc_login_ts';  // ISO timestamp of session start
+const TRAIL_KEY = '__kc_trail';
 
 const PAGE_LABELS: Record<string, string> = {
   'transactions:view': 'All Transactions',
@@ -126,79 +125,71 @@ export default function FloatingNavBar({
   const subMenuMobileRef  = useRef<HTMLDivElement>(null);
   const txnBtnDesktopRef  = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef   = useRef<HTMLButtonElement>(null);
-  // Cache the Clerk JWT so sendBeacon (which can't set headers) can embed it in the body
-  const cachedTokenRef = useRef<string | null>(null);
 
-  // Seed the trail + record login timestamp on mount
+  // Seed the trail on mount
   useEffect(() => {
     const initial = activeSection === 'transactions'
       ? PAGE_LABELS[`transactions:${transactionSubView}`]
       : PAGE_LABELS[activeSection] ?? activeSection;
     appendTrail(initial);
-    // Store session start time (only if not already set from a previous quick reload)
-    if (!sessionStorage.getItem(TRAIL_LOGIN_TIME_KEY)) {
-      sessionStorage.setItem(TRAIL_LOGIN_TIME_KEY, new Date().toISOString());
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep cached token fresh every 50 s (Clerk default JWT lifetime is 60 s)
+  // ── Heartbeat: POST the page trail every 2 min while user is active ─────────
+  // This ensures the trail is saved server-side BEFORE sign-out happens,
+  // regardless of how they sign out (Clerk UserButton, browser close, etc.)
+  // Much more reliable than the pagehide + sendBeacon approach.
   useEffect(() => {
     if (trialMode) return;
-    const refresh = async () => {
-      try { cachedTokenRef.current = await getToken(); } catch { /* non-fatal */ }
+    const postTrail = async () => {
+      const trail = getTrail();
+      if (!trail) return;
+      try {
+        const token = await getToken();
+        await fetch('/api/org-admin?action=heartbeat', {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ pageTrail: trail }),
+        });
+      } catch { /* non-fatal */ }
     };
-    refresh();
-    const timer = setInterval(refresh, 50_000);
+    const timer = setInterval(postTrail, 2 * 60 * 1000); // every 2 min
     return () => clearInterval(timer);
   }, [getToken, trialMode]);
 
-  // ── pagehide: catch Clerk UserButton sign-out and browser close ────────────
-  // Clerk's UserButton redirects the page, which triggers pagehide.
-  // navigator.sendBeacon is guaranteed to fire even during page unload.
-  useEffect(() => {
-    if (trialMode) return;
-    const onPageHide = () => {
-      const token = cachedTokenRef.current;
-      const trail = getTrail();
-      const loginTs = sessionStorage.getItem(TRAIL_LOGIN_TIME_KEY);
-      if (!token) return;
-      const payload = JSON.stringify({ pageTrail: trail, token, loginTs });
-      navigator.sendBeacon(
-        '/api/org-admin?action=logout',
-        new Blob([payload], { type: 'application/json' })
-      );
-      try {
-        sessionStorage.removeItem(TRAIL_KEY);
-        sessionStorage.removeItem(TRAIL_LOGIN_TIME_KEY);
-      } catch { /* non-fatal */ }
-    };
-    window.addEventListener('pagehide', onPageHide);
-    return () => window.removeEventListener('pagehide', onPageHide);
-  }, [trialMode]);
-
-  // ── Explicit logout button (trial mode or mobile sign-out button) ──────────
+  // ── Sign out ──────────────────────────────────────────────────────────────
   const handleSignOut = async () => {
     if (trialMode) {
       sessionStorage.removeItem(TRAIL_KEY);
-      sessionStorage.removeItem(TRAIL_LOGIN_TIME_KEY);
       if (onTrialSignOut) onTrialSignOut();
       else window.location.href = '/auth';
       return;
     }
-    // For non-trial: pagehide will fire after signOut() redirects, so
-    // the sendBeacon handler above covers it. We just trigger the redirect.
+    // Best-effort: POST the final trail before signing out
     try {
-      sessionStorage.removeItem(TRAIL_KEY);
-      sessionStorage.removeItem(TRAIL_LOGIN_TIME_KEY);
+      const trail = getTrail();
+      const token = await getToken();
+      if (trail && token) {
+        await fetch('/api/org-admin?action=heartbeat', {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ pageTrail: trail }),
+        });
+      }
     } catch { /* non-fatal */ }
+    sessionStorage.removeItem(TRAIL_KEY);
     await signOut({ redirectUrl: '/auth' });
   };
 
-  // (kept for backward compat)
+  // (kept for backward compat with onTrialSignOut prop)
   const handleTrialSignOut = onTrialSignOut ?? (() => {
     sessionStorage.removeItem(TRAIL_KEY);
-    sessionStorage.removeItem(TRAIL_LOGIN_TIME_KEY);
     window.location.href = '/auth';
   });
   void handleTrialSignOut;

@@ -12,8 +12,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
 import {
   ChevronLeft, ChevronRight, ScrollText,
-  LogIn, LogOut, UserCheck, UserX, UserMinus,
-  Plus, Trash2, Settings, RefreshCw,
+  LogIn, UserCheck, UserX, UserMinus,
+  Plus, Trash2, Settings, RefreshCw, Clock,
 } from 'lucide-react';
 import { Spinner, Button, Badge } from '../../ui';
 
@@ -31,6 +31,8 @@ interface AuditEntry {
   page_trail:   string | null;
   summary:      string | null;
   created_at:   string;
+  /** Session duration in ms, computed server-side for user_login entries */
+  session_duration_ms?: number | null;
 }
 
 interface AuditKpi {
@@ -47,7 +49,6 @@ const ACTION_META: Record<string, {
   Icon: React.ElementType;
 }> = {
   user_login:           { label: 'Login',        variant: 'success', Icon: LogIn      },
-  user_logout:          { label: 'Logout',        variant: 'neutral', Icon: LogOut     },
   provision_member:     { label: 'Provisioned',   variant: 'success', Icon: UserCheck  },
   approve_join_request: { label: 'Approved',      variant: 'success', Icon: UserCheck  },
   reject_join_request:  { label: 'Rejected',      variant: 'danger',  Icon: UserX      },
@@ -65,26 +66,29 @@ const DEMO_KPI: AuditKpi = {
 };
 const DEMO_ENTRIES: AuditEntry[] = [
   { id: 101, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
+    user_role: 'org:admin', action: 'user_login', entity_type: null,
+    entity_id: null, target_name: null, target_email: null,
+    page_trail: 'All Transactions - New Transaction - Reports - Admin › Audit Log',
+    summary: 'Rahib Khan signed in',
+    created_at: new Date(Date.now() - 3600_000 * 2).toISOString(),
+    session_duration_ms: 42 * 60_000 },
+  { id: 102, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
     user_role: 'org:admin', action: 'create_transaction', entity_type: 'transaction',
     entity_id: null, target_name: null, target_email: null, page_trail: null,
     summary: 'Rahib Khan created Income transaction: ₹5,000 for Monthly Fees',
-    created_at: new Date(Date.now() - 3600_000 * 2).toISOString() },
-  { id: 102, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
+    created_at: new Date(Date.now() - 3600_000 * 4).toISOString() },
+  { id: 103, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
     user_role: 'org:admin', action: 'approve_join_request', entity_type: 'member',
     entity_id: null, target_name: 'Abdur Rauf', target_email: 'abdur@demo.com', page_trail: null,
     summary: 'Rahib Khan approved join request for Abdur Rauf',
     created_at: new Date(Date.now() - 3600_000 * 24).toISOString() },
-  { id: 103, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
-    user_role: 'org:admin', action: 'user_logout', entity_type: null,
-    entity_id: null, target_name: null, target_email: null,
-    page_trail: 'All Transactions - New Transaction - Reports - Admin › Requests',
-    summary: 'Rahib Khan signed out',
-    created_at: new Date(Date.now() - 3600_000 * 48).toISOString() },
   { id: 104, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
     user_role: 'org:admin', action: 'user_login', entity_type: null,
-    entity_id: null, target_name: null, target_email: null, page_trail: null,
+    entity_id: null, target_name: null, target_email: null,
+    page_trail: 'All Transactions - Admin › Requests',
     summary: 'Rahib Khan signed in',
-    created_at: new Date(Date.now() - 3600_000 * 49).toISOString() },
+    created_at: new Date(Date.now() - 3600_000 * 49).toISOString(),
+    session_duration_ms: 3 * 3600_000 + 15 * 60_000 },
 ];
 
 // ── KPI Card component ─────────────────────────────────────────────────────────
@@ -132,6 +136,16 @@ function roleLabel(role: string): string {
   if (role === 'super_admin') return 'SA';
   if (role === 'org:admin')   return 'Admin';
   return 'Member';
+}
+
+// Format milliseconds into a human-readable duration
+function formatDuration(ms: number): string {
+  const totalMins = Math.round(ms / 60_000);
+  if (totalMins < 1)       return '< 1 min';
+  if (totalMins < 60)      return `${totalMins} min`;
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -222,7 +236,7 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
                   const date = new Date(e.created_at).toLocaleString('en-IN', {
                     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                   });
-                  const isSession = e.action === 'user_login' || e.action === 'user_logout';
+                  const isLogin = e.action === 'user_login';
 
                   return (
                     <li key={e.id} className="px-5 py-3.5">
@@ -240,28 +254,29 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
                             <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
                               {actorLabel(e)}
                             </span>
+                            {/* Session duration on login entries */}
+                            {isLogin && e.session_duration_ms != null && (
+                              <span className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500">
+                                <Clock size={10} />
+                                {formatDuration(e.session_duration_ms)}
+                              </span>
+                            )}
+                            {isLogin && e.session_duration_ms == null && (
+                              <span className="text-[11px] text-emerald-500 font-medium">active now</span>
+                            )}
                           </div>
-                          {/* Summary (non-session events only) */}
-                          {e.summary && !isSession && (
+                          {/* Summary (non-login events) */}
+                          {e.summary && !isLogin && (
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
                               {e.summary}
                             </p>
                           )}
-                          {/* Logout: session duration + page trail */}
-                          {e.action === 'user_logout' && (
-                            <>
-                              {e.summary && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {e.summary}
-                                </p>
-                              )}
-                              {e.page_trail && (
-                                <div className="mt-2">
-                                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Session path</p>
-                                  <TrailChips trail={e.page_trail} />
-                                </div>
-                              )}
-                            </>
+                          {/* Page trail on login entries (saved by heartbeat) */}
+                          {isLogin && e.page_trail && (
+                            <div className="mt-2">
+                              <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Pages visited</p>
+                              <TrailChips trail={e.page_trail} />
+                            </div>
                           )}
                         </div>
                         {/* Right side: date + role pill */}
