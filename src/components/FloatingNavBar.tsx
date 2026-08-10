@@ -18,6 +18,40 @@ export interface FloatingNavBarProps {
   onTrialSignOut?: () => void;
 }
 
+// ── Page trail tracking ──────────────────────────────────────────────────────
+const TRAIL_KEY = '__kc_trail';
+
+const PAGE_LABELS: Record<string, string> = {
+  'transactions:view': 'All Transactions',
+  'transactions:add':  'New Transaction',
+  'reports':           'Reports',
+  'admin:members':     'Admin › Members',
+  'admin:requests':    'Admin › Requests',
+  'admin:audit':       'Admin › Audit Log',
+  'admin:settings':    'Admin › Settings',
+  'admin':             'Admin',
+};
+
+function appendTrail(label: string) {
+  try {
+    const raw = sessionStorage.getItem(TRAIL_KEY);
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    // Avoid duplicating the same page twice in a row
+    if (arr[arr.length - 1] !== label) arr.push(label);
+    sessionStorage.setItem(TRAIL_KEY, JSON.stringify(arr));
+  } catch { /* non-fatal */ }
+}
+
+function getTrail(): string {
+  try {
+    const raw = sessionStorage.getItem(TRAIL_KEY);
+    const arr: string[] = raw ? JSON.parse(raw) : [];
+    return arr.join(' - ');
+  } catch {
+    return '';
+  }
+}
+
 interface SubMenuContentProps {
   transactionSubView: 'view' | 'add';
   onSubViewChange: (v: 'view' | 'add') => void;
@@ -84,7 +118,7 @@ export default function FloatingNavBar({
   trialMode = false,
   onTrialSignOut,
 }: FloatingNavBarProps) {
-  const { getToken } = useAuth();
+  const { getToken, signOut } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
   const subMenuDesktopRef = useRef<HTMLDivElement>(null);
@@ -92,11 +126,46 @@ export default function FloatingNavBar({
   const txnBtnDesktopRef = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef = useRef<HTMLButtonElement>(null);
 
-  // Synchronous trial sign-out: clear session immediately and navigate to /auth
+  // Seed the trail with the initial page on mount
+  useEffect(() => {
+    const initial = activeSection === 'transactions'
+      ? PAGE_LABELS[`transactions:${transactionSubView}`]
+      : PAGE_LABELS[activeSection] ?? activeSection;
+    appendTrail(initial);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Logout: POST trail then sign out ─────────────────────────────────────
+  const handleSignOut = async () => {
+    if (trialMode) {
+      sessionStorage.removeItem(TRAIL_KEY);
+      if (onTrialSignOut) onTrialSignOut();
+      else window.location.href = '/auth';
+      return;
+    }
+    try {
+      const trail = getTrail();
+      const token = await getToken();
+      await fetch('/api/org-admin?action=logout', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pageTrail: trail }),
+      });
+    } catch { /* non-fatal */ } finally {
+      sessionStorage.removeItem(TRAIL_KEY);
+      await signOut({ redirectUrl: '/auth' });
+    }
+  };
+
+  // Synchronous trial sign-out (kept for backward compat with onTrialSignOut prop)
   const handleTrialSignOut = onTrialSignOut ?? (() => {
-    sessionStorage.clear();
+    sessionStorage.removeItem(TRAIL_KEY);
     window.location.href = '/auth';
   });
+  void handleTrialSignOut; // suppress unused warning — used conditionally
 
   // Poll pending requests count every 60 s (org admins only)
   useEffect(() => {
@@ -141,6 +210,7 @@ export default function FloatingNavBar({
       if (activeSection !== 'transactions') {
         onSectionChange('transactions');
         onSubViewChange('view');
+        appendTrail(PAGE_LABELS['transactions:view']);
         setShowSubMenu(true);
       } else {
         setShowSubMenu(v => !v);
@@ -148,6 +218,7 @@ export default function FloatingNavBar({
     } else {
       onSectionChange('transactions');
       onSubViewChange('view');
+      appendTrail(PAGE_LABELS['transactions:view']);
       setShowSubMenu(false);
     }
   };
@@ -201,6 +272,7 @@ export default function FloatingNavBar({
                       handleTransactionsClick();
                     } else {
                       onSectionChange(key);
+                      appendTrail(PAGE_LABELS[key] ?? label);
                       setShowSubMenu(false);
                     }
                   }}
@@ -272,7 +344,7 @@ export default function FloatingNavBar({
           <div className="flex items-center px-3">
             <button
               type="button"
-              onClick={handleTrialSignOut}
+              onClick={handleSignOut}
               className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 hover:text-white text-xs font-semibold transition-all shadow-sm whitespace-nowrap active:scale-95"
               title="Sign Out to /auth"
             >

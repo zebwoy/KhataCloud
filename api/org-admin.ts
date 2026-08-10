@@ -40,6 +40,26 @@ const appBaseUrl = () =>
       ? `https://${process.env.VERCEL_URL}`
       : 'http://localhost:5173';
 
+/** Resolve a Clerk user's display name and email — best-effort, never throws. */
+async function resolveUser(userId: string): Promise<{ name?: string; email?: string }> {
+  try {
+    const u = await clerk().users.getUser(userId);
+    const first = u.firstName ?? '';
+    const last  = u.lastName  ?? '';
+    return {
+      name:  [first, last].filter(Boolean).join(' ') || undefined,
+      email: u.primaryEmailAddress?.emailAddress,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Extract actor display info from ctx (already resolved by Clerk SDK in whoami). */
+async function resolveActor(ctx: any): Promise<{ name?: string; email?: string }> {
+  return resolveUser(ctx.userId!);
+}
+
 function randomSecurePassword(): string {
   const pool = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
   let pw = '';
@@ -120,7 +140,10 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
 
   const [rows, total] = await Promise.all([
     client.query(
-      `SELECT id, user_id, user_role, action, entity_type, entity_id, summary, ip_addr, created_at
+      `SELECT id, user_id, user_name, user_email, user_role,
+              action, entity_type, entity_id,
+              target_name, target_email, page_trail,
+              summary, ip_addr, created_at
        FROM ${schemaName}.audit_log
        ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -135,6 +158,41 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
     total:      parseInt(total.rows[0]?.count ?? '0'),
     page,
     totalPages: Math.ceil(parseInt(total.rows[0]?.count ?? '0') / limit),
+  });
+}
+
+// ─── GET audit-kpi ───────────────────────────────────────────────────────────
+async function getAuditKpi(ctx: any, client: Client): Promise<SubResult> {
+  const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
+
+  const [logins, txns, activeUsers, mostActive] = await Promise.all([
+    client.query<{ count: string }>(
+      `SELECT COUNT(*)::int AS count FROM ${schemaName}.audit_log
+       WHERE action = 'user_login' AND created_at >= NOW() - INTERVAL '7 days'`
+    ),
+    client.query<{ count: string }>(
+      `SELECT COUNT(*)::int AS count FROM ${schemaName}.audit_log
+       WHERE action = 'create_transaction' AND created_at >= NOW() - INTERVAL '7 days'`
+    ),
+    client.query<{ count: string }>(
+      `SELECT COUNT(DISTINCT user_id)::int AS count FROM ${schemaName}.audit_log
+       WHERE action = 'user_login' AND created_at >= NOW() - INTERVAL '7 days'`
+    ),
+    client.query<{ user_name: string; user_email: string; cnt: string }>(
+      `SELECT user_name, user_email, COUNT(*)::int AS cnt
+       FROM ${schemaName}.audit_log
+       WHERE action = 'create_transaction' AND created_at >= NOW() - INTERVAL '7 days'
+       GROUP BY user_name, user_email
+       ORDER BY cnt DESC LIMIT 1`
+    ),
+  ]);
+
+  const top = mostActive.rows[0];
+  return ok({
+    loginsThisWeek:      parseInt(logins.rows[0]?.count ?? '0'),
+    transactionsThisWeek: parseInt(txns.rows[0]?.count ?? '0'),
+    activeMembersThisWeek: parseInt(activeUsers.rows[0]?.count ?? '0'),
+    mostActiveUser:      top?.user_name ?? top?.user_email ?? null,
   });
 }
 
@@ -195,15 +253,20 @@ async function postProvision(ctx: any, req: VercelReq, client: Client): Promise<
     signInUrl = `${appBaseUrl()}/auth#?__clerk_ticket=${token.token}`;
   } catch { /* best-effort */ }
 
-  // Audit
+  // Audit — actor name resolved once for the admin performing the action
+  const actor = await resolveActor(ctx);
   await logAudit(client, {
-    orgSlug:    ctx.orgSlug,
-    userId:     ctx.userId!,
-    userRole:   'org:admin',
-    action:     'provision_member',
-    entityType: 'member',
-    entityId:   userId,
-    summary:    `Admin provisioned '${name}' (${email}) as member`,
+    orgSlug:     ctx.orgSlug,
+    userId:      ctx.userId!,
+    userRole:    'org:admin',
+    action:      'provision_member',
+    userName:    actor.name,
+    userEmail:   actor.email,
+    entityType:  'member',
+    entityId:    userId,
+    targetName:  name.trim(),
+    targetEmail: email.trim().toLowerCase(),
+    summary:     `${actor.name ?? 'Admin'} provisioned '${name}' (${email}) as member`,
   });
 
   return ok({ success: true, userId, email, name, signInUrl }, 201);
@@ -250,14 +313,25 @@ async function patchRequest(ctx: any, req: VercelReq, client: Client): Promise<S
     [action === 'approve' ? 'approved' : 'rejected', ctx.userId, requestId]
   );
 
+  // Resolve both actor and target names at write-time
+  const [actor, target] = await Promise.all([
+    resolveActor(ctx),
+    resolveUser(user_id),
+  ]);
+  const verb    = action === 'approve' ? 'approved' : 'rejected';
+  const tName   = target.name ?? target.email ?? user_id;
   await logAudit(client, {
-    orgSlug:    ctx.orgSlug,
-    userId:     ctx.userId!,
-    userRole:   'org:admin',
-    action:     action === 'approve' ? 'approve_join_request' : 'reject_join_request',
-    entityType: 'member',
-    entityId:   user_id,
-    summary:    `Admin ${action}d join request for user ${user_id}`,
+    orgSlug:     ctx.orgSlug,
+    userId:      ctx.userId!,
+    userRole:    'org:admin',
+    action:      action === 'approve' ? 'approve_join_request' : 'reject_join_request',
+    userName:    actor.name,
+    userEmail:   actor.email,
+    entityType:  'member',
+    entityId:    user_id,
+    targetName:  target.name,
+    targetEmail: target.email,
+    summary:     `${actor.name ?? 'Admin'} ${verb} join request for ${tName}`,
   });
 
   return ok({ success: true, action, userId: user_id });
@@ -279,14 +353,24 @@ async function patchMemberRole(ctx: any, req: VercelReq, client: Client): Promis
     return err(`Failed to update role: ${e?.message}`, 422);
   }
 
+  const [actor, target] = await Promise.all([
+    resolveActor(ctx),
+    resolveUser(targetUserId),
+  ]);
+  const tName = target.name ?? target.email ?? targetUserId;
+  const roleLabel = role === 'org:admin' ? 'Admin' : 'Member';
   await logAudit(client, {
-    orgSlug:    ctx.orgSlug,
-    userId:     ctx.userId!,
-    userRole:   'org:admin',
-    action:     'change_member_role',
-    entityType: 'member',
-    entityId:   targetUserId,
-    summary:    `Admin changed role of ${targetUserId} to ${role}`,
+    orgSlug:     ctx.orgSlug,
+    userId:      ctx.userId!,
+    userRole:    'org:admin',
+    action:      'change_member_role',
+    userName:    actor.name,
+    userEmail:   actor.email,
+    entityType:  'member',
+    entityId:    targetUserId,
+    targetName:  target.name,
+    targetEmail: target.email,
+    summary:     `${actor.name ?? 'Admin'} changed role of ${tName} to ${roleLabel}`,
   });
 
   return ok({ success: true });
@@ -346,16 +430,42 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
     return err(`Failed to remove member: ${e?.message}`, 422);
   }
 
+  const [actor, target] = await Promise.all([
+    resolveActor(ctx),
+    resolveUser(targetUserId),
+  ]);
+  const tName = target.name ?? target.email ?? targetUserId;
   await logAudit(client, {
-    orgSlug:    ctx.orgSlug,
-    userId:     ctx.userId!,
-    userRole:   'org:admin',
-    action:     'remove_member',
-    entityType: 'member',
-    entityId:   targetUserId,
-    summary:    `Admin removed member ${targetUserId} from org`,
+    orgSlug:     ctx.orgSlug,
+    userId:      ctx.userId!,
+    userRole:    'org:admin',
+    action:      'remove_member',
+    userName:    actor.name,
+    userEmail:   actor.email,
+    entityType:  'member',
+    entityId:    targetUserId,
+    targetName:  target.name,
+    targetEmail: target.email,
+    summary:     `${actor.name ?? 'Admin'} removed ${tName} from org`,
   });
 
+  return ok({ success: true });
+}
+
+// ─── POST logout ─────────────────────────────────────────────────────────────
+async function postLogout(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const { pageTrail } = req.body ?? {};
+  const actor = await resolveActor(ctx);
+  await logAudit(client, {
+    orgSlug:   ctx.orgSlug,
+    userId:    ctx.userId!,
+    userRole:  ctx.orgRole ?? 'org:member',
+    action:    'user_logout',
+    userName:  actor.name,
+    userEmail: actor.email,
+    pageTrail: typeof pageTrail === 'string' ? pageTrail : undefined,
+    summary:   `${actor.name ?? 'User'} signed out`,
+  });
   return ok({ success: true });
 }
 
@@ -383,12 +493,14 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       case 'pending-count': result = await getPendingCount(ctx, client); break;
       case 'requests':      result = await getRequests(ctx, client); break;
       case 'audit':         result = await getAudit(ctx, req, client); break;
+      case 'audit-kpi':     result = await getAuditKpi(ctx, client); break;
       case 'settings':      result = await getSettings(ctx, client); break;
       case 'provision':     result = await postProvision(ctx, req, client); break;
       case 'request':       result = await patchRequest(ctx, req, client); break;
       case 'member-role':   result = await patchMemberRole(ctx, req, client); break;
       case 'settings-save': result = await patchSettings(ctx, req, client); break;
       case 'member':        result = await deleteMember(ctx, req, client); break;
+      case 'logout':        result = await postLogout(ctx, req, client); break;
       default:              result = err(`Unknown action '${action}'`);
     }
 
