@@ -91,9 +91,9 @@ export function exportTransactionsToExcelXML({
   <Created>${now.toISOString()}</Created>
  </DocumentProperties>
  <Styles>
-  <!-- Base Style -->
+  <!-- Base Style with balanced Vertical Centering padding -->
   <Style ss:ID="Default" ss:Name="Normal">
-   <Alignment ss:Vertical="Top" ss:WrapText="1"/>
+   <Alignment ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#1E293B"/>
   </Style>
   <!-- Header Banner -->
@@ -101,6 +101,9 @@ export function exportTransactionsToExcelXML({
    <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="14" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#4C1D95" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#3B0764"/>
+   </Borders>
   </Style>
   <Style ss:ID="SubBanner">
    <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
@@ -110,173 +113,243 @@ export function exportTransactionsToExcelXML({
   <!-- Section Title -->
   <Style ss:ID="SectionHeader">
    <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
-   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#6B21A8"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#581C87"/>
    <Interior ss:Color="#F3E8FF" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#DDD6FE"/>
+   </Borders>
   </Style>
   <!-- Filter Label & Value -->
   <Style ss:ID="FilterLabel">
-   <Alignment ss:Horizontal="Left" ss:Vertical="Top"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#581C87"/>
    <Interior ss:Color="#FAF5FF" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E8FF"/>
+   </Borders>
   </Style>
   <Style ss:ID="FilterVal">
-   <Alignment ss:Horizontal="Left" ss:Vertical="Top" ss:WrapText="1"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Segoe UI" ss:Size="9" ss:Color="#1E1B4B"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F3E8FF"/>
+   </Borders>
   </Style>
-  <!-- Cards -->
+  <!-- Executive Summary Cards -->
   <Style ss:ID="CardTitle">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#475569"/>
    <Interior ss:Color="#F1F5F9" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+   </Borders>
   </Style>
   <Style ss:ID="CardInflow">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#047857"/>
    <Interior ss:Color="#ECFDF5" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#A7F3D0"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#A7F3D0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#A7F3D0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#A7F3D0"/>
+   </Borders>
   </Style>
   <Style ss:ID="CardOutflow">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#BE123C"/>
    <Interior ss:Color="#FFF1F2" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FECDD3"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FECDD3"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FECDD3"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FECDD3"/>
+   </Borders>
   </Style>
   <Style ss:ID="CardNet">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#1D4ED8"/>
    <Interior ss:Color="#EFF6FF" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#BFDBFE"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#BFDBFE"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#BFDBFE"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#BFDBFE"/>
+   </Borders>
   </Style>
   <!-- Table Header -->
   <Style ss:ID="TableHeader">
    <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#4C1D95"/>
+   </Borders>
   </Style>
   <Style ss:ID="TableHeaderCenter">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#4C1D95"/>
+   </Borders>
   </Style>
   <Style ss:ID="TableHeaderRight">
    <Alignment ss:Horizontal="Right" ss:Vertical="Center" ss:WrapText="1"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#6D28D9" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#4C1D95"/>
+   </Borders>
   </Style>
-  <!-- Table Cells -->
+  <!-- Table Data Cells with Vertical Padding & Borders -->
   <Style ss:ID="CellText">
-   <Alignment ss:Horizontal="Left" ss:Vertical="Top" ss:WrapText="1"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center" ss:WrapText="1"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F8FAFC"/>
+   </Borders>
   </Style>
   <Style ss:ID="CellCenter">
-   <Alignment ss:Horizontal="Center" ss:Vertical="Top"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F8FAFC"/>
+   </Borders>
   </Style>
   <Style ss:ID="CellIncome">
-   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#047857"/>
    <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F8FAFC"/>
+   </Borders>
   </Style>
   <Style ss:ID="CellExpense">
-   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#BE123C"/>
    <NumberFormat ss:Format="&#34;-₹&#34;#,##0.00"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F8FAFC"/>
+   </Borders>
   </Style>
   <Style ss:ID="CellTransfer">
-   <Alignment ss:Horizontal="Right" ss:Vertical="Top"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#1D4ED8"/>
    <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F8FAFC"/>
+   </Borders>
   </Style>
   <!-- Footer Totals -->
   <Style ss:ID="FooterLabel">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#0F172A"/>
    <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#94A3B8"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#94A3B8"/>
+   </Borders>
   </Style>
   <Style ss:ID="FooterNet">
    <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#1D4ED8"/>
    <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
    <NumberFormat ss:Format="&#34;₹&#34;#,##0.00"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#94A3B8"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#94A3B8"/>
+   </Borders>
   </Style>
  </Styles>
  <Worksheet ss:Name="Statement">
   <Table ss:ExpandedColumnCount="${isAdmin ? 9 : 8}">
-   <!-- EXPLICIT COLUMN WIDTHS -->
-   <Column ss:Width="50"/>   <!-- S.No -->
-   <Column ss:Width="95"/>   <!-- Date -->
-   <Column ss:Width="95"/>   <!-- Category -->
-   <Column ss:Width="140"/>  <!-- Subcategory -->
-   <Column ss:Width="140"/>  <!-- Custodian -->
-   <Column ss:Width="180"/>  <!-- Counterparty -->
-   <Column ss:Width="115"/>  <!-- Amount -->
-   <Column ss:Width="240"/>  <!-- Remarks -->
-   ${isAdmin ? '<Column ss:Width="130"/>' : ''} <!-- Entered By -->
+   <!-- OPTIMIZED COLUMN WIDTHS -->
+   <Column ss:Width="65"/>   <!-- S.No -->
+   <Column ss:Width="110"/>  <!-- Date -->
+   <Column ss:Width="115"/>  <!-- Category -->
+   <Column ss:Width="160"/>  <!-- Subcategory -->
+   <Column ss:Width="160"/>  <!-- Custodian -->
+   <Column ss:Width="200"/>  <!-- Counterparty -->
+   <Column ss:Width="140"/>  <!-- Amount -->
+   <Column ss:Width="280"/>  <!-- Remarks -->
+   ${isAdmin ? '<Column ss:Width="150"/>' : ''} <!-- Entered By -->
 
    <!-- BANNER ROW -->
-   <Row ss:Height="28">
+   <Row ss:Height="32">
     <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="Banner">
-     <Data ss:Type="String">${escapeXML(orgName.toUpperCase())} — FINANCIAL ACCOUNT STATEMENT</Data>
+     <Data ss:Type="String"> ${escapeXML(orgName.toUpperCase())} — FINANCIAL ACCOUNT STATEMENT</Data>
     </Cell>
    </Row>
-   <Row ss:Height="20">
+   <Row ss:Height="22">
     <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SubBanner">
-     <Data ss:Type="String">Report Generated: ${dateStamp} at ${timeStamp} | Context: ${escapeXML(filenamePrefix.replace(/_/g, ' '))}</Data>
+     <Data ss:Type="String"> Report Generated: ${dateStamp} at ${timeStamp} | Context: ${escapeXML(filenamePrefix.replace(/_/g, ' '))}</Data>
     </Cell>
    </Row>
-   <Row ss:Height="10"/>
+   <Row ss:Height="12"/>
 
    <!-- APPLIED FILTERS HEADER -->
-   <Row ss:Height="20">
+   <Row ss:Height="24">
     <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SectionHeader">
-     <Data ss:Type="String">APPLIED FILTERS AT EXPORT TIME</Data>
+     <Data ss:Type="String"> APPLIED FILTERS AT EXPORT TIME</Data>
     </Cell>
    </Row>
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Date Filter Period:</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(dateRangeText)}</Data></Cell>
    </Row>
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Categories:</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(categoryText)}</Data></Cell>
    </Row>
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Custodians / Trustees:</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(custodianText)}</Data></Cell>
    </Row>
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Amount Range:</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(amountRangeText)}</Data></Cell>
    </Row>
    ${isAdmin ? `
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Entered By User(s):</Data></Cell>
     <Cell ss:MergeAcross="7" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(enteredByText)}</Data></Cell>
    </Row>
    ` : ''}
-   <Row>
+   <Row ss:Height="22">
     <Cell ss:StyleID="FilterLabel"><Data ss:Type="String">Search Term / Keyword:</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 7 : 6}" ss:StyleID="FilterVal"><Data ss:Type="String">${escapeXML(searchKeywordText)}</Data></Cell>
    </Row>
-   <Row ss:Height="10"/>
+   <Row ss:Height="12"/>
 
    <!-- EXECUTIVE FINANCIAL SUMMARY CARDS -->
-   <Row ss:Height="20">
+   <Row ss:Height="24">
     <Cell ss:MergeAcross="${isAdmin ? 8 : 7}" ss:StyleID="SectionHeader">
-     <Data ss:Type="String">FINANCIAL SUMMARY (EXACT EXPORTED RECORDS)</Data>
+     <Data ss:Type="String"> FINANCIAL SUMMARY (EXACT EXPORTED RECORDS)</Data>
     </Cell>
    </Row>
-   <Row ss:Height="22">
+   <Row ss:Height="24">
     <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Records Exported</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Income (Inflow)</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="String">Total Expenses (Outflow)</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 2 : 1}" ss:StyleID="CardTitle"><Data ss:Type="String">Net Position (${netPositionLabel})</Data></Cell>
    </Row>
-   <Row ss:Height="24">
+   <Row ss:Height="26">
     <Cell ss:MergeAcross="1" ss:StyleID="CardTitle"><Data ss:Type="Number">${transactions.length}</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="CardInflow"><Data ss:Type="Number">${stats.income}</Data></Cell>
     <Cell ss:MergeAcross="1" ss:StyleID="CardOutflow"><Data ss:Type="Number">${stats.expenses}</Data></Cell>
     <Cell ss:MergeAcross="${isAdmin ? 2 : 1}" ss:StyleID="CardNet"><Data ss:Type="Number">${stats.balance}</Data></Cell>
    </Row>
-   <Row ss:Height="12"/>
+   <Row ss:Height="14"/>
 
    <!-- DATA TABLE HEADERS -->
-   <Row ss:Height="24">
+   <Row ss:Height="28">
     <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">S.No.</Data></Cell>
     <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">Date</Data></Cell>
     <Cell ss:StyleID="TableHeaderCenter"><Data ss:Type="String">Category</Data></Cell>
@@ -288,7 +361,7 @@ export function exportTransactionsToExcelXML({
     ${isAdmin ? '<Cell ss:StyleID="TableHeader"><Data ss:Type="String">Entered By</Data></Cell>' : ''}
    </Row>
 
-   <!-- DATA ROWS -->
+   <!-- DATA ROWS WITH PADDING & BORDERS -->
    ${transactions.map((t, idx) => {
      const rawAmt = Number(t.amount) || 0;
      const isExp = t.category === 'Expense';
@@ -297,7 +370,7 @@ export function exportTransactionsToExcelXML({
      const valAmt = isExp ? -Math.abs(rawAmt) : rawAmt;
 
      return `
-   <Row>
+   <Row ss:Height="24">
     <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${idx + 1}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${escapeXML(t.date)}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${escapeXML(t.category)}</Data></Cell>
@@ -311,8 +384,8 @@ export function exportTransactionsToExcelXML({
    }).join('')}
 
    <!-- GRAND TOTALS FOOTER -->
-   <Row ss:Height="12"/>
-   <Row ss:Height="24">
+   <Row ss:Height="14"/>
+   <Row ss:Height="26">
     <Cell ss:MergeAcross="1" ss:StyleID="FooterLabel"><Data ss:Type="String">GRAND TOTALS</Data></Cell>
     <Cell ss:MergeAcross="3" ss:StyleID="FooterLabel"><Data ss:Type="String">Records Exported: ${transactions.length}</Data></Cell>
     <Cell ss:StyleID="FooterNet"><Data ss:Type="Number">${stats.balance}</Data></Cell>
@@ -340,14 +413,14 @@ export function exportTransactionsToExcelXML({
  </Worksheet>
 </Workbook>`;
 
-  // Create downloadable Excel file (.xml) — opens in Microsoft Excel & Google Sheets without warnings
-  const blob = new Blob([xmlString], { type: 'application/vnd.ms-excel' });
+  // Create downloadable Excel file (.xls) — opens directly in Microsoft Excel & Google Sheets
+  const blob = new Blob([xmlString], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   
   const cleanPrefix = filenamePrefix.replace(/[^a-zA-Z0-9_-]/g, '_');
-  link.setAttribute('download', `${cleanPrefix}_${dateStamp}.xml`);
+  link.setAttribute('download', `${cleanPrefix}_${dateStamp}.xls`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
