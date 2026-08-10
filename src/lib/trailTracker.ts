@@ -1,27 +1,12 @@
 /**
- * trailTracker.ts — Granular page / action trail for audit log.
+ * trailTracker.ts — Granular page / action trail & session lifecycle tracker for audit log.
  *
- * Stores a list of short acronyms in sessionStorage.
- * Any component can import `trackAction()` to record what the user did.
- *
- * Acronym → Full name mapping lives here AND in OAAudit.tsx (for display).
+ * Manages unique sessions via sessionStorage so page refreshes stay in the SAME session
+ * without generating ghost user_login entries.
  */
 
-const TRAIL_KEY = '__kc_trail';
-
-// ── Acronym registry ─────────────────────────────────────────────────────────
-// Page-level
-//   AT  = All Transactions     NT  = New Transaction (form)
-//   R   = Reports              A   = Admin
-//   AM  = Admin › Members      AR  = Admin › Requests
-//   AL  = Audit Log            AS  = Admin › Settings
-//
-// Action-level (granular)
-//   ET  = Edit Transaction     DT  = Delete Transaction
-//   ST  = Save Transaction (create or update)
-//   EX  = Export CSV           FR  = Filter/Search Applied
-//   VD  = View Details (expanded a row)
-//   ER  = Export Report
+const TRAIL_KEY   = '__kc_trail';
+const SESSION_KEY = '__kc_session_id';
 
 export const PAGE_META: Record<string, { short: string; long: string }> = {
   // Pages
@@ -43,21 +28,60 @@ export const PAGE_META: Record<string, { short: string; long: string }> = {
   'action:export-report':{ short:'ER', long: 'Export Report' },
 };
 
-/** Append an acronym to the trail. Accepts a page key (e.g. 'transactions:view')
- *  or an action key (e.g. 'action:edit-txn'). */
+export function getSessionId(): string {
+  try {
+    let sid = sessionStorage.getItem(SESSION_KEY);
+    if (!sid) {
+      sid = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionStorage.setItem(SESSION_KEY, sid);
+    }
+    return sid;
+  } catch {
+    return `sess_${Date.now()}`;
+  }
+}
+
+/** Initialize a session if not already active in sessionStorage.
+ *  Only logs a new user_login entry when a BRAND NEW session is created. */
+export async function ensureSession(getToken: () => Promise<string | null>, initialKey = 'transactions:view') {
+  try {
+    let sid = sessionStorage.getItem(SESSION_KEY);
+    if (!sid) {
+      sid = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionStorage.setItem(SESSION_KEY, sid);
+
+      const meta = PAGE_META[initialKey];
+      const initialCode = meta?.short ?? initialKey;
+      sessionStorage.setItem(TRAIL_KEY, JSON.stringify([initialCode]));
+
+      const token = await getToken();
+      if (token) {
+        await fetch('/api/org-admin?action=session-start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ sessionId: sid, initialTrail: initialCode }),
+        });
+      }
+    } else {
+      trackAction(initialKey);
+    }
+  } catch { /* non-fatal */ }
+}
+
 export function trackAction(key: string) {
   try {
     const meta = PAGE_META[key];
     const code = meta?.short ?? key;
     const raw = sessionStorage.getItem(TRAIL_KEY);
     const arr: string[] = raw ? JSON.parse(raw) : [];
-    // Avoid duplicate consecutive entries
     if (arr[arr.length - 1] !== code) arr.push(code);
     sessionStorage.setItem(TRAIL_KEY, JSON.stringify(arr));
   } catch { /* non-fatal */ }
 }
 
-/** Get the full trail as a dash-separated string (for POST to server). */
 export function getTrail(): string {
   try {
     const raw = sessionStorage.getItem(TRAIL_KEY);
@@ -68,23 +92,41 @@ export function getTrail(): string {
   }
 }
 
-/** Clear the trail (on sign-out). */
 export function clearTrail() {
-  try { sessionStorage.removeItem(TRAIL_KEY); } catch { /* non-fatal */ }
+  try {
+    sessionStorage.removeItem(TRAIL_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* non-fatal */ }
 }
 
-/** POST the current trail to the server (updates latest login entry). */
 export async function postTrailToServer(getToken: () => Promise<string | null>) {
   const trail = getTrail();
   if (!trail) return;
   const token = await getToken();
   if (!token) return;
+  const sid = getSessionId();
   await fetch('/api/org-admin?action=heartbeat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ pageTrail: trail }),
+    body: JSON.stringify({ sessionId: sid, pageTrail: trail }),
   });
+}
+
+export async function postSessionEndToServer(getToken: () => Promise<string | null>) {
+  const trail = getTrail();
+  const token = await getToken();
+  if (!token) return;
+  const sid = getSessionId();
+  await fetch('/api/org-admin?action=session-end', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ sessionId: sid, pageTrail: trail }),
+  });
+  clearTrail();
 }

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
 import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, LogOut } from 'lucide-react';
-import { trackAction, clearTrail, postTrailToServer } from '../lib/trailTracker';
+import { trackAction, clearTrail, postTrailToServer, ensureSession, postSessionEndToServer } from '../lib/trailTracker';
 
 export interface FloatingNavBarProps {
   isAdmin: boolean;
@@ -95,12 +95,13 @@ export default function FloatingNavBar({
   const txnBtnDesktopRef  = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef   = useRef<HTMLButtonElement>(null);
 
-  // ── 1. Seed the trail on mount ─────────────────────────────────────────────
+  // ── 1. Ensure active session on mount (sessionStorage-backed) ─────────────
   useEffect(() => {
+    if (trialMode) return;
     const pageKey = activeSection === 'transactions'
       ? `transactions:${transactionSubView}`
       : activeSection;
-    trackAction(pageKey);
+    ensureSession(getToken, pageKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -121,9 +122,9 @@ export default function FloatingNavBar({
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      // ── POST the trail while JWT is still alive ──
+      // ── POST session-end while JWT is still alive ──
       try {
-        await postTrailToServer(getToken);
+        await postSessionEndToServer(getToken);
       } catch { /* non-fatal */ }
 
       // ── Now sign out ourselves ──
@@ -154,7 +155,7 @@ export default function FloatingNavBar({
       else window.location.href = '/auth';
       return;
     }
-    try { await postTrailToServer(getToken); } catch { /* non-fatal */ }
+    try { await postSessionEndToServer(getToken); } catch { /* non-fatal */ }
     clearTrail();
     await signOut({ redirectUrl: '/auth' });
   };

@@ -174,16 +174,25 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
            ORDER BY created_at ASC LIMIT 1`,
           [e.user_id, e.created_at]
         );
-        if (next.rows.length > 0) {
+        const hasNext = next.rows.length > 0;
+        const trailEndsWithLogout = typeof e.page_trail === 'string' && e.page_trail.trim().endsWith('Logout');
+
+        if (hasNext) {
           const ms = new Date(next.rows[0].created_at).getTime() - new Date(e.created_at).getTime();
-          return { id: e.id, duration_ms: ms };
+          return { id: e.id, duration_ms: ms, session_ended: true };
+        } else if (trailEndsWithLogout) {
+          const ms = Math.max(1000, Date.now() - new Date(e.created_at).getTime());
+          return { id: e.id, duration_ms: ms, session_ended: true };
         }
-        return { id: e.id, duration_ms: null }; // most recent login, still active
+        return { id: e.id, duration_ms: null, session_ended: false }; // active session
       })
     );
     for (const d of durations) {
       const entry = entries.find((e: any) => e.id === d.id);
-      if (entry) entry.session_duration_ms = d.duration_ms;
+      if (entry) {
+        entry.session_duration_ms = d.duration_ms;
+        entry.session_ended = d.session_ended;
+      }
     }
   }
 
@@ -486,24 +495,108 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
   return ok({ success: true });
 }
 
+// ─── POST session-start ──────────────────────────────────────────────────────
+async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const { sessionId, initialTrail } = req.body ?? {};
+  if (!sessionId) return ok({ success: true });
+
+  const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
+
+  // Deduplicate: check if this sessionId was already logged as user_login
+  const existing = await client.query(
+    `SELECT id FROM ${schemaName}.audit_log WHERE entity_id = $1 AND action = 'user_login'`,
+    [sessionId]
+  );
+  if (existing.rows.length > 0) return ok({ success: true });
+
+  // Resolve display name from Clerk (best-effort)
+  let userName: string | undefined;
+  let userEmail: string | undefined;
+  try {
+    const clerkUser = await clerkClient().users.getUser(ctx.userId!);
+    const first = clerkUser.firstName ?? '';
+    const last  = clerkUser.lastName  ?? '';
+    userName  = [first, last].filter(Boolean).join(' ') || undefined;
+    userEmail = clerkUser.primaryEmailAddress?.emailAddress;
+  } catch { /* non-fatal */ }
+
+  await logAudit(client, {
+    orgSlug:    ctx.orgSlug!,
+    userId:     ctx.userId!,
+    userRole:   ctx.orgRole ?? 'org:member',
+    action:     'user_login',
+    entityType: 'session',
+    entityId:   sessionId,
+    userName,
+    userEmail,
+    pageTrail:  typeof initialTrail === 'string' && initialTrail.trim() ? initialTrail.trim() : 'AT',
+    summary:    `${userName ?? ctx.userId} signed in`,
+  });
+
+  return ok({ success: true });
+}
+
 // ─── POST heartbeat ──────────────────────────────────────────────────────────
-// Called periodically by the frontend (every 2 min) and on explicit sign-out.
-// Updates the page_trail on the user's most recent user_login audit entry.
+// Called periodically by the frontend (every 60s).
+// Updates the page_trail on the user's active session audit entry.
 async function postHeartbeat(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
-  const { pageTrail } = req.body ?? {};
+  const { sessionId, pageTrail } = req.body ?? {};
   if (typeof pageTrail !== 'string' || !pageTrail.trim()) return ok({ success: true });
 
   const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
-  await client.query(
-    `UPDATE ${schemaName}.audit_log
-     SET page_trail = $1
-     WHERE id = (
-       SELECT id FROM ${schemaName}.audit_log
-       WHERE user_id = $2 AND action = 'user_login'
-       ORDER BY created_at DESC LIMIT 1
-     )`,
-    [pageTrail.trim(), ctx.userId!]
-  );
+  if (sessionId) {
+    await client.query(
+      `UPDATE ${schemaName}.audit_log
+       SET page_trail = $1
+       WHERE entity_id = $2 AND action = 'user_login'`,
+      [pageTrail.trim(), sessionId]
+    );
+  } else {
+    await client.query(
+      `UPDATE ${schemaName}.audit_log
+       SET page_trail = $1
+       WHERE id = (
+         SELECT id FROM ${schemaName}.audit_log
+         WHERE user_id = $2 AND action = 'user_login'
+         ORDER BY created_at DESC LIMIT 1
+       )`,
+      [pageTrail.trim(), ctx.userId!]
+    );
+  }
+  return ok({ success: true });
+}
+
+// ─── POST session-end ────────────────────────────────────────────────────────
+async function postSessionEnd(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
+  const { sessionId, pageTrail } = req.body ?? {};
+  const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
+
+  let trail = typeof pageTrail === 'string' ? pageTrail.trim() : '';
+  if (trail && !trail.endsWith('Logout')) {
+    trail = trail ? `${trail} - Logout` : 'Logout';
+  } else if (!trail) {
+    trail = 'Logout';
+  }
+
+  if (sessionId) {
+    await client.query(
+      `UPDATE ${schemaName}.audit_log
+       SET page_trail = $1
+       WHERE entity_id = $2 AND action = 'user_login'`,
+      [trail, sessionId]
+    );
+  } else {
+    await client.query(
+      `UPDATE ${schemaName}.audit_log
+       SET page_trail = $1
+       WHERE id = (
+         SELECT id FROM ${schemaName}.audit_log
+         WHERE user_id = $2 AND action = 'user_login'
+         ORDER BY created_at DESC LIMIT 1
+       )`,
+      [trail, ctx.userId!]
+    );
+  }
   return ok({ success: true });
 }
 
@@ -523,10 +616,18 @@ export default async function handler(req: VercelReq, res: VercelRes) {
     await client.connect();
     const ctx = await getAuthContext(req);
 
-    // ── heartbeat: any org member may heartbeat (not just admins) ────────────
-    if (action === 'heartbeat') {
+    // ── Session lifecycle & heartbeat: any org member ────────────
+    if (action === 'heartbeat' || action === 'session-start' || action === 'session-end') {
       if (!ctx || ctx.userType !== 'org_member')
         return res.status(403).json({ error: 'Forbidden' });
+      if (action === 'session-start') {
+        const result = await postSessionStart(ctx, req, client);
+        return res.status(result.statusCode).send(result.body);
+      }
+      if (action === 'session-end') {
+        const result = await postSessionEnd(ctx, req, client);
+        return res.status(result.statusCode).send(result.body);
+      }
       const result = await postHeartbeat(ctx, req, client);
       return res.status(result.statusCode).send(result.body);
     }

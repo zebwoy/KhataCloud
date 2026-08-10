@@ -33,6 +33,8 @@ interface AuditEntry {
   created_at:   string;
   /** Session duration in ms, computed server-side for user_login entries */
   session_duration_ms?: number | null;
+  /** Whether the session has ended */
+  session_ended?: boolean;
 }
 
 interface AuditKpi {
@@ -119,8 +121,31 @@ const ACRONYM_TO_FULL: Record<string, string> = {
   ER: 'Export Report',
 };
 
+/** Reverse map full text names to short codes for historical DB rows */
+const FULL_TO_ACRONYM: Record<string, string> = {
+  'All Transactions': 'AT', 'New Transaction': 'NT',
+  'Reports': 'R', 'Admin': 'A',
+  'Admin › Members': 'AM', 'Admin › Requests': 'AR',
+  'Admin › Audit Log': 'AL', 'Audit Log': 'AL',
+  'Admin › Settings': 'AS',
+};
+
 function TrailChips({ trail, sessionEnded }: { trail: string; sessionEnded?: boolean }) {
-  const parts = trail.split(' - ').map(s => s.trim()).filter(Boolean);
+  const rawParts = trail.split(' - ').map(s => s.trim()).filter(Boolean);
+  const hasLogoutAtEnd = rawParts[rawParts.length - 1] === 'Logout';
+  const showLogoutChip = sessionEnded || hasLogoutAtEnd;
+
+  // Filter out any 'Logout' string from parts array, normalize full text names
+  const cleanParts = rawParts
+    .filter(p => p !== 'Logout')
+    .map(p => FULL_TO_ACRONYM[p] ?? p);
+
+  // Deduplicate consecutive identical items if any
+  const parts: string[] = [];
+  for (const code of cleanParts) {
+    if (parts[parts.length - 1] !== code) parts.push(code);
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-1 mt-1.5">
       {parts.map((code, i) => (
@@ -131,13 +156,13 @@ function TrailChips({ trail, sessionEnded }: { trail: string; sessionEnded?: boo
           >
             {code}
           </span>
-          {(i < parts.length - 1 || sessionEnded) && (
+          {(i < parts.length - 1 || showLogoutChip) && (
             <span className="text-slate-300 dark:text-slate-600 text-[10px]">→</span>
           )}
         </span>
       ))}
       {/* Red "Logout" chip at end when session has ended */}
-      {sessionEnded && (
+      {showLogoutChip && (
         <span
           title="Signed out"
           className="text-[10px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-700/50 font-semibold cursor-default flex items-center gap-0.5"
@@ -304,7 +329,7 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
                           {isLogin && e.page_trail && (
                             <div className="mt-2">
                               <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Pages visited</p>
-                              <TrailChips trail={e.page_trail} sessionEnded={e.session_duration_ms != null} />
+                              <TrailChips trail={e.page_trail} sessionEnded={e.session_ended ?? (e.session_duration_ms != null)} />
                             </div>
                           )}
                         </div>

@@ -56,45 +56,6 @@ async function handleWhoami(authCtx: any, client: Client): Promise<SubResult> {
     return ok({ userType: 'super_admin', userId: authCtx.userId });
 
   if (authCtx.userType === 'org_member') {
-    // ── Log user_login (with 5-min dedup to suppress reload spam) ────────────
-    try {
-      const schemaName = `org_${authCtx.orgSlug!.replace(/-/g, '_')}`;
-
-      // Check if last login entry for this user was within 5 minutes
-      const recentLogin = await client.query<{ created_at: string }>(
-        `SELECT created_at FROM ${schemaName}.audit_log
-         WHERE user_id = $1 AND action = 'user_login'
-         ORDER BY created_at DESC LIMIT 1`,
-        [authCtx.userId]
-      );
-      const lastLogin = recentLogin.rows[0]?.created_at;
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      const shouldLog = !lastLogin || new Date(lastLogin) < fiveMinutesAgo;
-
-      if (shouldLog) {
-        // Resolve display name from Clerk (best-effort)
-        let userName: string | undefined;
-        let userEmail: string | undefined;
-        try {
-          const clerkUser = await clerkClient().users.getUser(authCtx.userId!);
-          const first = clerkUser.firstName ?? '';
-          const last  = clerkUser.lastName  ?? '';
-          userName  = [first, last].filter(Boolean).join(' ') || undefined;
-          userEmail = clerkUser.primaryEmailAddress?.emailAddress;
-        } catch { /* non-fatal — log without name if Clerk unavailable */ }
-
-        await logAudit(client, {
-          orgSlug:   authCtx.orgSlug!,
-          userId:    authCtx.userId!,
-          userRole:  authCtx.orgRole ?? 'org:member',
-          action:    'user_login',
-          userName,
-          userEmail,
-          summary:   `${userName ?? authCtx.userId} signed in`,
-        });
-      }
-    } catch { /* non-fatal — login logging must never break the main auth flow */ }
-
     return ok({
       userType: 'org_member',
       orgSlug:  authCtx.orgSlug,
