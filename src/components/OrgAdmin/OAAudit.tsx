@@ -68,7 +68,7 @@ const DEMO_ENTRIES: AuditEntry[] = [
   { id: 101, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
     user_role: 'org:admin', action: 'user_login', entity_type: null,
     entity_id: null, target_name: null, target_email: null,
-    page_trail: 'All Transactions - New Transaction - Reports - Admin › Audit Log',
+    page_trail: 'AT - NT - R - AL',
     summary: 'Rahib Khan signed in',
     created_at: new Date(Date.now() - 3600_000 * 2).toISOString(),
     session_duration_ms: 42 * 60_000 },
@@ -85,7 +85,7 @@ const DEMO_ENTRIES: AuditEntry[] = [
   { id: 104, user_id: 'demo', user_name: 'Rahib Khan', user_email: 'rahib@demo.com',
     user_role: 'org:admin', action: 'user_login', entity_type: null,
     entity_id: null, target_name: null, target_email: null,
-    page_trail: 'All Transactions - Admin › Requests',
+    page_trail: 'AT - AR',
     summary: 'Rahib Khan signed in',
     created_at: new Date(Date.now() - 3600_000 * 49).toISOString(),
     session_duration_ms: 3 * 3600_000 + 15 * 60_000 },
@@ -105,14 +105,25 @@ function KpiCard({ value, label, sub }: { value: string | number | null; label: 
 }
 
 // ── Trail chips ────────────────────────────────────────────────────────────────
+/** Map acronym → full page name for tooltips */
+const ACRONYM_TO_FULL: Record<string, string> = {
+  AT: 'All Transactions', NT: 'New Transaction',
+  R:  'Reports',          A:  'Admin',
+  AM: 'Admin › Members',  AR: 'Admin › Requests',
+  AL: 'Audit Log',        AS: 'Admin › Settings',
+};
+
 function TrailChips({ trail }: { trail: string }) {
   const parts = trail.split(' - ').map(s => s.trim()).filter(Boolean);
   return (
     <div className="flex flex-wrap items-center gap-1 mt-1.5">
-      {parts.map((p, i) => (
+      {parts.map((code, i) => (
         <span key={i} className="flex items-center gap-1">
-          <span className="text-[10px] bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600/50 font-medium">
-            {p}
+          <span
+            title={ACRONYM_TO_FULL[code] ?? code}
+            className="text-[10px] bg-slate-100 dark:bg-slate-700/60 text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-600/50 font-medium cursor-default"
+          >
+            {code}
           </span>
           {i < parts.length - 1 && (
             <span className="text-slate-300 dark:text-slate-600 text-[10px]">→</span>
@@ -122,6 +133,7 @@ function TrailChips({ trail }: { trail: string }) {
     </div>
   );
 }
+
 
 // ── Display name helpers ──────────────────────────────────────────────────────
 function actorLabel(e: AuditEntry): string {

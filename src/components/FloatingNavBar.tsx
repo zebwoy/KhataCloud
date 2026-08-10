@@ -21,23 +21,25 @@ export interface FloatingNavBarProps {
 // ── Page trail tracking ──────────────────────────────────────────────────────
 const TRAIL_KEY = '__kc_trail';
 
-const PAGE_LABELS: Record<string, string> = {
-  'transactions:view': 'All Transactions',
-  'transactions:add':  'New Transaction',
-  'reports':           'Reports',
-  'admin:members':     'Admin › Members',
-  'admin:requests':    'Admin › Requests',
-  'admin:audit':       'Admin › Audit Log',
-  'admin:settings':    'Admin › Settings',
-  'admin':             'Admin',
+/** Short acronyms stored in sessionStorage / DB. Full names shown on hover. */
+const PAGE_META: Record<string, { short: string; long: string }> = {
+  'transactions:view': { short: 'AT',  long: 'All Transactions' },
+  'transactions:add':  { short: 'NT',  long: 'New Transaction' },
+  'reports':           { short: 'R',   long: 'Reports' },
+  'admin':             { short: 'A',   long: 'Admin' },
+  'admin:members':     { short: 'AM',  long: 'Admin › Members' },
+  'admin:requests':    { short: 'AR',  long: 'Admin › Requests' },
+  'admin:audit':       { short: 'AL',  long: 'Audit Log' },
+  'admin:settings':    { short: 'AS',  long: 'Admin › Settings' },
 };
 
-function appendTrail(label: string) {
+function appendTrail(pageKey: string) {
   try {
+    const meta = PAGE_META[pageKey];
+    const code = meta?.short ?? pageKey;
     const raw = sessionStorage.getItem(TRAIL_KEY);
     const arr: string[] = raw ? JSON.parse(raw) : [];
-    // Avoid duplicating the same page twice in a row
-    if (arr[arr.length - 1] !== label) arr.push(label);
+    if (arr[arr.length - 1] !== code) arr.push(code);
     sessionStorage.setItem(TRAIL_KEY, JSON.stringify(arr));
   } catch { /* non-fatal */ }
 }
@@ -51,6 +53,23 @@ function getTrail(): string {
     return '';
   }
 }
+
+/** Helper: POST the current trail to the server (updates latest login entry). */
+async function postTrailToServer(getToken: () => Promise<string | null>) {
+  const trail = getTrail();
+  if (!trail) return;
+  const token = await getToken();
+  if (!token) return;
+  await fetch('/api/org-admin?action=heartbeat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ pageTrail: trail }),
+  });
+}
+
 
 interface SubMenuContentProps {
   transactionSubView: 'view' | 'add';
@@ -126,41 +145,58 @@ export default function FloatingNavBar({
   const txnBtnDesktopRef  = useRef<HTMLButtonElement>(null);
   const txnBtnMobileRef   = useRef<HTMLButtonElement>(null);
 
-  // Seed the trail on mount
+  // ── 1. Seed the trail on mount ─────────────────────────────────────────────
   useEffect(() => {
-    const initial = activeSection === 'transactions'
-      ? PAGE_LABELS[`transactions:${transactionSubView}`]
-      : PAGE_LABELS[activeSection] ?? activeSection;
-    appendTrail(initial);
+    const pageKey = activeSection === 'transactions'
+      ? `transactions:${transactionSubView}`
+      : activeSection;
+    appendTrail(pageKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Heartbeat: POST the page trail every 2 min while user is active ─────────
-  // This ensures the trail is saved server-side BEFORE sign-out happens,
-  // regardless of how they sign out (Clerk UserButton, browser close, etc.)
-  // Much more reliable than the pagehide + sendBeacon approach.
+  // ── 2. Intercept Clerk UserButton sign-out click ───────────────────────────
+  // Clerk's <UserButton> renders a popover with a "Sign out" button inside
+  // `.cl-userButtonPopoverFooter`. We listen in the CAPTURE phase so our
+  // handler fires BEFORE Clerk's — at that moment the JWT is still valid.
   useEffect(() => {
     if (trialMode) return;
-    const postTrail = async () => {
-      const trail = getTrail();
-      if (!trail) return;
+
+    const interceptClerkSignOut = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Is this click inside Clerk's sign-out footer area?
+      const footer = target.closest('.cl-userButtonPopoverFooter');
+      if (!footer) return;
+
+      // ── Stop Clerk from handling this click ──
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      // ── POST the trail while JWT is still alive ──
       try {
-        const token = await getToken();
-        await fetch('/api/org-admin?action=heartbeat', {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ pageTrail: trail }),
-        });
+        await postTrailToServer(getToken);
       } catch { /* non-fatal */ }
+
+      // ── Now sign out ourselves ──
+      sessionStorage.removeItem(TRAIL_KEY);
+      await signOut({ redirectUrl: '/auth' });
     };
-    const timer = setInterval(postTrail, 2 * 60 * 1000); // every 2 min
+
+    // capture: true → fires before Clerk's handler
+    document.addEventListener('click', interceptClerkSignOut, true);
+    return () => document.removeEventListener('click', interceptClerkSignOut, true);
+  }, [getToken, signOut, trialMode]);
+
+  // ── 3. Heartbeat: POST trail every 60s as backup ───────────────────────────
+  useEffect(() => {
+    if (trialMode) return;
+    const tick = async () => {
+      try { await postTrailToServer(getToken); } catch { /* non-fatal */ }
+    };
+    const timer = setInterval(tick, 60_000); // every 60s
     return () => clearInterval(timer);
   }, [getToken, trialMode]);
 
-  // ── Sign out ──────────────────────────────────────────────────────────────
+  // ── 4. Explicit sign-out button (trial mode) ──────────────────────────────
   const handleSignOut = async () => {
     if (trialMode) {
       sessionStorage.removeItem(TRAIL_KEY);
@@ -168,31 +204,11 @@ export default function FloatingNavBar({
       else window.location.href = '/auth';
       return;
     }
-    // Best-effort: POST the final trail before signing out
-    try {
-      const trail = getTrail();
-      const token = await getToken();
-      if (trail && token) {
-        await fetch('/api/org-admin?action=heartbeat', {
-          method:  'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ pageTrail: trail }),
-        });
-      }
-    } catch { /* non-fatal */ }
+    try { await postTrailToServer(getToken); } catch { /* non-fatal */ }
     sessionStorage.removeItem(TRAIL_KEY);
     await signOut({ redirectUrl: '/auth' });
   };
-
-  // (kept for backward compat with onTrialSignOut prop)
-  const handleTrialSignOut = onTrialSignOut ?? (() => {
-    sessionStorage.removeItem(TRAIL_KEY);
-    window.location.href = '/auth';
-  });
-  void handleTrialSignOut;
+  void handleSignOut; // used by trial-mode button
 
   // Poll pending requests count every 60 s (org admins only)
   useEffect(() => {
@@ -237,7 +253,7 @@ export default function FloatingNavBar({
       if (activeSection !== 'transactions') {
         onSectionChange('transactions');
         onSubViewChange('view');
-        appendTrail(PAGE_LABELS['transactions:view']);
+        appendTrail('transactions:view');
         setShowSubMenu(true);
       } else {
         setShowSubMenu(v => !v);
@@ -245,7 +261,7 @@ export default function FloatingNavBar({
     } else {
       onSectionChange('transactions');
       onSubViewChange('view');
-      appendTrail(PAGE_LABELS['transactions:view']);
+      appendTrail('transactions:view');
       setShowSubMenu(false);
     }
   };
@@ -299,7 +315,7 @@ export default function FloatingNavBar({
                       handleTransactionsClick();
                     } else {
                       onSectionChange(key);
-                      appendTrail(PAGE_LABELS[key] ?? label);
+                      appendTrail(key);
                       setShowSubMenu(false);
                     }
                   }}
@@ -508,7 +524,7 @@ export default function FloatingNavBar({
           ) : (
             <button
               type="button"
-              onClick={handleTrialSignOut}
+              onClick={handleSignOut}
               className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors whitespace-nowrap active:scale-95"
               title="Sign Out"
             >
