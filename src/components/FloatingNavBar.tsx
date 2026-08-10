@@ -32,6 +32,7 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
         onClick={(e) => {
           e.stopPropagation();
           onSubViewChange('view');
+          trackAction('transactions:view');
           onClose();
         }}
         className={`
@@ -48,6 +49,7 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
         onClick={(e) => {
           e.stopPropagation();
           onSubViewChange('add');
+          trackAction('transactions:add');
           onClose();
         }}
         className={`
@@ -370,6 +372,7 @@ export default function FloatingNavBar({
               onClick={(e) => {
                 e.stopPropagation();
                 onSubViewChange('view');
+                trackAction('transactions:view');
                 setTimeout(() => setShowSubMenu(false), 20);
               }}
               className={`
@@ -387,6 +390,7 @@ export default function FloatingNavBar({
               onClick={(e) => {
                 e.stopPropagation();
                 onSubViewChange('add');
+                trackAction('transactions:add');
                 setTimeout(() => setShowSubMenu(false), 20);
               }}
               className={`

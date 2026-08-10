@@ -849,7 +849,7 @@ export default function AccountingSystem({
               <div className="inline-flex bg-slate-900 border border-white/10 rounded-2xl p-1 gap-1 shadow-xl">
                 <button
                   id="tab-view"
-                  onClick={() => { handleCancelEdit(); setActiveTab('view'); }}
+                  onClick={() => { handleCancelEdit(); setActiveTab('view'); trackAction('transactions:view'); }}
                   className={`
                     px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
                     ${ activeTab === 'view'
@@ -862,7 +862,7 @@ export default function AccountingSystem({
                 </button>
                 <button
                   id="tab-add"
-                  onClick={() => { if (activeTab !== 'add') handleCancelEdit(); setActiveTab('add'); }}
+                  onClick={() => { if (activeTab !== 'add') handleCancelEdit(); setActiveTab('add'); trackAction('transactions:add'); }}
                   className={`
                     flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200
                     ${ activeTab === 'add'
@@ -885,6 +885,7 @@ export default function AccountingSystem({
                 handleCancelEdit();
               }
               setActiveTab('add');
+              trackAction('transactions:add');
             }}
             className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 ${
               activeTab === 'add'
@@ -904,6 +905,7 @@ export default function AccountingSystem({
             onClick={() => {
               handleCancelEdit();
               setActiveTab('view');
+              trackAction('transactions:view');
             }}
             className={`px-4 py-2 rounded-lg font-semibold ${
               activeTab === 'view'
@@ -923,6 +925,7 @@ export default function AccountingSystem({
             onClick={() => {
               handleCancelEdit();
               setActiveTab('report');
+              trackAction('reports');
             }}
             className={`px-4 py-2 rounded-lg font-semibold ${
               activeTab === 'report'
