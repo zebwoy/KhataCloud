@@ -186,15 +186,17 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
         const hasNext = next.rows.length > 0;
         const trailEndsWithLogout = typeof e.page_trail === 'string' && e.page_trail.trim().endsWith('Logout');
 
-        if (hasNext) {
-          const nextCreatedAt = new Date(next.rows[0].created_at).getTime();
-          const ms = Math.max(1000, nextCreatedAt - createdAt);
-          return { id: e.id, duration_ms: ms, session_ended: true };
-        } else if (trailEndsWithLogout) {
+        if (trailEndsWithLogout) {
+          // Explicit logout occurred — use exact duration between created_at and logout (updated_at)
           const ms = Math.max(1000, updatedAt > createdAt ? updatedAt - createdAt : Date.now() - createdAt);
           return { id: e.id, duration_ms: ms, session_ended: true };
+        } else if (hasNext) {
+          // Session ended implicitly by a new sign-in
+          const nextCreatedAt = new Date(next.rows[0].created_at).getTime();
+          const ms = Math.max(1000, updatedAt > createdAt ? updatedAt - createdAt : nextCreatedAt - createdAt);
+          return { id: e.id, duration_ms: ms, session_ended: true };
         }
-        // Active session — elapsed duration from login to now/last heartbeat
+        // Active session — elapsed duration from login to now
         const ms = Math.max(0, Date.now() - createdAt);
         return { id: e.id, duration_ms: ms, session_ended: false };
       })
