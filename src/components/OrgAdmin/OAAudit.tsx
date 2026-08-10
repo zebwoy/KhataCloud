@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
 import {
   ChevronLeft, ChevronRight, ScrollText,
-  LogIn, UserCheck, UserX, UserMinus,
+  LogIn, LogOut, UserCheck, UserX, UserMinus,
   Plus, Trash2, Settings, RefreshCw, Clock,
 } from 'lucide-react';
 import { Spinner, Button, Badge } from '../../ui';
@@ -105,15 +105,21 @@ function KpiCard({ value, label, sub }: { value: string | number | null; label: 
 }
 
 // ── Trail chips ────────────────────────────────────────────────────────────────
-/** Map acronym → full page name for tooltips */
+/** Map acronym → full page/action name for tooltips */
 const ACRONYM_TO_FULL: Record<string, string> = {
+  // Pages
   AT: 'All Transactions', NT: 'New Transaction',
   R:  'Reports',          A:  'Admin',
   AM: 'Admin › Members',  AR: 'Admin › Requests',
   AL: 'Audit Log',        AS: 'Admin › Settings',
+  // Actions
+  ET: 'Edit Transaction', DT: 'Delete Transaction',
+  ST: 'Save Transaction', EX: 'Export CSV',
+  FR: 'Filter / Search',  VD: 'View Details',
+  ER: 'Export Report',
 };
 
-function TrailChips({ trail }: { trail: string }) {
+function TrailChips({ trail, sessionEnded }: { trail: string; sessionEnded?: boolean }) {
   const parts = trail.split(' - ').map(s => s.trim()).filter(Boolean);
   return (
     <div className="flex flex-wrap items-center gap-1 mt-1.5">
@@ -125,14 +131,25 @@ function TrailChips({ trail }: { trail: string }) {
           >
             {code}
           </span>
-          {i < parts.length - 1 && (
+          {(i < parts.length - 1 || sessionEnded) && (
             <span className="text-slate-300 dark:text-slate-600 text-[10px]">→</span>
           )}
         </span>
       ))}
+      {/* Red "Logout" chip at end when session has ended */}
+      {sessionEnded && (
+        <span
+          title="Signed out"
+          className="text-[10px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full border border-red-200 dark:border-red-700/50 font-semibold cursor-default flex items-center gap-0.5"
+        >
+          <LogOut size={8} />
+          Logout
+        </span>
+      )}
     </div>
   );
 }
+
 
 
 // ── Display name helpers ──────────────────────────────────────────────────────
@@ -287,7 +304,7 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
                           {isLogin && e.page_trail && (
                             <div className="mt-2">
                               <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Pages visited</p>
-                              <TrailChips trail={e.page_trail} />
+                              <TrailChips trail={e.page_trail} sessionEnded={e.session_duration_ms != null} />
                             </div>
                           )}
                         </div>

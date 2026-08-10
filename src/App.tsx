@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Plus, X } from 'lucide-react';
+import { trackAction } from './lib/trailTracker';
 import { SingleValue } from 'react-select';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -514,6 +515,7 @@ export default function AccountingSystem({
 
   const handleAddTransaction = async () => {
     if (!validateTransactionForm()) return;
+    trackAction('action:save-txn');
     setIsSyncing(true);
     setDataError('');
 
@@ -582,6 +584,7 @@ export default function AccountingSystem({
     if (!window.confirm('Delete this transaction?')) {
       return;
     }
+    trackAction('action:delete-txn');
 
     setIsSyncing(true);
     setDataError('');
@@ -608,6 +611,7 @@ export default function AccountingSystem({
 
   const handleEditTransaction = (transaction: Transaction) => {
     setEditingTransactionId(transaction.id);
+    trackAction('action:edit-txn');
     setFormData({
       date: transaction.date,
       category: transaction.category,
@@ -633,6 +637,7 @@ export default function AccountingSystem({
 
   const handleUpdateTransaction = async () => {
     if (!validateTransactionForm() || !editingTransactionId) return;
+    trackAction('action:save-txn');
     setIsSyncing(true);
     setDataError('');
 
@@ -691,6 +696,7 @@ export default function AccountingSystem({
   };
 
   const exportToCSV = () => {
+    trackAction('action:export-csv');
     const filteredTrans = getFilteredTransactions();
     exportTransactionsToCSV({
       transactions: filteredTrans,

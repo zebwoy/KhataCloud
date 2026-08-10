@@ -1,10 +1,10 @@
 /**
  * FloatingNavBar.tsx — Premium floating navigation bar
- * Reverted to commit d685080
  */
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, UserButton } from '@clerk/react';
 import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, LogOut } from 'lucide-react';
+import { trackAction, clearTrail, postTrailToServer } from '../lib/trailTracker';
 
 export interface FloatingNavBarProps {
   isAdmin: boolean;
@@ -16,58 +16,6 @@ export interface FloatingNavBarProps {
   orgId?: string;
   trialMode?: boolean;
   onTrialSignOut?: () => void;
-}
-
-// ── Page trail tracking ──────────────────────────────────────────────────────
-const TRAIL_KEY = '__kc_trail';
-
-/** Short acronyms stored in sessionStorage / DB. Full names shown on hover. */
-const PAGE_META: Record<string, { short: string; long: string }> = {
-  'transactions:view': { short: 'AT',  long: 'All Transactions' },
-  'transactions:add':  { short: 'NT',  long: 'New Transaction' },
-  'reports':           { short: 'R',   long: 'Reports' },
-  'admin':             { short: 'A',   long: 'Admin' },
-  'admin:members':     { short: 'AM',  long: 'Admin › Members' },
-  'admin:requests':    { short: 'AR',  long: 'Admin › Requests' },
-  'admin:audit':       { short: 'AL',  long: 'Audit Log' },
-  'admin:settings':    { short: 'AS',  long: 'Admin › Settings' },
-};
-
-function appendTrail(pageKey: string) {
-  try {
-    const meta = PAGE_META[pageKey];
-    const code = meta?.short ?? pageKey;
-    const raw = sessionStorage.getItem(TRAIL_KEY);
-    const arr: string[] = raw ? JSON.parse(raw) : [];
-    if (arr[arr.length - 1] !== code) arr.push(code);
-    sessionStorage.setItem(TRAIL_KEY, JSON.stringify(arr));
-  } catch { /* non-fatal */ }
-}
-
-function getTrail(): string {
-  try {
-    const raw = sessionStorage.getItem(TRAIL_KEY);
-    const arr: string[] = raw ? JSON.parse(raw) : [];
-    return arr.join(' - ');
-  } catch {
-    return '';
-  }
-}
-
-/** Helper: POST the current trail to the server (updates latest login entry). */
-async function postTrailToServer(getToken: () => Promise<string | null>) {
-  const trail = getTrail();
-  if (!trail) return;
-  const token = await getToken();
-  if (!token) return;
-  await fetch('/api/org-admin?action=heartbeat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({ pageTrail: trail }),
-  });
 }
 
 
@@ -150,7 +98,7 @@ export default function FloatingNavBar({
     const pageKey = activeSection === 'transactions'
       ? `transactions:${transactionSubView}`
       : activeSection;
-    appendTrail(pageKey);
+    trackAction(pageKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -177,7 +125,7 @@ export default function FloatingNavBar({
       } catch { /* non-fatal */ }
 
       // ── Now sign out ourselves ──
-      sessionStorage.removeItem(TRAIL_KEY);
+      clearTrail();
       await signOut({ redirectUrl: '/auth' });
     };
 
@@ -199,13 +147,13 @@ export default function FloatingNavBar({
   // ── 4. Explicit sign-out button (trial mode) ──────────────────────────────
   const handleSignOut = async () => {
     if (trialMode) {
-      sessionStorage.removeItem(TRAIL_KEY);
+      clearTrail();
       if (onTrialSignOut) onTrialSignOut();
       else window.location.href = '/auth';
       return;
     }
     try { await postTrailToServer(getToken); } catch { /* non-fatal */ }
-    sessionStorage.removeItem(TRAIL_KEY);
+    clearTrail();
     await signOut({ redirectUrl: '/auth' });
   };
   void handleSignOut; // used by trial-mode button
@@ -253,7 +201,7 @@ export default function FloatingNavBar({
       if (activeSection !== 'transactions') {
         onSectionChange('transactions');
         onSubViewChange('view');
-        appendTrail('transactions:view');
+        trackAction('transactions:view');
         setShowSubMenu(true);
       } else {
         setShowSubMenu(v => !v);
@@ -261,7 +209,7 @@ export default function FloatingNavBar({
     } else {
       onSectionChange('transactions');
       onSubViewChange('view');
-      appendTrail('transactions:view');
+      trackAction('transactions:view');
       setShowSubMenu(false);
     }
   };
@@ -315,7 +263,7 @@ export default function FloatingNavBar({
                       handleTransactionsClick();
                     } else {
                       onSectionChange(key);
-                      appendTrail(key);
+                      trackAction(key);
                       setShowSubMenu(false);
                     }
                   }}

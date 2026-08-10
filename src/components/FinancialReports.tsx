@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { trackAction } from '../lib/trailTracker';
 import { Download, Calendar, TrendingUp, TrendingDown, Printer } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -123,13 +124,13 @@ export default function FinancialReports({
         </div>
         <div className="flex gap-2 no-print">
           <button
-            onClick={() => window.print()}
+            onClick={() => { trackAction('action:export-report'); window.print(); }}
             className="bg-indigo-600 dark:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
           >
             <Printer size={18} /> Print Report
           </button>
           <button
-            onClick={() => setExportModalOpen(true)}
+            onClick={() => { trackAction('action:export-report'); setExportModalOpen(true); }}
             className="bg-green-600 dark:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 dark:hover:bg-green-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
           >
             <Download size={18} /> Export Report
