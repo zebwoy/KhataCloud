@@ -9,6 +9,9 @@ const TRAIL_KEY   = '__kc_trail';
 const SESSION_KEY = '__kc_session_id';
 const USER_ID_KEY = '__kc_user_id';
 
+let activeGetToken: (() => Promise<string | null>) | null = null;
+let postDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const PAGE_META: Record<string, { short: string; long: string }> = {
   // Pages
   'transactions:view': { short: 'AT',  long: 'All Transactions' },
@@ -47,11 +50,13 @@ export function getSessionId(): string {
 export async function ensureSession(
   getToken: () => Promise<string | null>,
   pageKey = 'transactions:view',
-  userId?: string
+  userId?: string,
+  userName?: string,
+  userEmail?: string
 ) {
+  activeGetToken = getToken;
   try {
     const storedUser = sessionStorage.getItem(USER_ID_KEY);
-    // If user changed or logout happened, clear old trail state
     if (userId && storedUser && storedUser !== userId) {
       clearTrail();
     }
@@ -77,7 +82,12 @@ export async function ensureSession(
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ sessionId: sid, initialTrail: initialCode }),
+          body: JSON.stringify({
+            sessionId: sid,
+            initialTrail: initialCode,
+            userName,
+            userEmail,
+          }),
         });
       }
     } else {
@@ -94,6 +104,14 @@ export function trackAction(key: string) {
     const arr: string[] = raw ? JSON.parse(raw) : [];
     if (arr[arr.length - 1] !== code) arr.push(code);
     sessionStorage.setItem(TRAIL_KEY, JSON.stringify(arr));
+
+    // Debounced instant persistence to server (300ms)
+    if (activeGetToken) {
+      if (postDebounceTimer) clearTimeout(postDebounceTimer);
+      postDebounceTimer = setTimeout(() => {
+        if (activeGetToken) postTrailToServer(activeGetToken);
+      }, 300);
+    }
   } catch { /* non-fatal */ }
 }
 
@@ -109,6 +127,7 @@ export function getTrail(): string {
 
 export function clearTrail() {
   try {
+    if (postDebounceTimer) clearTimeout(postDebounceTimer);
     sessionStorage.removeItem(TRAIL_KEY);
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(USER_ID_KEY);
@@ -132,6 +151,7 @@ export async function postTrailToServer(getToken: () => Promise<string | null>) 
 }
 
 export async function postSessionEndToServer(getToken: () => Promise<string | null>) {
+  if (postDebounceTimer) clearTimeout(postDebounceTimer);
   const trail = getTrail();
   const token = await getToken();
   if (!token) return;

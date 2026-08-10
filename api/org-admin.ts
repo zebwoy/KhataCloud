@@ -497,7 +497,7 @@ async function deleteMember(ctx: any, req: VercelReq, client: Client): Promise<S
 
 // ─── POST session-start ──────────────────────────────────────────────────────
 async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
-  const { sessionId, initialTrail } = req.body ?? {};
+  const { sessionId, initialTrail, userName: clientUserName, userEmail: clientUserEmail } = req.body ?? {};
   if (!sessionId) return ok({ success: true });
 
   const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
@@ -509,16 +509,19 @@ async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promi
   );
   if (existing.rows.length > 0) return ok({ success: true });
 
-  // Resolve display name from Clerk (best-effort)
-  let userName: string | undefined;
-  let userEmail: string | undefined;
-  try {
-    const clerkUser = await clerkClient().users.getUser(ctx.userId!);
-    const first = clerkUser.firstName ?? '';
-    const last  = clerkUser.lastName  ?? '';
-    userName  = [first, last].filter(Boolean).join(' ') || undefined;
-    userEmail = clerkUser.primaryEmailAddress?.emailAddress;
-  } catch { /* non-fatal */ }
+  let userName: string | undefined = typeof clientUserName === 'string' && clientUserName.trim() ? clientUserName.trim() : undefined;
+  let userEmail: string | undefined = typeof clientUserEmail === 'string' && clientUserEmail.trim() ? clientUserEmail.trim() : undefined;
+
+  // If missing from client, resolve from Clerk
+  if (!userName || !userEmail) {
+    try {
+      const clerkUser = await clerkClient().users.getUser(ctx.userId!);
+      const first = clerkUser.firstName ?? '';
+      const last  = clerkUser.lastName  ?? '';
+      userName  = userName  || ([first, last].filter(Boolean).join(' ') || undefined);
+      userEmail = userEmail || clerkUser.primaryEmailAddress?.emailAddress;
+    } catch { /* non-fatal */ }
+  }
 
   await logAudit(client, {
     orgSlug:    ctx.orgSlug!,
@@ -530,7 +533,7 @@ async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promi
     userName,
     userEmail,
     pageTrail:  typeof initialTrail === 'string' && initialTrail.trim() ? initialTrail.trim() : 'AT',
-    summary:    `${userName ?? ctx.userId} signed in`,
+    summary:    `${userName ?? userEmail ?? ctx.userId} signed in`,
   });
 
   return ok({ success: true });

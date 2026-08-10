@@ -179,12 +179,11 @@ function TrailChips({ trail, sessionEnded }: { trail: string; sessionEnded?: boo
 
 // ── Display name helpers ──────────────────────────────────────────────────────
 function actorLabel(e: AuditEntry): string {
-  if (e.user_name)  return e.user_name;
-  if (e.user_email) return e.user_email;
-  // Historical rows before v2 migration — show role-based label, never raw Clerk ID
+  if (e.user_name && e.user_name.trim())  return e.user_name;
+  if (e.user_email && e.user_email.trim()) return e.user_email;
   if (e.user_role === 'super_admin') return 'Super Admin';
   if (e.user_role === 'org:admin')   return 'Admin';
-  return 'Member';
+  return e.user_id ? `Member (${e.user_id.slice(-4)})` : 'Member';
 }
 function roleLabel(role: string): string {
   if (role === 'super_admin') return 'SA';

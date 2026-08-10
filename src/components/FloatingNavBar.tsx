@@ -2,7 +2,7 @@
  * FloatingNavBar.tsx — Premium floating navigation bar
  */
 import { useState, useEffect, useRef } from 'react';
-import { useAuth, UserButton } from '@clerk/react';
+import { useAuth, useUser, UserButton } from '@clerk/react';
 import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, LogOut } from 'lucide-react';
 import { trackAction, clearTrail, postTrailToServer, ensureSession, postSessionEndToServer } from '../lib/trailTracker';
 
@@ -88,6 +88,10 @@ export default function FloatingNavBar({
   onTrialSignOut,
 }: FloatingNavBarProps) {
   const { getToken, signOut, userId } = useAuth();
+  const { user } = useUser();
+  const userName  = user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || undefined;
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
   const subMenuDesktopRef = useRef<HTMLDivElement>(null);
@@ -101,9 +105,9 @@ export default function FloatingNavBar({
     const pageKey = activeSection === 'transactions'
       ? `transactions:${transactionSubView}`
       : activeSection;
-    ensureSession(getToken, pageKey, userId ?? undefined);
+    ensureSession(getToken, pageKey, userId ?? undefined, userName, userEmail);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, userName, userEmail]);
 
   // ── 2. Intercept Clerk UserButton sign-out click ───────────────────────────
   // Clerk's <UserButton> renders a popover with a "Sign out" button inside
