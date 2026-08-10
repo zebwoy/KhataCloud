@@ -87,7 +87,7 @@ export default function FloatingNavBar({
   trialMode = false,
   onTrialSignOut,
 }: FloatingNavBarProps) {
-  const { getToken, signOut } = useAuth();
+  const { getToken, signOut, userId } = useAuth();
   const [pendingCount, setPendingCount] = useState(0);
   const [showSubMenu, setShowSubMenu] = useState(false);
   const subMenuDesktopRef = useRef<HTMLDivElement>(null);
@@ -101,9 +101,9 @@ export default function FloatingNavBar({
     const pageKey = activeSection === 'transactions'
       ? `transactions:${transactionSubView}`
       : activeSection;
-    ensureSession(getToken, pageKey);
+    ensureSession(getToken, pageKey, userId ?? undefined);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   // ── 2. Intercept Clerk UserButton sign-out click ───────────────────────────
   // Clerk's <UserButton> renders a popover with a "Sign out" button inside

@@ -1,12 +1,13 @@
 /**
  * trailTracker.ts — Granular page / action trail & session lifecycle tracker for audit log.
  *
- * Manages unique sessions via sessionStorage so page refreshes stay in the SAME session
- * without generating ghost user_login entries.
+ * Binds unique sessions to the current user ID in sessionStorage so switching users
+ * or page refreshes stay completely isolated without cross-user trail bleeding.
  */
 
 const TRAIL_KEY   = '__kc_trail';
 const SESSION_KEY = '__kc_session_id';
+const USER_ID_KEY = '__kc_user_id';
 
 export const PAGE_META: Record<string, { short: string; long: string }> = {
   // Pages
@@ -41,17 +42,31 @@ export function getSessionId(): string {
   }
 }
 
-/** Initialize a session if not already active in sessionStorage.
- *  Only logs a new user_login entry when a BRAND NEW session is created. */
-export async function ensureSession(getToken: () => Promise<string | null>, initialKey = 'transactions:view') {
+/** Initialize a session if not already active for this specific user.
+ *  Wipes old sessionStorage if current userId does not match stored user. */
+export async function ensureSession(
+  getToken: () => Promise<string | null>,
+  pageKey = 'transactions:view',
+  userId?: string
+) {
   try {
+    const storedUser = sessionStorage.getItem(USER_ID_KEY);
+    // If user changed or logout happened, clear old trail state
+    if (userId && storedUser && storedUser !== userId) {
+      clearTrail();
+    }
+
+    if (userId) {
+      sessionStorage.setItem(USER_ID_KEY, userId);
+    }
+
     let sid = sessionStorage.getItem(SESSION_KEY);
     if (!sid) {
       sid = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       sessionStorage.setItem(SESSION_KEY, sid);
 
-      const meta = PAGE_META[initialKey];
-      const initialCode = meta?.short ?? initialKey;
+      const meta = PAGE_META[pageKey];
+      const initialCode = meta?.short ?? pageKey;
       sessionStorage.setItem(TRAIL_KEY, JSON.stringify([initialCode]));
 
       const token = await getToken();
@@ -66,7 +81,7 @@ export async function ensureSession(getToken: () => Promise<string | null>, init
         });
       }
     } else {
-      trackAction(initialKey);
+      trackAction(pageKey);
     }
   } catch { /* non-fatal */ }
 }
@@ -96,6 +111,7 @@ export function clearTrail() {
   try {
     sessionStorage.removeItem(TRAIL_KEY);
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(USER_ID_KEY);
   } catch { /* non-fatal */ }
 }
 

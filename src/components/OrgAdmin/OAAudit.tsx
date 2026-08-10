@@ -214,6 +214,8 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
   const [totalPages, setTotalPages] = useState(1);
   const [loading,    setLoading]    = useState(!trialMode);
 
+  const [roleFilter, setRoleFilter] = useState<'members' | 'admins' | 'all'>('members');
+
   // Fetch KPI + log page in parallel
   const fetch_ = useCallback(async (p: number) => {
     if (trialMode) return;
@@ -238,6 +240,13 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
   }, [getToken, trialMode]);
 
   useEffect(() => { fetch_(page); }, [fetch_, page]);
+
+  const filteredEntries = entries.filter(e => {
+    const isAdmin = e.user_role === 'org:admin' || e.user_role === 'super_admin' || e.user_role === 'org_admin';
+    if (roleFilter === 'members') return !isAdmin;
+    if (roleFilter === 'admins') return isAdmin;
+    return true;
+  });
 
   if (loading && entries.length === 0)
     return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
@@ -273,18 +282,58 @@ export default function OAAudit({ orgSlug: _orgSlug, trialMode = false }: Props)
 
       {/* ── Log list ──────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{total} total entries</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {filteredEntries.length} of {total} total entries
+          </p>
 
-        {entries.length === 0 ? (
+          <div className="inline-flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl gap-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setRoleFilter('members')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === 'members'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Members Only
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('admins')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === 'admins'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Admins Only
+            </button>
+            <button
+              type="button"
+              onClick={() => setRoleFilter('all')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                roleFilter === 'all'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              All Activity
+            </button>
+          </div>
+        </div>
+
+        {filteredEntries.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <ScrollText size={40} className="mx-auto mb-3 opacity-40" />
-            <p className="text-sm">No audit entries yet.</p>
+            <p className="text-sm">No audit entries found for this filter.</p>
           </div>
         ) : (
           <>
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 overflow-hidden">
               <ul className="divide-y divide-gray-100 dark:divide-slate-800">
-                {entries.map(e => {
+                {filteredEntries.map(e => {
                   const meta = ACTION_META[e.action];
                   const Icon = meta?.Icon ?? ScrollText;
                   const date = new Date(e.created_at).toLocaleString('en-IN', {

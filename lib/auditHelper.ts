@@ -31,12 +31,6 @@ export interface AuditEntry {
  * Best-effort — errors are logged but never thrown (never breaks the main operation).
  */
 export async function logAudit(client: Client, entry: AuditEntry): Promise<void> {
-  // Do not record audit log entries for admin users
-  const role = (entry.userRole ?? '').toLowerCase();
-  if (role === 'org:admin' || role === 'org_admin' || role === 'super_admin' || role === 'admin') {
-    return;
-  }
-
   const schemaName = `org_${entry.orgSlug.replace(/-/g, '_')}`;
   try {
     await client.query(
