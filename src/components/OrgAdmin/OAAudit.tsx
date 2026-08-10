@@ -115,10 +115,10 @@ const ACRONYM_TO_FULL: Record<string, string> = {
   AM: 'Admin › Members',  AR: 'Admin › Requests',
   AL: 'Audit Log',        AS: 'Admin › Settings',
   // Actions
-  ET: 'Edit Transaction', DT: 'Delete Transaction',
-  ST: 'Save Transaction', EX: 'Export CSV',
-  FR: 'Filter / Search',  VD: 'View Details',
-  ER: 'Export Report',
+  ET:  'Edit Transaction',    DT:  'Delete Transaction',
+  ST:  'Save Transaction',    EXT: 'Export Transactions',
+  FR:  'Filter / Search',     VD:  'View Details',
+  EXR: 'Export Report',       PR:  'Print Report',
 };
 
 /** Reverse map full text names to short codes for historical DB rows */
@@ -128,6 +128,9 @@ const FULL_TO_ACRONYM: Record<string, string> = {
   'Admin › Members': 'AM', 'Admin › Requests': 'AR',
   'Admin › Audit Log': 'AL', 'Audit Log': 'AL',
   'Admin › Settings': 'AS',
+  'Export CSV': 'EXT', 'Export Transactions': 'EXT', 'EX': 'EXT',
+  'Export Report': 'EXR', 'ER': 'EXR',
+  'Print Report': 'PR',
 };
 
 function TrailChips({ trail, sessionEnded }: { trail: string; sessionEnded?: boolean }) {
@@ -191,14 +194,18 @@ function roleLabel(role: string): string {
   return 'Member';
 }
 
-// Format milliseconds into a human-readable duration
+// Format milliseconds into a human-readable duration (seconds, minutes, hours)
 function formatDuration(ms: number): string {
-  const totalMins = Math.round(ms / 60_000);
-  if (totalMins < 1)       return '< 1 min';
-  if (totalMins < 60)      return `${totalMins} min`;
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  const totalSecs = Math.round(ms / 1000);
+  if (totalSecs < 60) return `${Math.max(1, totalSecs)}s`;
+  const totalMins = Math.floor(totalSecs / 60);
+  if (totalMins < 60) {
+    const remainingSecs = totalSecs % 60;
+    return remainingSecs > 0 ? `${totalMins}m ${remainingSecs}s` : `${totalMins}m`;
+  }
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────

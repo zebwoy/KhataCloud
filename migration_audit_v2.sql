@@ -14,7 +14,8 @@ ALTER TABLE org_mqlc.audit_log
   ADD COLUMN IF NOT EXISTS user_email   TEXT,
   ADD COLUMN IF NOT EXISTS target_name  TEXT,
   ADD COLUMN IF NOT EXISTS target_email TEXT,
-  ADD COLUMN IF NOT EXISTS page_trail   TEXT;
+  ADD COLUMN IF NOT EXISTS page_trail   TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at   TIMESTAMPTZ DEFAULT NOW();
 
 -- ── Step 2: Fix typos in existing rows ───────────────────────────────────────
 -- "rejectd" → "rejected"

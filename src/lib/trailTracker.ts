@@ -23,13 +23,14 @@ export const PAGE_META: Record<string, { short: string; long: string }> = {
   'admin:audit':       { short: 'AL',  long: 'Audit Log' },
   'admin:settings':    { short: 'AS',  long: 'Admin › Settings' },
   // Actions
-  'action:edit-txn':   { short: 'ET',  long: 'Edit Transaction' },
-  'action:delete-txn': { short: 'DT',  long: 'Delete Transaction' },
-  'action:save-txn':   { short: 'ST',  long: 'Save Transaction' },
-  'action:export-csv': { short: 'EX',  long: 'Export CSV' },
-  'action:filter':     { short: 'FR',  long: 'Filter / Search' },
-  'action:view-detail':{ short: 'VD',  long: 'View Details' },
-  'action:export-report':{ short:'ER', long: 'Export Report' },
+  'action:edit-txn':     { short: 'ET',  long: 'Edit Transaction' },
+  'action:delete-txn':   { short: 'DT',  long: 'Delete Transaction' },
+  'action:save-txn':     { short: 'ST',  long: 'Save Transaction' },
+  'action:export-csv':   { short: 'EXT', long: 'Export Transactions' },
+  'action:filter':       { short: 'FR',  long: 'Filter / Search' },
+  'action:view-detail':  { short: 'VD',  long: 'View Details' },
+  'action:export-report':{ short: 'EXR', long: 'Export Report' },
+  'action:print-report': { short: 'PR',  long: 'Print Report' },
 };
 
 export function getSessionId(): string {

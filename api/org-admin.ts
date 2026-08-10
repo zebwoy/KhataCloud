@@ -168,6 +168,15 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
   if (loginEntries.length > 0) {
     const durations = await Promise.all(
       loginEntries.map(async (e: any) => {
+        const selfRes = await client.query<{ created_at: string; updated_at: string }>(
+          `SELECT created_at, COALESCE(updated_at, created_at) AS updated_at
+           FROM ${schemaName}.audit_log WHERE id = $1`,
+          [e.id]
+        );
+        const selfRow = selfRes.rows[0];
+        const createdAt = selfRow ? new Date(selfRow.created_at).getTime() : new Date(e.created_at).getTime();
+        const updatedAt = selfRow ? new Date(selfRow.updated_at).getTime() : createdAt;
+
         const next = await client.query<{ created_at: string }>(
           `SELECT created_at FROM ${schemaName}.audit_log
            WHERE user_id = $1 AND action = 'user_login' AND created_at > $2
@@ -178,13 +187,16 @@ async function getAudit(ctx: any, req: VercelReq, client: Client): Promise<SubRe
         const trailEndsWithLogout = typeof e.page_trail === 'string' && e.page_trail.trim().endsWith('Logout');
 
         if (hasNext) {
-          const ms = new Date(next.rows[0].created_at).getTime() - new Date(e.created_at).getTime();
+          const nextCreatedAt = new Date(next.rows[0].created_at).getTime();
+          const ms = Math.max(1000, nextCreatedAt - createdAt);
           return { id: e.id, duration_ms: ms, session_ended: true };
         } else if (trailEndsWithLogout) {
-          const ms = Math.max(1000, Date.now() - new Date(e.created_at).getTime());
+          const ms = Math.max(1000, updatedAt > createdAt ? updatedAt - createdAt : Date.now() - createdAt);
           return { id: e.id, duration_ms: ms, session_ended: true };
         }
-        return { id: e.id, duration_ms: null, session_ended: false }; // active session
+        // Active session — elapsed duration from login to now/last heartbeat
+        const ms = Math.max(0, Date.now() - createdAt);
+        return { id: e.id, duration_ms: ms, session_ended: false };
       })
     );
     for (const d of durations) {
@@ -540,24 +552,28 @@ async function postSessionStart(ctx: any, req: VercelReq, client: Client): Promi
 }
 
 // ─── POST heartbeat ──────────────────────────────────────────────────────────
-// Called periodically by the frontend (every 60s).
+// Called periodically by the frontend (every 60s) and instantly on user actions.
 // Updates the page_trail on the user's active session audit entry.
 async function postHeartbeat(ctx: any, req: VercelReq, client: Client): Promise<SubResult> {
   const { sessionId, pageTrail } = req.body ?? {};
   if (typeof pageTrail !== 'string' || !pageTrail.trim()) return ok({ success: true });
 
   const schemaName = `org_${ctx.orgSlug.replace(/-/g, '_')}`;
+  try {
+    await client.query(`ALTER TABLE ${schemaName}.audit_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+  } catch { /* non-fatal */ }
+
   if (sessionId) {
     await client.query(
       `UPDATE ${schemaName}.audit_log
-       SET page_trail = $1
+       SET page_trail = $1, updated_at = NOW()
        WHERE entity_id = $2 AND user_id = $3 AND action = 'user_login'`,
       [pageTrail.trim(), sessionId, ctx.userId!]
     );
   } else {
     await client.query(
       `UPDATE ${schemaName}.audit_log
-       SET page_trail = $1
+       SET page_trail = $1, updated_at = NOW()
        WHERE id = (
          SELECT id FROM ${schemaName}.audit_log
          WHERE user_id = $2 AND action = 'user_login'
@@ -581,17 +597,21 @@ async function postSessionEnd(ctx: any, req: VercelReq, client: Client): Promise
     trail = 'Logout';
   }
 
+  try {
+    await client.query(`ALTER TABLE ${schemaName}.audit_log ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()`);
+  } catch { /* non-fatal */ }
+
   if (sessionId) {
     await client.query(
       `UPDATE ${schemaName}.audit_log
-       SET page_trail = $1
+       SET page_trail = $1, updated_at = NOW()
        WHERE entity_id = $2 AND user_id = $3 AND action = 'user_login'`,
       [trail, sessionId, ctx.userId!]
     );
   } else {
     await client.query(
       `UPDATE ${schemaName}.audit_log
-       SET page_trail = $1
+       SET page_trail = $1, updated_at = NOW()
        WHERE id = (
          SELECT id FROM ${schemaName}.audit_log
          WHERE user_id = $2 AND action = 'user_login'

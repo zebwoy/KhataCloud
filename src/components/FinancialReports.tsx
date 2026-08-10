@@ -124,7 +124,7 @@ export default function FinancialReports({
         </div>
         <div className="flex gap-2 no-print">
           <button
-            onClick={() => { trackAction('action:export-report'); window.print(); }}
+            onClick={() => { trackAction('action:print-report'); window.print(); }}
             className="bg-indigo-600 dark:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
           >
             <Printer size={18} /> Print Report
