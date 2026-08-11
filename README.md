@@ -16,9 +16,27 @@ A focused accounting and reconciliation tool for small teams and NGOs to record 
 - Filters and presets: this month/quarter/fiscal year/all-time/custom ranges.
 - Data consistency: numeric coercion to avoid NaN, local date parsing to avoid TZ drift, consistent currency/date presentation for auditability.
 
+## Directory Structure
+
+```text
+├── api/            # Serverless backend endpoints (org-admin, admin, transactions, entities)
+├── src/            # React + TypeScript frontend application (components, utils, lib)
+├── migrations/     # Ordered SQL schema migration scripts & database seeds
+│   ├── 001_migration_saas_platform.sql
+│   ├── 002_migration_clerk_orgs.sql
+│   ├── 003_migration_custodian_counterparty.sql
+│   ├── 004_migration_entered_by.sql
+│   ├── 005_migration_audit_v2.sql
+│   └── 006_create_entities_table.sql
+├── docs/           # Documentation, local dev guide, & architecture diagrams
+├── scripts/        # CLI utilities & migration helpers
+├── lib/            # Shared backend helpers (auditHelper, postgres)
+└── public/         # Static web assets
+```
+
 ## Hosting & operations
-- Hosted on Netlify, backed by Neon (PostgreSQL).
-- Environment-driven configuration (e.g., admin password hash, DB URL).
+- Hosted on Vercel / Netlify, backed by Neon (PostgreSQL).
+- Environment-driven configuration (e.g., Clerk Auth, DB URL).
 
 ## Project at a glance
 - Iterative build focused on UX clarity (friendly dates/currency), receiver analytics, and audit-friendly reporting.
