@@ -31,7 +31,8 @@ export interface AuditEntry {
  * Best-effort — errors are logged but never thrown (never breaks the main operation).
  */
 export async function logAudit(client: Client, entry: AuditEntry): Promise<void> {
-  const schemaName = `org_${entry.orgSlug.replace(/-/g, '_')}`;
+  const safeSlug = (entry.orgSlug ?? '').replace(/[^a-zA-Z0-9_]/g, '_');
+  const schemaName = `org_${safeSlug}`;
   try {
     await client.query(
       `INSERT INTO ${schemaName}.audit_log

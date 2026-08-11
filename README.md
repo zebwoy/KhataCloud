@@ -44,3 +44,8 @@ A focused accounting and reconciliation tool for small teams and NGOs to record 
 
 ## Contact
 - Maintained by Ayman Shaikh (zebwoy).
+
+## License & Copyright
+**Copyright (c) 2026 Ayman Shaikh ([@zebwoy](https://github.com/zebwoy)). All Rights Reserved.**
+
+This repository is publicly accessible for portfolio demonstration and code inspection only. Copying, modifying, distributing, hosting, or selling any code or assets from this repository without prior written authorization is strictly prohibited. See [LICENSE](./LICENSE) for terms.
