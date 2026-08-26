@@ -29,6 +29,7 @@ import {
   getDateRangeForMode,
   type DateFilterMode,
 } from './utils/constants';
+import type { NoticeboardConfig } from '../api/org-config';
 
 const apiFetch = async (url: string, options: RequestInit = {}) => {
   // Prefer a live Clerk token (exposed by OrgAppShell when in saas mode).
@@ -143,6 +144,10 @@ export default function AccountingSystem({
   // Saved senders state (loaded from server)
   const [savedCounterparties, setSavedCounterparties] = useState<string[]>([]);
   const [showCounterpartyDropdown, setShowCounterpartyDropdown] = useState(false);
+
+  // Org noticeboard config (from /api/org-config)
+  const DEFAULT_ORG_CONFIG: NoticeboardConfig = { publicMessage: null, donationLink: null, hiddenSubcategories: [] };
+  const [orgConfig, setOrgConfig] = useState<NoticeboardConfig>(DEFAULT_ORG_CONFIG);
   
   // Date range filter state
   const [dateRange, setDateRange] = useState({
@@ -228,6 +233,19 @@ export default function AccountingSystem({
     }
   }, []);
 
+  // Fetch org noticeboard config (non-blocking — fails silently, defaults used)
+  const fetchOrgConfig = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/org-config');
+      if (res.ok) {
+        const data: NoticeboardConfig = await res.json();
+        setOrgConfig(data);
+      }
+    } catch {
+      // Non-critical — noticeboard will render with empty defaults
+    }
+  }, []);
+
 
 
   useEffect(() => {
@@ -250,16 +268,19 @@ export default function AccountingSystem({
       setTransactions([]);
       setTrusteeOptions([]);
       setIsInitializing(true);
-      
+
       // Fetch new data for the current user type
       Promise.all([fetchTransactions(), fetchEntities()]).finally(() => {
         setIsInitializing(false);
       });
+
+      // Non-blocking: fetch org noticeboard config
+      fetchOrgConfig();
     } else {
       // Clear entities when logged out
       setTrusteeOptions([]);
     }
-  }, [isLoggedIn, userType, fetchTransactions, fetchEntities]);
+  }, [isLoggedIn, userType, fetchTransactions, fetchEntities, fetchOrgConfig]);
 
   // Signal parent (OrgAppShell) that initial data load is done — fires once
   useEffect(() => {
@@ -1026,6 +1047,7 @@ export default function AccountingSystem({
             formatPreviousPeriodLabel={formatPreviousPeriodLabel}
             handleQuickFilter={handleQuickFilter}
             exportToCSV={exportToCSV}
+            orgConfig={orgConfig}
           />
         )}
 
