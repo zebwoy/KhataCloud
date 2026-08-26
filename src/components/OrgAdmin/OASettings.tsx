@@ -1,9 +1,9 @@
-/**
+﻿/**
  * OASettings.tsx — Org admin settings panel
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
-import { Save, Loader2, LayoutTemplate, ClipboardList, Heart, EyeOff } from 'lucide-react';
+import { Save, Loader2, LayoutTemplate, ClipboardList, Heart, EyeOff, ListPlus, X as XIcon, RotateCcw } from 'lucide-react';
 import { Spinner, Input, Button, Alert } from '../../ui';
 import type { NoticeboardConfig } from '../../../api/org-config';
 
@@ -55,10 +55,15 @@ export default function OASettings({ trialMode = false }: Props) {
   const [nbError,      setNbError]      = useState('');
 
   // All known subcategories across Income + Expense (for the toggle list)
-  const ALL_SUBCATS = [
-    'Donations', 'Student Fees', 'Grants', 'Other Income',
-    'Salaries', 'Utilities', 'Books & Materials', 'Infrastructure', 'Other Expenses',
-  ];
+  const DEFAULT_INCOME_SUBCATS  = ['Donations', 'Student Fees', 'Grants', 'Other Income'];
+  const DEFAULT_EXPENSE_SUBCATS = ['Salaries', 'Utilities', 'Books & Materials', 'Infrastructure', 'Other Expenses'];
+  const ALL_SUBCATS = [...DEFAULT_INCOME_SUBCATS, ...DEFAULT_EXPENSE_SUBCATS];
+
+  // ── Custom subcategory state ─────────────────────────────────────────────
+  const [customIncome,  setCustomIncome]  = useState<string[]>(DEFAULT_INCOME_SUBCATS);
+  const [customExpense, setCustomExpense] = useState<string[]>(DEFAULT_EXPENSE_SUBCATS);
+  const [newIncomeSub,  setNewIncomeSub]  = useState('');
+  const [newExpenseSub, setNewExpenseSub] = useState('');
 
   const fetch_ = useCallback(async () => {
     if (trialMode) return;
@@ -93,6 +98,8 @@ export default function OASettings({ trialMode = false }: Props) {
         setNbMessage(d.publicMessage    ?? '');
         setNbDonateLink(d.donationLink  ?? '');
         setNbHidden(d.hiddenSubcategories ?? []);
+        setCustomIncome(d.customIncomeSubcats   ?? DEFAULT_INCOME_SUBCATS);
+        setCustomExpense(d.customExpenseSubcats ?? DEFAULT_EXPENSE_SUBCATS);
       }
     } finally { setNbLoading(false); }
   }, [getToken, trialMode]);
@@ -133,6 +140,8 @@ export default function OASettings({ trialMode = false }: Props) {
           publicMessage:       nbMessage.trim()    || null,
           donationLink:        nbDonateLink.trim() || null,
           hiddenSubcategories: nbHidden,
+          customIncomeSubcats:  customIncome,
+          customExpenseSubcats: customExpense,
         } satisfies NoticeboardConfig),
       });
       const d = await r.json();
@@ -147,6 +156,15 @@ export default function OASettings({ trialMode = false }: Props) {
       prev.includes(sub) ? prev.filter(s => s !== sub) : [...prev, sub]
     );
   };
+
+  // Add / remove from custom subcategory lists
+  const addSub = (list: string[], setList: (v: string[]) => void, value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed || list.includes(trimmed)) return;
+    setList([...list, trimmed]);
+  };
+  const removeSub = (list: string[], setList: (v: string[]) => void, value: string) =>
+    setList(list.filter(s => s !== value));
 
   if (loading || nbLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
   if (!settings) return <div className="text-center py-12 text-gray-400 text-sm">Could not load settings.</div>;
@@ -378,6 +396,137 @@ export default function OASettings({ trialMode = false }: Props) {
             {trialMode ? 'Save Noticeboard (Demo Mode Locked)' : nbSaving ? 'Saving…' : 'Save Noticeboard Settings'}
           </Button>
         </div>
+      </div>
+
+      {/* Subcategory Management Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 mt-6">
+        <div className="flex items-center gap-2 mb-1">
+          <ListPlus size={14} className="text-violet-500" />
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Subcategory Management</h3>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+          Customise the dropdown options shown when adding transactions. Changes apply to the form and the Noticeboard's hide-category list.
+        </p>
+
+        {/* Income subcategories */}
+        <div className="mb-5">
+          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Income Subcategories</p>
+          <div className="flex flex-wrap gap-2 mb-3 min-h-[36px]">
+            {customIncome.map(sub => (
+              <span key={sub} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+                {sub}
+                <button
+                  type="button"
+                  disabled={trialMode}
+                  onClick={() => removeSub(customIncome, setCustomIncome, sub)}
+                  className="ml-0.5 hover:text-red-500 transition-colors disabled:opacity-40"
+                  title="Remove"
+                >
+                  <XIcon size={11} />
+                </button>
+              </span>
+            ))}
+            {customIncome.length === 0 && (
+              <p className="text-xs text-gray-400 dark:text-slate-500 italic">No income subcategories defined</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add income subcategory…"
+              value={newIncomeSub}
+              disabled={trialMode}
+              onChange={e => setNewIncomeSub(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSub(customIncome, setCustomIncome, newIncomeSub);
+                  setNewIncomeSub('');
+                }
+              }}
+              className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all"
+            />
+            <button
+              type="button"
+              disabled={trialMode || !newIncomeSub.trim()}
+              onClick={() => { addSub(customIncome, setCustomIncome, newIncomeSub); setNewIncomeSub(''); }}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              disabled={trialMode}
+              onClick={() => setCustomIncome(['Donations', 'Student Fees', 'Grants', 'Other Income'])}
+              className="px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              title="Reset to defaults"
+            >
+              <RotateCcw size={13} className="text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* Expense subcategories */}
+        <div>
+          <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-2 uppercase tracking-wide">Expense Subcategories</p>
+          <div className="flex flex-wrap gap-2 mb-3 min-h-[36px]">
+            {customExpense.map(sub => (
+              <span key={sub} className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-medium">
+                {sub}
+                <button
+                  type="button"
+                  disabled={trialMode}
+                  onClick={() => removeSub(customExpense, setCustomExpense, sub)}
+                  className="ml-0.5 hover:text-red-500 transition-colors disabled:opacity-40"
+                  title="Remove"
+                >
+                  <XIcon size={11} />
+                </button>
+              </span>
+            ))}
+            {customExpense.length === 0 && (
+              <p className="text-xs text-gray-400 dark:text-slate-500 italic">No expense subcategories defined</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Add expense subcategory…"
+              value={newExpenseSub}
+              disabled={trialMode}
+              onChange={e => setNewExpenseSub(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSub(customExpense, setCustomExpense, newExpenseSub);
+                  setNewExpenseSub('');
+                }
+              }}
+              className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all"
+            />
+            <button
+              type="button"
+              disabled={trialMode || !newExpenseSub.trim()}
+              onClick={() => { addSub(customExpense, setCustomExpense, newExpenseSub); setNewExpenseSub(''); }}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Add
+            </button>
+            <button
+              type="button"
+              disabled={trialMode}
+              onClick={() => setCustomExpense(['Salaries', 'Utilities', 'Books & Materials', 'Infrastructure', 'Other Expenses'])}
+              className="px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-colors"
+              title="Reset to defaults"
+            >
+              <RotateCcw size={13} className="text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-4">
+          Click "Save Noticeboard Settings" above to persist all subcategory changes.
+        </p>
       </div>
     </div>
   );

@@ -146,7 +146,13 @@ export default function AccountingSystem({
   const [showCounterpartyDropdown, setShowCounterpartyDropdown] = useState(false);
 
   // Org noticeboard config (from /api/org-config)
-  const DEFAULT_ORG_CONFIG: NoticeboardConfig = { publicMessage: null, donationLink: null, hiddenSubcategories: [] };
+  const DEFAULT_ORG_CONFIG: NoticeboardConfig = {
+    publicMessage: null,
+    donationLink: null,
+    hiddenSubcategories: [],
+    customIncomeSubcats: null,
+    customExpenseSubcats: null,
+  };
   const [orgConfig, setOrgConfig] = useState<NoticeboardConfig>(DEFAULT_ORG_CONFIG);
   
   // Date range filter state
@@ -162,8 +168,17 @@ export default function AccountingSystem({
   // Theme state + CSS effects + button class helper
   const { theme, setTheme, getPrimaryButtonClasses } = useTheme();
 
-  // Derived values from imported utilities
-  const subcategoryOptions = getSubcategoryOptions(formData.category);
+  // Derived values — use org-defined custom subcategories when available
+  const incomeSubcats  = (orgConfig.customIncomeSubcats  && orgConfig.customIncomeSubcats.length  > 0)
+    ? orgConfig.customIncomeSubcats  : undefined;
+  const expenseSubcats = (orgConfig.customExpenseSubcats && orgConfig.customExpenseSubcats.length > 0)
+    ? orgConfig.customExpenseSubcats : undefined;
+  const subcategoryOptions: SubcategoryOption[] = (() => {
+    if (formData.category === 'Transfer') return [];
+    const customList = formData.category === 'Income' ? incomeSubcats : expenseSubcats;
+    if (customList && customList.length > 0) return customList.map(sub => ({ value: sub, label: sub }));
+    return getSubcategoryOptions(formData.category);
+  })();
   const fieldLabels = getFieldLabels(formData.category);
 
 
@@ -368,11 +383,16 @@ export default function AccountingSystem({
 
   const handleCategorySelect = (option: SingleValue<CategoryOption>) => {
     const value = option?.value ?? 'Income';
+    // Default to first available subcategory in the org's custom list, or classic defaults
     let subcategory = '';
     if (value === 'Income') {
-      subcategory = 'Donations';
+      subcategory = (orgConfig.customIncomeSubcats  && orgConfig.customIncomeSubcats.length  > 0)
+        ? orgConfig.customIncomeSubcats[0]
+        : 'Donations';
     } else if (value === 'Expense') {
-      subcategory = 'Salaries';
+      subcategory = (orgConfig.customExpenseSubcats && orgConfig.customExpenseSubcats.length > 0)
+        ? orgConfig.customExpenseSubcats[0]
+        : 'Salaries';
     }
     // For Transfer, subcategory stays empty
     setFormData({
@@ -471,11 +491,8 @@ export default function AccountingSystem({
     if (formData.category === 'Transfer' && formData.custodian.trim() && formData.counterparty.trim() && formData.custodian.trim() === formData.counterparty.trim()) {
       errors.counterparty = 'Source and destination trustee cannot be the same';
     }
-    if (!formData.remarks.trim()) {
-      errors.remarks = 'Remarks is required';
-    } else if (formData.remarks.trim().length < 3) {
-      errors.remarks = 'Remarks should be at least 3 characters';
-    }
+    // Remarks are optional — blank will be saved as 'Not Available'
+    // (no validation needed)
 
     if (formData.amount === '') {
       errors.amount = 'Amount is required';
@@ -544,7 +561,7 @@ export default function AccountingSystem({
       ...formData,
       custodian: formData.custodian.trim(),
       counterparty: formData.counterparty.trim(),
-      remarks: formData.remarks.trim(),
+      remarks: formData.remarks.trim() || 'Not Available',
       amount: Number(formData.amount),
     };
 
@@ -678,7 +695,7 @@ export default function AccountingSystem({
       ...formData,
       custodian: formData.custodian.trim(),
       counterparty: formData.counterparty.trim(),
-      remarks: formData.remarks.trim(),
+      remarks: formData.remarks.trim() || 'Not Available',
       amount: Number(formData.amount),
       modifiedDate: modifiedDate,
     };

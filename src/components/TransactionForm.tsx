@@ -288,7 +288,9 @@ export default function TransactionForm({
         </div>
 
         <div>
-          <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Remarks *</label>
+          <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+            Remarks <span className="font-normal text-gray-400 dark:text-slate-500 text-xs">(optional)</span>
+          </label>
           
           {/* Label Buttons */}
           <div className="mb-3 flex flex-wrap gap-2">
@@ -317,7 +319,7 @@ export default function TransactionForm({
           </div>
 
           <textarea
-            placeholder="Type your remarks or click labels above to add them"
+            placeholder="Optional — click a label above or type a description. Leave blank for 'Not Available'."
             value={formData.remarks}
             onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
             rows={3}

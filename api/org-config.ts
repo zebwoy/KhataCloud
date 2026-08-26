@@ -22,12 +22,16 @@ export interface NoticeboardConfig {
   publicMessage: string | null;
   donationLink: string | null;
   hiddenSubcategories: string[];
+  customIncomeSubcats: string[] | null;   // null = use defaults from constants.ts
+  customExpenseSubcats: string[] | null;  // null = use defaults from constants.ts
 }
 
 const DEFAULT_CONFIG: NoticeboardConfig = {
   publicMessage: null,
   donationLink: null,
   hiddenSubcategories: [],
+  customIncomeSubcats: null,
+  customExpenseSubcats: null,
 };
 
 const getConnectionString = () =>
@@ -118,6 +122,12 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       const hiddenSubcats   = Array.isArray(body.hiddenSubcategories)
         ? body.hiddenSubcategories.filter((s): s is string => typeof s === 'string')
         : [];
+      const customIncomeSubcats  = Array.isArray(body.customIncomeSubcats)
+        ? body.customIncomeSubcats.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).map(s => s.trim())
+        : null;
+      const customExpenseSubcats = Array.isArray(body.customExpenseSubcats)
+        ? body.customExpenseSubcats.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).map(s => s.trim())
+        : null;
 
       // Basic URL validation for donationLink
       if (donationLink) {
@@ -126,7 +136,13 @@ export default async function handler(req: VercelReq, res: VercelRes) {
         }
       }
 
-      const newConfig: NoticeboardConfig = { publicMessage, donationLink, hiddenSubcategories: hiddenSubcats };
+      const newConfig: NoticeboardConfig = {
+        publicMessage,
+        donationLink,
+        hiddenSubcategories: hiddenSubcats,
+        customIncomeSubcats,
+        customExpenseSubcats,
+      };
 
       await runQuery(
         `INSERT INTO org_config (org_slug, config_key, config_json, updated_at)

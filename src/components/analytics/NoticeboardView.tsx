@@ -1,15 +1,14 @@
 /**
  * NoticeboardView.tsx — Digital monthly notice board
  *
- * A premium styled monthly financial summary inspired by the physical
- * whiteboard. Driven by filteredTransactions + CMS config from org-config API.
+ * Premium styled monthly financial summary with a toggle to switch between:
+ *   • Subcategory mode  — groups transactions by subcategory (default)
+ *   • Remark mode       — shows individual transactions with their remarks
  *
- * Admin can:
- *   - Show a public message (e.g. "We are running short this month…")
- *   - Show a donation button (links to UPI / Razorpay URL)
- *   - Hide specific subcategories (e.g. hide "Salaries" from public view)
+ * Driven by filteredTransactions + CMS config from org-config API.
  */
-import { Heart, MessageSquare, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useState } from 'react';
+import { Heart, MessageSquare, ExternalLink, TrendingUp, TrendingDown, Minus, AlignLeft, Tag } from 'lucide-react';
 import type { Transaction, Theme } from '../../types';
 import type { Stats } from '../../utils/calculations';
 import { getCategoryBreakdown } from '../../utils/calculations';
@@ -24,6 +23,8 @@ interface Props {
   orgConfig: NoticeboardConfig;
   theme: Theme;
 }
+
+type DisplayMode = 'subcategory' | 'remark';
 
 function getPeriodLabel(
   dateFilterMode: DateFilterMode,
@@ -49,14 +50,33 @@ function getPeriodLabel(
   return 'All Time';
 }
 
+/** Get individual transactions with their remark (or label) as display text */
+function getRemarkLines(
+  transactions: Transaction[],
+  category: 'Income' | 'Expense',
+  hiddenSubcategories: string[]
+): { label: string; amount: number; id: number }[] {
+  return transactions
+    .filter(t => t.category === category && !hiddenSubcategories.includes(t.subcategory))
+    .map(t => ({
+      id: t.id,
+      amount: t.amount,
+      label: (t.remarks && t.remarks !== 'Not Available') ? t.remarks : t.subcategory,
+    }));
+}
+
 export default function NoticeboardView({ filteredTransactions, stats, dateFilterMode, dateRange, orgConfig, theme: _theme }: Props) {
   const { publicMessage, donationLink, hiddenSubcategories = [] } = orgConfig;
   const periodLabel = getPeriodLabel(dateFilterMode, dateRange);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('subcategory');
 
   const incomeBreakdown  = getCategoryBreakdown(filteredTransactions, 'Income')
     .filter(item => !hiddenSubcategories.includes(item.sub));
   const expenseBreakdown = getCategoryBreakdown(filteredTransactions, 'Expense')
     .filter(item => !hiddenSubcategories.includes(item.sub));
+
+  const incomeRemarks  = getRemarkLines(filteredTransactions, 'Income',  hiddenSubcategories);
+  const expenseRemarks = getRemarkLines(filteredTransactions, 'Expense', hiddenSubcategories);
 
   const isDeficit  = stats.balance < 0;
   const isEmpty    = filteredTransactions.length === 0;
@@ -75,16 +95,50 @@ export default function NoticeboardView({ filteredTransactions, stats, dateFilte
               </p>
               <h2 className="text-2xl font-bold text-white tracking-tight">{periodLabel}</h2>
             </div>
-            {/* Surplus / Deficit badge */}
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-lg ${
-              isEmpty
-                ? 'bg-slate-700 text-slate-400'
-                : isDeficit
-                  ? 'bg-red-600/90 text-white shadow-red-500/30'
-                  : 'bg-emerald-600/90 text-white shadow-emerald-500/30'
-            }`}>
-              {isEmpty ? <Minus size={16} /> : isDeficit ? <TrendingDown size={16} /> : <TrendingUp size={16} />}
-              {isEmpty ? 'No data' : isDeficit ? 'Deficit' : 'Surplus'}
+            <div className="flex items-center gap-3">
+              {/* Subtle display mode toggle */}
+              {!isEmpty && (
+                <div className="flex items-center bg-slate-700/50 rounded-lg p-0.5 border border-slate-600/40">
+                  <button
+                    id="noticeboard-toggle-subcategory"
+                    onClick={() => setDisplayMode('subcategory')}
+                    title="Group by subcategory"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      displayMode === 'subcategory'
+                        ? 'bg-white/15 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Tag size={11} />
+                    <span className="hidden sm:inline">Category</span>
+                  </button>
+                  <button
+                    id="noticeboard-toggle-remark"
+                    onClick={() => setDisplayMode('remark')}
+                    title="Show individual remarks"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      displayMode === 'remark'
+                        ? 'bg-white/15 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <AlignLeft size={11} />
+                    <span className="hidden sm:inline">Remarks</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Surplus / Deficit badge */}
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm shadow-lg ${
+                isEmpty
+                  ? 'bg-slate-700 text-slate-400'
+                  : isDeficit
+                    ? 'bg-red-600/90 text-white shadow-red-500/30'
+                    : 'bg-emerald-600/90 text-white shadow-emerald-500/30'
+              }`}>
+                {isEmpty ? <Minus size={16} /> : isDeficit ? <TrendingDown size={16} /> : <TrendingUp size={16} />}
+                {isEmpty ? 'No data' : isDeficit ? 'Deficit' : 'Surplus'}
+              </div>
             </div>
           </div>
         </div>
@@ -107,15 +161,24 @@ export default function NoticeboardView({ filteredTransactions, stats, dateFilte
                     <TrendingDown size={13} /> Expenses
                   </p>
                   <div className="space-y-2">
-                    {expenseBreakdown.length > 0 ? expenseBreakdown.map(item => (
-                      <div key={item.sub} className="flex justify-between items-baseline">
-                        <span className="text-sm text-gray-600 dark:text-slate-400">{item.sub}</span>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
-                          ₹{item.total.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    )) : (
-                      <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
+                    {displayMode === 'subcategory' ? (
+                      expenseBreakdown.length > 0 ? expenseBreakdown.map(item => (
+                        <div key={item.sub} className="flex justify-between items-baseline">
+                          <span className="text-sm text-gray-600 dark:text-slate-400">{item.sub}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
+                            ₹{item.total.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      )) : <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
+                    ) : (
+                      expenseRemarks.length > 0 ? expenseRemarks.map(item => (
+                        <div key={item.id} className="flex justify-between items-baseline">
+                          <span className="text-sm text-gray-600 dark:text-slate-400 truncate max-w-[65%]" title={item.label}>{item.label}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums flex-shrink-0">
+                            ₹{item.amount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      )) : <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
                     )}
                   </div>
                   {/* Expense total */}
@@ -133,15 +196,24 @@ export default function NoticeboardView({ filteredTransactions, stats, dateFilte
                     <TrendingUp size={13} /> Income
                   </p>
                   <div className="space-y-2">
-                    {incomeBreakdown.length > 0 ? incomeBreakdown.map(item => (
-                      <div key={item.sub} className="flex justify-between items-baseline">
-                        <span className="text-sm text-gray-600 dark:text-slate-400">{item.sub}</span>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
-                          ₹{item.total.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    )) : (
-                      <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
+                    {displayMode === 'subcategory' ? (
+                      incomeBreakdown.length > 0 ? incomeBreakdown.map(item => (
+                        <div key={item.sub} className="flex justify-between items-baseline">
+                          <span className="text-sm text-gray-600 dark:text-slate-400">{item.sub}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
+                            ₹{item.total.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      )) : <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
+                    ) : (
+                      incomeRemarks.length > 0 ? incomeRemarks.map(item => (
+                        <div key={item.id} className="flex justify-between items-baseline">
+                          <span className="text-sm text-gray-600 dark:text-slate-400 truncate max-w-[65%]" title={item.label}>{item.label}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums flex-shrink-0">
+                            ₹{item.amount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      )) : <p className="text-xs text-gray-400 dark:text-slate-500">None recorded</p>
                     )}
                   </div>
                   {/* Income total */}

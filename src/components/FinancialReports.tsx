@@ -388,7 +388,7 @@ export default function FinancialReports({
                 {stats.balance >= 0 ? 'SURPLUS' : 'DEFICIT'}
               </p>
               <p className="text-3xl font-bold">
-                â‚¹{Math.abs(stats.balance).toLocaleString('en-IN')}
+                ₹{Math.abs(stats.balance).toLocaleString('en-IN')}
               </p>
             </div>
           </div>
