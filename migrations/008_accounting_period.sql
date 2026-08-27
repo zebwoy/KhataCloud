@@ -119,6 +119,9 @@ BEGIN
 END $$;
 
 -- ── 5. Update provision_org_schema() for future orgs ──────────────────────────
+-- DROP first: CREATE OR REPLACE cannot change an existing function's signature/definition
+-- when PostgreSQL detects a type conflict. This is safe — we recreate it immediately below.
+DROP FUNCTION IF EXISTS platform.provision_org_schema(TEXT);
 CREATE OR REPLACE FUNCTION platform.provision_org_schema(p_slug TEXT)
 RETURNS TEXT LANGUAGE plpgsql AS $$
 DECLARE
