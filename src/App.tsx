@@ -316,13 +316,15 @@ export default function AccountingSystem({
     }
 
     if (dateFilterMode !== 'allTime') {
-      const range = dateFilterMode === 'custom' ? dateRange : getDateRangeForMode(dateFilterMode);
+      const range = (dateFilterMode === 'custom' || dateFilterMode === 'selectedMonth') 
+        ? dateRange 
+        : getDateRangeForMode(dateFilterMode, dateRange);
     
-    if (range.fromDate) {
-      filtered = filtered.filter(t => t.date >= range.fromDate);
-    }
-    if (range.toDate) {
-      filtered = filtered.filter(t => t.date <= range.toDate);
+      if (range.fromDate) {
+        filtered = filtered.filter(t => t.date >= range.fromDate);
+      }
+      if (range.toDate) {
+        filtered = filtered.filter(t => t.date <= range.toDate);
       }
     }
     
@@ -333,10 +335,10 @@ export default function AccountingSystem({
   const getPreviousPeriodRange = () => {
     let currentRange;
     
-    if (dateFilterMode === 'custom') {
+    if (dateFilterMode === 'custom' || dateFilterMode === 'selectedMonth') {
       currentRange = dateRange;
     } else {
-      currentRange = getDateRangeForMode(dateFilterMode);
+      currentRange = getDateRangeForMode(dateFilterMode, dateRange);
     }
     
     if (!currentRange.fromDate || !currentRange.toDate) {
@@ -373,7 +375,7 @@ export default function AccountingSystem({
   // Handle quick filter button clicks
   const handleQuickFilter = (mode: DateFilterMode) => {
     setDateFilterMode(mode);
-    if (mode !== 'custom' && mode !== 'allTime') {
+    if (mode !== 'custom' && mode !== 'selectedMonth' && mode !== 'allTime') {
       const range = getDateRangeForMode(mode);
       setDateRange(range);
     } else if (mode === 'allTime') {

@@ -81,6 +81,16 @@ export default function FinancialReports({
   });
   const monthDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  // Sync pickerYear when dateRange.fromDate changes
+  useEffect(() => {
+    if (dateRange.fromDate) {
+      const parsedYear = parseInt(dateRange.fromDate.split('-')[0], 10);
+      if (!isNaN(parsedYear)) {
+        setPickerYear(parsedYear);
+      }
+    }
+  }, [dateRange.fromDate]);
+
   // Flatpickr range input ref
   const flatpickrInputRef = useRef<HTMLInputElement | null>(null);
   const flatpickrInstance = useRef<flatpickr.Instance | null>(null);
