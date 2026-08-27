@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { trackAction } from '../lib/trailTracker';
-import { Download, Calendar, TrendingUp, TrendingDown, Printer } from 'lucide-react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
+import { Download, Calendar, TrendingUp, TrendingDown, Printer, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
 import type { Transaction, TrusteeOption, Theme } from '../types';
 import type { Stats } from '../utils/calculations';
 import { formatCurrency } from '../utils/formatters';
-import { getDateRangeForMode, type DateFilterMode, type DateRange } from '../utils/constants';
+import { type DateFilterMode, type DateRange } from '../utils/constants';
 import ExportOptionsModal from './ExportOptionsModal';
 import AnalyticsPanel from './AnalyticsPanel';
 import type { NoticeboardConfig } from '../../api/org-config';
@@ -33,6 +33,21 @@ interface FinancialReportsProps {
   orgConfig: NoticeboardConfig;
 }
 
+const MONTHS = [
+  { name: 'January', short: 'Jan', index: 0 },
+  { name: 'February', short: 'Feb', index: 1 },
+  { name: 'March', short: 'Mar', index: 2 },
+  { name: 'April', short: 'Apr', index: 3 },
+  { name: 'May', short: 'May', index: 4 },
+  { name: 'June', short: 'Jun', index: 5 },
+  { name: 'July', short: 'Jul', index: 6 },
+  { name: 'August', short: 'Aug', index: 7 },
+  { name: 'September', short: 'Sep', index: 8 },
+  { name: 'October', short: 'Oct', index: 9 },
+  { name: 'November', short: 'Nov', index: 10 },
+  { name: 'December', short: 'Dec', index: 11 },
+];
+
 export default function FinancialReports({
   filteredTransactions,
   dateFilterMode,
@@ -54,25 +69,115 @@ export default function FinancialReports({
   orgConfig,
 }: FinancialReportsProps) {
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  // Local state for draft date range selection
-  const [localRange, setLocalRange] = useState<{ fromDate: string; toDate: string }>({
-    fromDate: dateRange.fromDate,
-    toDate: dateRange.toDate,
+  
+  // Month dropdown state
+  const [monthDropdownOpen, setMonthDropdownOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState<number>(() => {
+    if (dateRange.fromDate) {
+      const parsedYear = parseInt(dateRange.fromDate.split('-')[0], 10);
+      if (!isNaN(parsedYear)) return parsedYear;
+    }
+    return new Date().getFullYear();
   });
+  const monthDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep draft state in sync if global filters change from outside (e.g. quick filters)
+  // Flatpickr range input ref
+  const flatpickrInputRef = useRef<HTMLInputElement | null>(null);
+  const flatpickrInstance = useRef<flatpickr.Instance | null>(null);
+
+  // Close month dropdown when clicking outside
   useEffect(() => {
-    setLocalRange({
-      fromDate: dateRange.fromDate,
-      toDate: dateRange.toDate,
+    const handleClickOutside = (event: MouseEvent) => {
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
+        setMonthDropdownOpen(false);
+      }
+    };
+    if (monthDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [monthDropdownOpen]);
+
+  // Initialize Flatpickr in range mode
+  useEffect(() => {
+    if (!flatpickrInputRef.current) return;
+
+    const fp = flatpickr(flatpickrInputRef.current, {
+      mode: "range",
+      dateFormat: "Y-m-d",
+      defaultDate: dateRange.fromDate && dateRange.toDate ? [dateRange.fromDate, dateRange.toDate] : undefined,
+      onClose: (selectedDates) => {
+        if (selectedDates.length === 2) {
+          const start = fp.formatDate(selectedDates[0], "Y-m-d");
+          const end = fp.formatDate(selectedDates[1], "Y-m-d");
+          setDateRange({ fromDate: start, toDate: end });
+          setDateFilterMode('custom');
+        } else if (selectedDates.length === 1) {
+          const single = fp.formatDate(selectedDates[0], "Y-m-d");
+          setDateRange({ fromDate: single, toDate: single });
+          setDateFilterMode('custom');
+        }
+      },
     });
-  }, [dateRange]);
+
+    flatpickrInstance.current = fp;
+
+    return () => {
+      fp.destroy();
+    };
+  }, [setDateRange, setDateFilterMode]);
+
+  // Sync external dateRange changes into Flatpickr
+  useEffect(() => {
+    if (flatpickrInstance.current) {
+      if (dateFilterMode === 'custom' && dateRange.fromDate && dateRange.toDate) {
+        flatpickrInstance.current.setDate([dateRange.fromDate, dateRange.toDate], false);
+      } else if (dateFilterMode !== 'custom') {
+        flatpickrInstance.current.clear(false);
+      }
+    }
+  }, [dateRange, dateFilterMode]);
+
+  // Handle selecting a specific month
+  const handleSelectMonth = (monthIndex: number) => {
+    const firstDay = new Date(pickerYear, monthIndex, 1);
+    const lastDay = new Date(pickerYear, monthIndex + 1, 0);
+
+    const fromYearStr = String(firstDay.getFullYear());
+    const fromMonthStr = String(firstDay.getMonth() + 1).padStart(2, '0');
+    const toYearStr = String(lastDay.getFullYear());
+    const toMonthStr = String(lastDay.getMonth() + 1).padStart(2, '0');
+    const toDayStr = String(lastDay.getDate()).padStart(2, '0');
+
+    const fromDate = `${fromYearStr}-${fromMonthStr}-01`;
+    const toDate = `${toYearStr}-${toMonthStr}-${toDayStr}`;
+
+    setDateRange({ fromDate, toDate });
+    setDateFilterMode('selectedMonth');
+    setMonthDropdownOpen(false);
+  };
+
+  // Helper to format the active selected month label
+  const getSelectedMonthButtonText = () => {
+    if (dateFilterMode === 'selectedMonth' && dateRange.fromDate) {
+      const parts = dateRange.fromDate.split('-');
+      if (parts.length >= 2) {
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const d = new Date(y, m, 1);
+        return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+      }
+    }
+    return 'Select Month';
+  };
 
   const getTrendData = () => {
     const groups: Record<string, { interval: string; sortKey: string; income: number; expense: number }> = {};
     
     let isDaily = false;
-    if (dateFilterMode === 'thisMonth') {
+    if (dateFilterMode === 'thisMonth' || dateFilterMode === 'selectedMonth') {
       isDaily = true;
     } else if (dateFilterMode === 'custom' && dateRange.fromDate && dateRange.toDate) {
       const start = new Date(dateRange.fromDate);
@@ -162,10 +267,10 @@ export default function FinancialReports({
         <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Select Period</p>
         
         {/* Quick Filter Buttons */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <button
             onClick={() => handleQuickFilter('thisMonth')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               dateFilterMode === 'thisMonth'
                 ? (theme.mode === 'dark' 
                     ? 'bg-gray-700 text-white' 
@@ -179,9 +284,89 @@ export default function FinancialReports({
           >
             This Month
           </button>
+
+          {/* Select Month Dropdown */}
+          <div className="relative" ref={monthDropdownRef}>
+            <button
+              id="btn-select-month-dropdown"
+              type="button"
+              onClick={() => setMonthDropdownOpen(prev => !prev)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition-all ${
+                dateFilterMode === 'selectedMonth'
+                  ? (theme.mode === 'dark' 
+                      ? 'bg-gray-700 text-white shadow-sm' 
+                      : (theme.palette === 'indigo' ? 'bg-indigo-600' :
+                         theme.palette === 'blue' ? 'bg-blue-600' :
+                         theme.palette === 'purple' ? 'bg-purple-600' :
+                         theme.palette === 'emerald' ? 'bg-emerald-600' :
+                         'bg-rose-600') + ' text-white shadow-sm')
+                  : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
+              }`}
+            >
+              <Calendar size={14} />
+              <span>{getSelectedMonthButtonText()}</span>
+              <ChevronDown size={14} className={`transition-transform duration-200 ${monthDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown Popover */}
+            {monthDropdownOpen && (
+              <div className="absolute left-0 mt-2 z-50 w-64 p-3 bg-white dark:bg-slate-950 border border-gray-200 dark:border-slate-800 rounded-2xl shadow-2xl dark:shadow-[0_20px_40px_rgba(0,0,0,0.85)] animate-in fade-in zoom-in-95 duration-150">
+                {/* Year Header with Previous / Next */}
+                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setPickerYear(y => y - 1)}
+                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors"
+                    title="Previous Year"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {pickerYear}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPickerYear(y => y + 1)}
+                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 transition-colors"
+                    title="Next Year"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                {/* 12 Months Grid */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {MONTHS.map((m) => {
+                    const isSelected = dateFilterMode === 'selectedMonth' && 
+                      dateRange.fromDate.startsWith(`${pickerYear}-${String(m.index + 1).padStart(2, '0')}`);
+                    const isCurrentRealMonth = new Date().getFullYear() === pickerYear && new Date().getMonth() === m.index;
+
+                    return (
+                      <button
+                        key={m.index}
+                        type="button"
+                        onClick={() => handleSelectMonth(m.index)}
+                        className={`py-2 px-1 text-xs font-semibold rounded-xl transition-all ${
+                          isSelected
+                            ? 'bg-violet-600 text-white shadow-md shadow-violet-600/30'
+                            : isCurrentRealMonth
+                            ? 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800/60 hover:bg-violet-100 dark:hover:bg-violet-900/50'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                        }`}
+                        title={m.name}
+                      >
+                        {m.short}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => handleQuickFilter('thisQuarter')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               dateFilterMode === 'thisQuarter'
                 ? (theme.mode === 'dark' 
                     ? 'bg-gray-700 text-white' 
@@ -197,7 +382,7 @@ export default function FinancialReports({
           </button>
           <button
             onClick={() => handleQuickFilter('thisFiscalYear')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               dateFilterMode === 'thisFiscalYear'
                 ? (theme.mode === 'dark' 
                     ? 'bg-gray-700 text-white' 
@@ -213,7 +398,7 @@ export default function FinancialReports({
           </button>
           <button
             onClick={() => handleQuickFilter('allTime')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
               dateFilterMode === 'allTime'
                 ? (theme.mode === 'dark' 
                     ? 'bg-gray-700 text-white' 
@@ -227,31 +412,39 @@ export default function FinancialReports({
           >
             All Time
           </button>
-          <button
-            onClick={() => {
-              if (dateFilterMode !== 'custom') {
-                // When switching to custom, preserve current range if available
-                if (dateFilterMode !== 'allTime') {
-                  const currentRange = getDateRangeForMode(dateFilterMode);
-                  setDateRange(currentRange);
-                }
-              }
-              setDateFilterMode('custom');
-            }}
-            className={`px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1 ${
-              dateFilterMode === 'custom'
-                ? (theme.mode === 'dark' 
-                    ? 'bg-gray-700 text-white' 
-                    : (theme.palette === 'indigo' ? 'bg-indigo-600' :
-                       theme.palette === 'blue' ? 'bg-blue-600' :
-                       theme.palette === 'purple' ? 'bg-purple-600' :
-                       theme.palette === 'emerald' ? 'bg-emerald-600' :
-                       'bg-rose-600') + ' text-white')
-                : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
-            }`}
-          >
-            <Calendar size={14} /> Custom Range
-          </button>
+
+          {/* Custom Range Button using Flatpickr */}
+          <div className="relative inline-flex items-center">
+            <input
+              ref={flatpickrInputRef}
+              type="text"
+              aria-label="Custom Date Range Picker"
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+              title="Click to select custom date range"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 pointer-events-none transition-all ${
+                dateFilterMode === 'custom'
+                  ? (theme.mode === 'dark' 
+                      ? 'bg-gray-700 text-white shadow-sm' 
+                      : (theme.palette === 'indigo' ? 'bg-indigo-600' :
+                         theme.palette === 'blue' ? 'bg-blue-600' :
+                         theme.palette === 'purple' ? 'bg-purple-600' :
+                         theme.palette === 'emerald' ? 'bg-emerald-600' :
+                         'bg-rose-600') + ' text-white shadow-sm')
+                  : 'bg-white dark:bg-black dark:border-gray-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-900 hover:bg-gray-100 dark:hover:bg-gray-900'
+              }`}
+            >
+              <Calendar size={14} />
+              <span>
+                {dateFilterMode === 'custom' && dateRange.fromDate && dateRange.toDate
+                  ? `${dateRange.fromDate} → ${dateRange.toDate}`
+                  : 'Custom Range'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Trustee Filter Buttons */}
@@ -283,84 +476,18 @@ export default function FinancialReports({
           ))}
         </div>
 
-        {/* Custom Date Range Inputs */}
-        {dateFilterMode === 'custom' && (
-          <div className="mt-4 p-4 border border-gray-200 dark:border-gray-900 rounded-xl bg-gray-50/50 dark:bg-black/20 flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div className="flex-1">
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                Select Date Range
-              </label>
-              <div className="relative">
-                <DatePicker
-                  selectsRange={true}
-                  startDate={localRange.fromDate ? new Date(localRange.fromDate) : null}
-                  endDate={localRange.toDate ? new Date(localRange.toDate) : null}
-                  onChange={(update: [Date | null, Date | null]) => {
-                    const [start, end] = update;
-                    setLocalRange({
-                      fromDate: start ? start.toISOString().split('T')[0] : '',
-                      toDate: end ? end.toISOString().split('T')[0] : '',
-                    });
-                  }}
-                  isClearable={true}
-                  dateFormat="yyyy-MM-dd"
-                  className={`w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-black ${
-                    theme.mode === 'dark' 
-                      ? 'focus:ring-gray-700' 
-                      : (theme.palette === 'indigo' ? 'focus:ring-indigo-500' :
-                         theme.palette === 'blue' ? 'focus:ring-blue-500' :
-                         theme.palette === 'purple' ? 'focus:ring-purple-500' :
-                         theme.palette === 'emerald' ? 'focus:ring-emerald-500' :
-                         'focus:ring-rose-500')
-                  } text-sm bg-white dark:bg-black text-gray-900 dark:text-gray-100 transition-all shadow-sm`}
-                  placeholderText="Click to select start and end dates"
-                />
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-gray-600">
-                  <Calendar size={16} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (localRange.fromDate && localRange.toDate) {
-                    setDateRange(localRange);
-                  }
-                }}
-                disabled={!localRange.fromDate || !localRange.toDate}
-                className={`w-full md:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
-                  localRange.fromDate && localRange.toDate
-                    ? (theme.mode === 'dark'
-                        ? 'bg-white hover:bg-gray-100 text-black shadow-md'
-                        : getPrimaryButtonClasses() + ' text-white hover:shadow-lg')
-                    : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                Apply Range
-              </button>
-              {(localRange.fromDate || localRange.toDate) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLocalRange({ fromDate: '', toDate: '' });
-                  }}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-200 dark:border-gray-850 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900 transition-all"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Display Selected Period */}
         {dateFilterMode !== 'allTime' && (
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
             Showing: {
               dateFilterMode === 'custom' 
                 ? `${dateRange.fromDate} to ${dateRange.toDate}`
+                : dateFilterMode === 'selectedMonth' && dateRange.fromDate
+                ? (() => {
+                    const parts = dateRange.fromDate.split('-');
+                    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+                    return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                  })()
                 : dateFilterMode === 'thisMonth'
                 ? new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
                 : dateFilterMode === 'thisQuarter'

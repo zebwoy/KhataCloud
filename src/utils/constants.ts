@@ -70,7 +70,7 @@ export const getFieldLabels = (category: TransactionCategory): FieldLabels => {
 
 // ---- Date range computation (pure — no state) ----
 
-export type DateFilterMode = 'thisMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom';
+export type DateFilterMode = 'thisMonth' | 'selectedMonth' | 'thisQuarter' | 'thisFiscalYear' | 'allTime' | 'custom';
 
 export interface DateRange {
   fromDate: string;
@@ -89,6 +89,8 @@ export const getDateRangeForMode = (mode: DateFilterMode, customRange?: DateRang
         toDate: lastDay.toISOString().split('T')[0]
       };
     }
+    case 'selectedMonth':
+      return customRange || { fromDate: '', toDate: '' };
     case 'thisQuarter': {
       const quarter = Math.floor(today.getMonth() / 3);
       const firstDay = new Date(today.getFullYear(), quarter * 3, 1);

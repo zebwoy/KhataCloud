@@ -34,6 +34,15 @@ function getPeriodLabel(
   if (dateFilterMode === 'thisMonth') {
     return today.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   }
+  if (dateFilterMode === 'selectedMonth' && dateRange.fromDate) {
+    const parts = dateRange.fromDate.split('-');
+    if (parts.length >= 2) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const d = new Date(year, month, 1);
+      return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    }
+  }
   if (dateFilterMode === 'thisQuarter') {
     const q = Math.floor(today.getMonth() / 3) + 1;
     return `Q${q} ${today.getFullYear()}`;

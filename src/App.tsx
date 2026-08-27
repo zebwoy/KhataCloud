@@ -759,6 +759,15 @@ export default function AccountingSystem({
     if (dateFilterMode === 'custom') {
       return `${formatDisplayDateShort(dateRange.fromDate)} to ${formatDisplayDateShort(dateRange.toDate)}`;
     }
+    if (dateFilterMode === 'selectedMonth' && dateRange.fromDate) {
+      const parts = dateRange.fromDate.split('-');
+      if (parts.length >= 2) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const d = new Date(year, month, 1);
+        return d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      }
+    }
     if (dateFilterMode === 'allTime') {
       return 'All time';
     }
