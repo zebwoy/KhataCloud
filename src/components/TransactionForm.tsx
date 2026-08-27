@@ -113,9 +113,10 @@ export default function TransactionForm({
         {editingTransactionId ? 'Edit Transaction' : 'Add New Transaction'}
       </h2>
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Transaction Date */}
           <div>
-            <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Date *</label>
+            <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Transaction Date *</label>
             <DatePicker
               selected={formData.date ? new Date(formData.date) : null}
               onChange={(date: Date | null) => {
@@ -132,6 +133,36 @@ export default function TransactionForm({
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.date}</p>
             )}
           </div>
+
+          {/* Accounting Period */}
+          <div>
+            <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">
+              Accounting Period *
+              <span
+                title="Which month should this transaction be counted under? Change this when logging a late entry to ensure accurate monthly reports."
+                className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 text-[10px] font-bold cursor-help select-none"
+              >
+                ?
+              </span>
+            </label>
+            <input
+              id="accounting-period"
+              type="month"
+              value={formData.accounting_period}
+              onChange={(e) => setFormData({ ...formData, accounting_period: e.target.value })}
+              className={[
+                inputClass,
+                'cursor-pointer',
+                // Ensure native month picker chrome matches the dark theme
+                'dark:[color-scheme:dark]',
+              ].join(' ')}
+            />
+            {formErrors.accounting_period && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.accounting_period}</p>
+            )}
+          </div>
+
+          {/* Category */}
           <div>
             <label className="block text-sm font-semibold mb-1 dark:text-gray-300">Category *</label>
             <Select<CategoryOption>

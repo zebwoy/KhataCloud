@@ -307,27 +307,53 @@ export default function AccountingSystem({
   }, [isInitializing]);
 
 
-  // Helper function to filter transactions by date range
+  // Helper function to filter transactions by date range.
+  // For period-based modes (thisMonth, selectedMonth) we compare against
+  // accounting_period (YYYY-MM) — the reconciliation field — so late-entered
+  // transactions are counted in the month they actually belong to.
+  // For range-based modes (thisQuarter, thisFiscalYear, custom) we continue
+  // to use t.date so the wider date windows are respected correctly.
   const getFilteredTransactions = (): Transaction[] => {
     let filtered = transactions;
-    
+
     if (trusteeFilter) {
       filtered = filtered.filter(t => t.custodian === trusteeFilter);
     }
 
-    if (dateFilterMode !== 'allTime') {
-      const range = (dateFilterMode === 'custom' || dateFilterMode === 'selectedMonth') 
-        ? dateRange 
-        : getDateRangeForMode(dateFilterMode, dateRange);
-    
-      if (range.fromDate) {
-        filtered = filtered.filter(t => t.date >= range.fromDate);
-      }
-      if (range.toDate) {
-        filtered = filtered.filter(t => t.date <= range.toDate);
-      }
+    if (dateFilterMode === 'allTime') return filtered;
+
+    if (dateFilterMode === 'thisMonth') {
+      // Current calendar month — compare accounting_period (YYYY-MM)
+      const currentPeriod = new Date().toISOString().slice(0, 7); // e.g. '2026-08'
+      return filtered.filter(t => {
+        // Graceful fallback for pre-migration rows that have no accounting_period yet
+        const period = t.accounting_period ?? t.date?.slice(0, 7) ?? '';
+        return period === currentPeriod;
+      });
     }
-    
+
+    if (dateFilterMode === 'selectedMonth') {
+      // User-picked month via the month popover — dateRange holds the first/last day
+      if (!dateRange.fromDate) return filtered;
+      const selectedPeriod = dateRange.fromDate.slice(0, 7); // 'YYYY-MM'
+      return filtered.filter(t => {
+        const period = t.accounting_period ?? t.date?.slice(0, 7) ?? '';
+        return period === selectedPeriod;
+      });
+    }
+
+    // For custom / thisQuarter / thisFiscalYear — use date-based range as before
+    const range = dateFilterMode === 'custom'
+      ? dateRange
+      : getDateRangeForMode(dateFilterMode, dateRange);
+
+    if (range.fromDate) {
+      filtered = filtered.filter(t => t.date >= range.fromDate);
+    }
+    if (range.toDate) {
+      filtered = filtered.filter(t => t.date <= range.toDate);
+    }
+
     return filtered;
   };
 
@@ -654,6 +680,8 @@ export default function AccountingSystem({
     trackAction('action:edit-txn');
     setFormData({
       date: transaction.date,
+      // Populate accounting_period from the transaction; fall back gracefully for pre-migration rows
+      accounting_period: transaction.accounting_period ?? transaction.date?.slice(0, 7) ?? new Date().toISOString().slice(0, 7),
       category: transaction.category,
       subcategory: transaction.subcategory,
       custodian: transaction.custodian || '',

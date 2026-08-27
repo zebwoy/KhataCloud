@@ -140,11 +140,17 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       await ensureOrgSchema(auth.orgSlug, runQuery);
     }
 
-    // Auto-heal: Ensure entered_by column exists on whatever schema table is active (org_*, public, trial)
+    // Auto-heal: Ensure entered_by + accounting_period columns exist on the active table.
+    // This guards against cold-starts before the migration is applied in Neon.
     try {
       await runQuery(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS entered_by VARCHAR(255)`);
     } catch (err) {
       console.warn(`[transactions] Failed to auto-add entered_by to ${tableName}:`, err);
+    }
+    try {
+      await runQuery(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS accounting_period CHAR(7)`);
+    } catch (err) {
+      console.warn(`[transactions] Failed to auto-add accounting_period to ${tableName}:`, err);
     }
 
     // ── GET ─────────────────────────────────────────────────────────────────
@@ -163,7 +169,7 @@ export default async function handler(req: VercelReq, res: VercelRes) {
         : `WHERE ${softDelete}`;
 
       const result = await runQuery(
-        `SELECT id, date, category, subcategory, sender, receiver,
+        `SELECT id, date, accounting_period, category, subcategory, sender, receiver,
                 COALESCE(custodian, receiver)    AS custodian,
                 COALESCE(counterparty, sender)   AS counterparty,
                 remarks, amount, created_at, ModifiedDate AS modifieddate,
@@ -194,12 +200,19 @@ export default async function handler(req: VercelReq, res: VercelRes) {
       // Resolve the display name of the user making this entry (admin users only)
       const enteredBy = auth.userId ? await resolveDisplayName(auth.userId) : null;
 
+      // accounting_period: use client-provided value (YYYY-MM), or fall back to current month.
+      // This ensures entries logged late are attributed to the correct accounting period.
+      const accountingPeriod: string =
+        payload.accounting_period && /^\d{4}-\d{2}$/.test(payload.accounting_period)
+          ? payload.accounting_period
+          : new Date().toISOString().slice(0, 7); // e.g. '2026-08'
+
       const result = await runQuery(
         `INSERT INTO ${tableName}
-           (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, IsDeleted, entered_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'N',$10)
-         RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at, entered_by`,
-        [payload.date, payload.category, payload.subcategory || null,
+           (date, accounting_period, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, IsDeleted, entered_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'N',$11)
+         RETURNING id, date, accounting_period, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, created_at, entered_by`,
+        [payload.date, accountingPeriod, payload.category, payload.subcategory || null,
          sender, receiver, payload.custodian, payload.counterparty,
          payload.remarks, payload.amount, enteredBy]
       );
@@ -240,20 +253,29 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           [Number(id)]
         );
 
-        // Preserve entered_by from the original row being edited
-        const origRow = await client.query<{ entered_by: string | null }>(
-          `SELECT entered_by FROM ${tableName} WHERE id = $1 LIMIT 1`,
+        // Preserve entered_by + accounting_period from the original row being edited.
+        // accounting_period: use client-provided value if valid, else fall back to original,
+        // else derive from date, else use current month.
+        const origRow = await client.query<{ entered_by: string | null; accounting_period: string | null }>(
+          `SELECT entered_by, accounting_period FROM ${tableName} WHERE id = $1 LIMIT 1`,
           [Number(id)]
         );
-        const origEnteredBy = origRow.rows[0]?.entered_by ?? null;
+        const origEnteredBy        = origRow.rows[0]?.entered_by        ?? null;
+        const origAccountingPeriod = origRow.rows[0]?.accounting_period ?? null;
+
+        const accountingPeriod: string =
+          (txData.accounting_period && /^\d{4}-\d{2}$/.test(txData.accounting_period))
+            ? txData.accounting_period
+            : origAccountingPeriod
+              ?? (txData.date ? txData.date.slice(0, 7) : new Date().toISOString().slice(0, 7));
 
         const insertResult = await client.query(
           `INSERT INTO ${tableName}
-             (date, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, ModifiedDate, entered_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamp,$11)
-           RETURNING id, date, category, subcategory, sender, receiver, custodian, counterparty,
+             (date, accounting_period, category, subcategory, sender, receiver, custodian, counterparty, remarks, amount, ModifiedDate, entered_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamp,$12)
+           RETURNING id, date, accounting_period, category, subcategory, sender, receiver, custodian, counterparty,
                      remarks, amount, created_at, ModifiedDate AS modifieddate, entered_by`,
-          [txData.date, txData.category, txData.subcategory || null,
+          [txData.date, accountingPeriod, txData.category, txData.subcategory || null,
            sender, receiver, txData.custodian, txData.counterparty,
            txData.remarks, txData.amount, ts, origEnteredBy]
         );

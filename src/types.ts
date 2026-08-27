@@ -7,6 +7,7 @@ export type TransactionCategory = 'Income' | 'Expense' | 'Transfer';
 export interface Transaction {
   id: number;
   date: string;
+  accounting_period?: string;  // YYYY-MM — which month this belongs to for reporting
   category: TransactionCategory;
   subcategory: string;
   sender: string;
@@ -22,6 +23,7 @@ export interface Transaction {
 
 export interface FormState {
   date: string;
+  accounting_period: string;  // YYYY-MM — which month this belongs to for reporting
   category: TransactionCategory;
   subcategory: string;
   amount: string;
@@ -32,6 +34,7 @@ export interface FormState {
 
 export const getDefaultFormState = (): FormState => ({
   date: new Date().toISOString().split('T')[0],
+  accounting_period: new Date().toISOString().slice(0, 7), // YYYY-MM, e.g. '2026-08'
   category: 'Income',
   subcategory: 'Donations',
   amount: '',
