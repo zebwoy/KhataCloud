@@ -145,6 +145,18 @@ body {
   animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Ensure react-datepicker wrapper and input container stretch to 100% of grid/flex columns */
+.react-datepicker-wrapper,
+.react-datepicker__input-container {
+  display: block !important;
+  width: 100% !important;
+}
+
+.react-datepicker__input-container input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 /* Center and beautify inline react-datepicker */
 .react-datepicker-inline-container .react-datepicker {
   border: none !important;
