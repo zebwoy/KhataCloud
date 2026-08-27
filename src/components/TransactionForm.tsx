@@ -38,34 +38,8 @@ interface TransactionFormProps {
   onSubmit: () => void;
 }
 
-// ── Month option type ────────────────────────────────────────────────────────
-interface MonthOption {
-  value: string;  // YYYY-MM
-  label: string;  // "August 2026"
-}
-
-/**
- * Build a list of selectable months: 24 months back → 6 months forward.
- * Ordered most-recent-first so the current month is always at the top.
- */
-function buildMonthOptions(): MonthOption[] {
-  const options: MonthOption[] = [];
-  const now = new Date();
-
-  for (let offset = 6; offset >= -24; offset--) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const value = d.toISOString().slice(0, 7); // 'YYYY-MM'
-    const label = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-    options.push({ value, label });
-  }
-
-  return options;
-}
-
-const MONTH_OPTIONS = buildMonthOptions();
-
 // ── Shared react-select styles ───────────────────────────────────────────────
-// Single source of truth — avoids copy-pasting the same style object 4+ times.
+// Single source of truth — avoids copy-pasting the same style object 4 times.
 function getSelectStyles(isDark: boolean) {
   return {
     control: (base: object) => ({
@@ -108,9 +82,6 @@ const inputClass = [
   'transition-all',
 ].join(' ');
 
-// Shared label class — single source of truth for consistent spacing
-const labelClass = 'block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300';
-
 export default function TransactionForm({
   formData,
   setFormData,
@@ -136,24 +107,16 @@ export default function TransactionForm({
   onCancelEdit,
   onSubmit,
 }: TransactionFormProps) {
-  const isDark = theme.mode === 'dark';
-
-  const selectedMonthOption =
-    MONTH_OPTIONS.find((o) => o.value === formData.accounting_period) ?? null;
-
   return (
     <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
       <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
         {editingTransactionId ? 'Edit Transaction' : 'Add New Transaction'}
       </h2>
       <div className="space-y-4">
-
-        {/* ── Row 1: Transaction Date | Accounting Period | Category ─────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
           {/* Transaction Date */}
           <div>
-            <label className={labelClass}>Transaction Date *</label>
+            <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">Transaction Date *</label>
             <DatePicker
               selected={formData.date ? new Date(formData.date) : null}
               onChange={(date: Date | null) => {
@@ -171,45 +134,44 @@ export default function TransactionForm({
             )}
           </div>
 
-          {/* Accounting Period — react-select dropdown, matches all other selects */}
+          {/* Accounting Period */}
           <div>
-            <label className={labelClass}>
-              Accounting Period *{' '}
+            <label className="block text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">
+              Accounting Period *
               <span
                 title="Which month should this transaction be counted under? Change this when logging a late entry to ensure accurate monthly reports."
-                className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 text-[10px] font-bold cursor-help select-none align-middle"
+                className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-300 text-[10px] font-bold cursor-help select-none"
               >
                 ?
               </span>
             </label>
-            <Select<MonthOption>
-              options={MONTH_OPTIONS}
-              value={selectedMonthOption}
-              onChange={(opt) =>
-                setFormData({ ...formData, accounting_period: opt?.value ?? '' })
-              }
-              classNamePrefix="hk-select"
-              className="text-sm"
-              styles={getSelectStyles(isDark)}
-              isSearchable={false}
+            <input
+              id="accounting-period"
+              type="month"
+              value={formData.accounting_period}
+              onChange={(e) => setFormData({ ...formData, accounting_period: e.target.value })}
+              className={[
+                inputClass,
+                'cursor-pointer',
+                // Ensure native month picker chrome matches the dark theme
+                'dark:[color-scheme:dark]',
+              ].join(' ')}
             />
             {formErrors.accounting_period && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {formErrors.accounting_period}
-              </p>
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.accounting_period}</p>
             )}
           </div>
 
           {/* Category */}
           <div>
-            <label className={labelClass}>Category *</label>
+            <label className="block text-sm font-semibold mb-1 dark:text-gray-300">Category *</label>
             <Select<CategoryOption>
               options={categoryOptions}
               value={categoryOptions.find((opt) => opt.value === formData.category)}
               onChange={onCategorySelect}
               classNamePrefix="hk-select"
               className="text-sm"
-              styles={getSelectStyles(isDark)}
+              styles={getSelectStyles(theme.mode === 'dark')}
             />
             {formErrors.category && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.category}</p>
@@ -217,26 +179,25 @@ export default function TransactionForm({
           </div>
         </div>
 
-        {/* ── Row 2: Subcategory | Amount ────────────────────────────────────── */}
         <div className={`grid grid-cols-1 ${formData.category !== 'Transfer' ? 'md:grid-cols-2' : ''} gap-4`}>
           {formData.category !== 'Transfer' && (
-            <div>
-              <label className={labelClass}>Subcategory *</label>
-              <Select<SubcategoryOption>
-                options={subcategoryOptions}
-                value={subcategoryOptions.find((opt) => opt.value === formData.subcategory)}
-                onChange={onSubcategorySelect}
-                classNamePrefix="hk-select"
-                className="text-sm"
-                styles={getSelectStyles(isDark)}
-              />
-              {formErrors.subcategory && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.subcategory}</p>
-              )}
-            </div>
+          <div>
+            <label className="block text-sm font-semibold mb-1 dark:text-gray-300">Subcategory *</label>
+            <Select<SubcategoryOption>
+              options={subcategoryOptions}
+              value={subcategoryOptions.find((opt) => opt.value === formData.subcategory)}
+              onChange={onSubcategorySelect}
+              classNamePrefix="hk-select"
+              className="text-sm"
+              styles={getSelectStyles(theme.mode === 'dark')}
+            />
+            {formErrors.subcategory && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.subcategory}</p>
+            )}
+          </div>
           )}
           <div>
-            <label className={labelClass}>Amount (₹) *</label>
+            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Amount (₹) *</label>
             <input
               type="number"
               step="0.01"
@@ -251,11 +212,12 @@ export default function TransactionForm({
           </div>
         </div>
 
-        {/* ── Row 3: Custodian | Counterparty ────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Custodian — always a trustee dropdown */}
+          {/* Custodian Field — Always a trustee dropdown */}
           <div>
-            <label className={labelClass}>{fieldLabels.custodianLabel} *</label>
+            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+              {fieldLabels.custodianLabel} *
+            </label>
             <Select<TrusteeOption>
               options={trusteeOptions}
               value={trusteeOptions.find((opt) => opt.value === formData.custodian) ?? null}
@@ -263,26 +225,30 @@ export default function TransactionForm({
               classNamePrefix="hk-select"
               className="text-sm"
               placeholder={fieldLabels.custodianPlaceholder}
-              styles={getSelectStyles(isDark)}
+              styles={getSelectStyles(theme.mode === 'dark')}
             />
             {formErrors.custodian && (
               <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.custodian}</p>
             )}
           </div>
 
-          {/* Counterparty — dropdown for Transfer, text input for Income/Expense */}
+          {/* Counterparty Field — Dropdown for Transfer, text input for Income/Expense */}
           <div className="relative">
-            <label className={labelClass}>{fieldLabels.counterpartyLabel} *</label>
+            <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+              {fieldLabels.counterpartyLabel} *
+            </label>
             {formData.category === 'Transfer' ? (
-              <Select<TrusteeOption>
-                options={trusteeOptions.filter((opt) => opt.value !== formData.custodian.trim())}
-                value={trusteeOptions.find((opt) => opt.value === formData.counterparty) ?? null}
-                onChange={onCounterpartySelect}
-                classNamePrefix="hk-select"
-                className="text-sm"
-                placeholder={fieldLabels.counterpartyPlaceholder}
-                styles={getSelectStyles(isDark)}
-              />
+              <>
+                <Select<TrusteeOption>
+                  options={trusteeOptions.filter(opt => opt.value !== formData.custodian.trim())}
+                  value={trusteeOptions.find((opt) => opt.value === formData.counterparty) ?? null}
+                  onChange={onCounterpartySelect}
+                  classNamePrefix="hk-select"
+                  className="text-sm"
+                  placeholder={fieldLabels.counterpartyPlaceholder}
+                  styles={getSelectStyles(theme.mode === 'dark')}
+                />
+              </>
             ) : (
               <div className="relative">
                 <input
@@ -303,7 +269,7 @@ export default function TransactionForm({
                   }}
                   className={inputClass}
                 />
-
+                
                 {/* Saved Counterparties Dropdown */}
                 {showCounterpartyDropdown && filteredSavedCounterparties.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] max-h-60 overflow-y-auto">
@@ -318,7 +284,7 @@ export default function TransactionForm({
                           setShowCounterpartyDropdown(false);
                         }}
                       >
-                        <span
+                        <span 
                           className="text-sm text-gray-900 dark:text-gray-100 flex-1"
                           onMouseDown={(e) => {
                             e.preventDefault();
@@ -352,16 +318,15 @@ export default function TransactionForm({
           </div>
         </div>
 
-        {/* ── Remarks ────────────────────────────────────────────────────────── */}
         <div>
-          <label className={labelClass}>
-            Remarks{' '}
-            <span className="font-normal text-gray-400 dark:text-slate-500 text-xs">(optional)</span>
+          <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+            Remarks <span className="font-normal text-gray-400 dark:text-slate-500 text-xs">(optional)</span>
           </label>
-
+          
           {/* Label Buttons */}
           <div className="mb-3 flex flex-wrap gap-2">
             {remarkLabels.map((label) => {
+              // Check if label exists as a whole word (case-insensitive)
               const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const labelRegex = new RegExp(`\\b${escapedLabel}\\b`, 'i');
               const isLabelInRemarks = labelRegex.test(formData.remarks);
@@ -396,7 +361,6 @@ export default function TransactionForm({
           )}
         </div>
 
-        {/* ── Submit / Cancel ─────────────────────────────────────────────────── */}
         <div className="flex gap-3">
           {editingTransactionId && (
             <button
@@ -412,14 +376,13 @@ export default function TransactionForm({
             disabled={isSyncing}
             className={`${editingTransactionId ? 'flex-1' : 'w-full'} ${getPrimaryButtonClasses()} py-2 rounded-lg font-semibold ${isSyncing ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            {isSyncing
-              ? 'Saving...'
-              : editingTransactionId
-                ? 'Update Transaction'
+            {isSyncing 
+              ? 'Saving...' 
+              : editingTransactionId 
+                ? 'Update Transaction' 
                 : 'Add Transaction'}
           </button>
         </div>
-
         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
           <input
             id="success-sound"
