@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useAuth, useUser, UserButton } from '@clerk/react';
-import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, LogOut } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Eye, Plus, LogOut, Pencil } from 'lucide-react';
 import { trackAction, clearTrail, postTrailToServer, ensureSession, postSessionEndToServer } from '../lib/trailTracker';
 
 export interface FloatingNavBarProps {
@@ -12,6 +12,7 @@ export interface FloatingNavBarProps {
   onSectionChange: (s: 'transactions' | 'reports' | 'admin') => void;
   transactionSubView: 'view' | 'add';
   onSubViewChange: (v: 'view' | 'add') => void;
+  isEditing?: boolean;
   navStyle?: 'pill' | 'classic';
   orgId?: string;
   trialMode?: boolean;
@@ -22,10 +23,11 @@ export interface FloatingNavBarProps {
 interface SubMenuContentProps {
   transactionSubView: 'view' | 'add';
   onSubViewChange: (v: 'view' | 'add') => void;
+  isEditing?: boolean;
   onClose: () => void;
 }
 
-function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMenuContentProps) {
+function SubMenuContent({ transactionSubView, onSubViewChange, isEditing, onClose }: SubMenuContentProps) {
   return (
     <>
       <button
@@ -60,7 +62,8 @@ function SubMenuContent({ transactionSubView, onSubViewChange, onClose }: SubMen
             : 'text-slate-300 hover:text-white hover:bg-white/8'}
         `}
       >
-        <Plus size={14} /> New Transaction
+        {isEditing ? <Pencil size={14} className="text-amber-300" /> : <Plus size={14} />}
+        {isEditing ? 'Editing Transaction' : 'New Transaction'}
       </button>
     </>
   );
@@ -82,6 +85,7 @@ export default function FloatingNavBar({
   onSectionChange,
   transactionSubView,
   onSubViewChange,
+  isEditing = false,
   navStyle = 'pill',
   orgId,
   trialMode = false,
@@ -289,7 +293,11 @@ export default function FloatingNavBar({
                   {isTxn && isActive && navStyle === 'pill' && (
                     <span className={`
                     w-1.5 h-1.5 rounded-full ml-0.5 shrink-0
-                    ${transactionSubView === 'add' ? 'bg-emerald-400' : 'bg-white/30'}
+                    ${isEditing
+                      ? 'bg-amber-400 animate-pulse'
+                      : transactionSubView === 'add'
+                        ? 'bg-emerald-400'
+                        : 'bg-white/30'}
                   `} />
                   )}
                   {hasBadge && (
@@ -322,6 +330,7 @@ export default function FloatingNavBar({
                     <SubMenuContent
                       transactionSubView={transactionSubView}
                       onSubViewChange={onSubViewChange}
+                      isEditing={isEditing}
                       onClose={() => setTimeout(() => setShowSubMenu(false), 20)}
                     />
                   </div>
@@ -407,7 +416,8 @@ export default function FloatingNavBar({
                   : 'text-slate-300 hover:text-white hover:bg-white/8'}
               `}
             >
-              <Plus size={14} /> New
+              {isEditing ? <Pencil size={14} className="text-amber-300" /> : <Plus size={14} />}
+              {isEditing ? 'Editing' : 'New'}
             </button>
           </div>
         )}
@@ -454,9 +464,9 @@ export default function FloatingNavBar({
                   )}
                 </div>
                 <span className="text-[10px] font-medium">{label}</span>
-                {/* Green dot when in "add" sub-view */}
+                {/* Green / Amber dot when in "add" or "edit" sub-view */}
                 {isTxn && isActive && navStyle === 'pill' && transactionSubView === 'add' && (
-                  <span className="absolute top-1.5 right-3 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className={`absolute top-1.5 right-3 w-1.5 h-1.5 rounded-full ${isEditing ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
                 )}
               </button>
             );

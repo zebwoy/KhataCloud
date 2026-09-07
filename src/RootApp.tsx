@@ -143,13 +143,19 @@ function TrialShell() {
       .finally(() => setTrialReady(true));
   }, []);
 
+  const [isEditing, setIsEditing] = useState(false);
+
   const handleSectionChange = (s: Section) => {
     setActiveSection(s);
-    if (s !== 'transactions') setTransactionSubView('view');
+    if (s !== 'transactions') {
+      setTransactionSubView('view');
+      setIsEditing(false);
+    }
   };
 
   const handleSubViewChange = (v: 'view' | 'add') => {
     setTransactionSubView(v);
+    if (v === 'view') setIsEditing(false);
   };
 
   const handleAppReady = useCallback(() => setAppReady(true), []);
@@ -173,6 +179,7 @@ function TrialShell() {
           onSectionChange={handleSectionChange}
           transactionSubView={transactionSubView}
           onSubViewChange={handleSubViewChange}
+          isEditing={isEditing}
           navStyle={navStyle}
           trialMode
           onTrialSignOut={() => {
@@ -192,6 +199,15 @@ function TrialShell() {
               navStyle={navStyle}
               isAdmin={true}
               onReady={handleAppReady}
+              onTabChange={(tab) => {
+                if (tab === 'view' || tab === 'add') {
+                  setActiveSection('transactions');
+                  setTransactionSubView(tab);
+                } else if (tab === 'report') {
+                  setActiveSection('reports');
+                }
+              }}
+              onEditingChange={setIsEditing}
             />
           </div>
 
@@ -443,6 +459,7 @@ function OrgAppShell({
   type Section = 'transactions' | 'reports' | 'admin';
   const [activeSection, setActiveSection] = useState<Section>('transactions');
   const [transactionSubView, setTransactionSubView] = useState<'view' | 'add'>('view');
+  const [isEditing, setIsEditing] = useState(false);
   const [bridged, setBridged] = useState(false);
   const [appReady, setAppReady] = useState(false);
   const navStyle = (localStorage.getItem('kc_nav_style') ?? 'pill') as 'pill' | 'classic';
@@ -455,11 +472,15 @@ function OrgAppShell({
 
   const handleSectionChange = (s: Section) => {
     setActiveSection(s);
-    if (s !== 'transactions') setTransactionSubView('view');
+    if (s !== 'transactions') {
+      setTransactionSubView('view');
+      setIsEditing(false);
+    }
   };
 
   const handleSubViewChange = (v: 'view' | 'add') => {
     setTransactionSubView(v);
+    if (v === 'view') setIsEditing(false);
   };
 
   const handleAppReady = useCallback(() => setAppReady(true), []);
@@ -515,6 +536,7 @@ function OrgAppShell({
           onSectionChange={handleSectionChange}
           transactionSubView={transactionSubView}
           onSubViewChange={handleSubViewChange}
+          isEditing={isEditing}
           navStyle={navStyle}
           orgId={orgId}
           onTrialSignOut={() => {
@@ -539,6 +561,15 @@ function OrgAppShell({
               navStyle={navStyle}
               isAdmin={isAdmin}
               onReady={handleAppReady}
+              onTabChange={(tab) => {
+                if (tab === 'view' || tab === 'add') {
+                  setActiveSection('transactions');
+                  setTransactionSubView(tab);
+                } else if (tab === 'report') {
+                  setActiveSection('reports');
+                }
+              }}
+              onEditingChange={setIsEditing}
             />
           </div>
 

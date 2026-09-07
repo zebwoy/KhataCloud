@@ -74,6 +74,8 @@ export default function AccountingSystem({
   navStyle = 'pill',
   onReady,
   isAdmin = false,
+  onTabChange,
+  onEditingChange,
 }: {
   saasMode?:   boolean;
   onSignOut?:  () => void;
@@ -81,6 +83,8 @@ export default function AccountingSystem({
   navStyle?:   'pill' | 'classic'; // 'pill' = sub-menu handles view/add; 'classic' = inline toggle
   onReady?:    () => void;       // called once when initial data fetch completes
   isAdmin?:    boolean;          // org admin — unlocks 'Entered By' column + filter
+  onTabChange?: (tab: 'view' | 'add' | 'report') => void;
+  onEditingChange?: (isEditing: boolean) => void;
 } = {}) {
   // Auth state + handlers (login, logout, user type selection)
   const {
@@ -97,12 +101,12 @@ export default function AccountingSystem({
   const [activeTab, setActiveTab] = useState(saasMode ? (initialTab ?? 'view') : 'add');
 
   // Sync initialTab prop changes from FloatingNavBar / RootApp to internal activeTab
-  // NOTE: do NOT call handleCancelEdit here — it is defined at line ~605 (const, not hoisted).
-  // Calling it from this useEffect at line ~75 hits the temporal dead zone and silently
-  // aborts the effect before setActiveTab ever runs.
   useEffect(() => {
     if (initialTab) {
       setActiveTab(initialTab);
+      if (initialTab === 'view' || initialTab === 'report') {
+        setEditingTransactionId(null);
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [initialTab]);
@@ -112,6 +116,12 @@ export default function AccountingSystem({
   const [trusteeFilter, setTrusteeFilter] = useState<string>('');
   const [staffMembers, setStaffMembers] = useState<string[]>([]);
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
+
+  // Notify parent of active editing state
+  useEffect(() => {
+    onEditingChange?.(Boolean(editingTransactionId));
+  }, [editingTransactionId, onEditingChange]);
+
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
   const hasCalledReady = useRef(false);
@@ -288,11 +298,6 @@ export default function AccountingSystem({
 
   // In saasMode the logout button calls Clerk signOut; otherwise old flow
   const effectiveLogout = saasMode && onSignOut ? onSignOut : handleLogout;
-
-  // Sync activeTab when FloatingNavBar switches between Transactions/Reports
-  useEffect(() => {
-    if (saasMode && initialTab) setActiveTab(initialTab);
-  }, [saasMode, initialTab]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -736,6 +741,7 @@ export default function AccountingSystem({
     });
     setFormErrors({});
     setActiveTab('add'); // Switch to Add Transaction tab to show the form
+    onTabChange?.('add');
     // Scroll to form
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -746,6 +752,8 @@ export default function AccountingSystem({
     setEditingTransactionId(null);
     setFormData(getDefaultFormState());
     setFormErrors({});
+    setActiveTab('view');
+    onTabChange?.('view');
   };
 
   const handleUpdateTransaction = async () => {
@@ -803,6 +811,8 @@ export default function AccountingSystem({
       setFormData(getDefaultFormState());
       setFormErrors({});
       showToast('Transaction updated successfully!', 'success');
+      setActiveTab('view');
+      onTabChange?.('view');
     } catch (error) {
       const errMsg = (error as Error).message || 'Unable to update the transaction.';
       setDataError(errMsg);
