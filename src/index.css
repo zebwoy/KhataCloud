@@ -237,6 +237,55 @@ body {
   th {
     color: black !important;
   }
+
+  /* ── Noticeboard 4-Page Multilingual Print Styles ── */
+  body.printing-noticeboard {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-noticeboard * {
+    visibility: hidden;
+  }
+
+  body.printing-noticeboard .noticeboard-print-sheet,
+  body.printing-noticeboard .noticeboard-print-sheet * {
+    visibility: visible;
+  }
+
+  body.printing-noticeboard .noticeboard-print-sheet {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  body.printing-noticeboard .noticeboard-print-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
+    min-height: 98vh !important;
+    padding: 2.2rem !important;
+    box-sizing: border-box !important;
+    background: white !important;
+    color: black !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  body.printing-noticeboard .noticeboard-print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
 }
 
 /* ── Clerk UserButton popover — dark glass theme (single source of truth) ──── */

@@ -35,6 +35,8 @@ const VIEWS: ViewDef[] = [
 interface Props {
   filteredTransactions: Transaction[];
   stats: Stats;
+  previousPeriodStats?: Stats;
+  previousRange?: { fromDate: string; toDate: string } | null;
   dateFilterMode: DateFilterMode;
   dateRange: { fromDate: string; toDate: string };
   orgConfig: NoticeboardConfig;
@@ -44,6 +46,8 @@ interface Props {
 export default function AnalyticsPanel({
   filteredTransactions,
   stats,
+  previousPeriodStats,
+  previousRange,
   dateFilterMode,
   dateRange,
   orgConfig,
@@ -51,7 +55,16 @@ export default function AnalyticsPanel({
 }: Props) {
   const [activeView, setActiveView] = useState<ViewId>('breakdown');
 
-  const sharedProps = { filteredTransactions, stats, dateFilterMode, dateRange, orgConfig, theme };
+  const sharedProps = {
+    filteredTransactions,
+    stats,
+    previousPeriodStats,
+    previousRange,
+    dateFilterMode,
+    dateRange,
+    orgConfig,
+    theme,
+  };
 
   return (
     <div>
