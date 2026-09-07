@@ -6,6 +6,7 @@ import 'react-datepicker/dist/react-datepicker.css';
 
 import type {
   Transaction,
+  TransactionCategory,
   FormState,
   CategoryOption,
   SubcategoryOption,
@@ -27,6 +28,7 @@ import { exportTransactionsToCSV } from './utils/exportUtils';
 import {
   getSubcategoryOptions, getFieldLabels,
   getDateRangeForMode,
+  isDonorRequired, getExpensePrepopulation,
   type DateFilterMode,
 } from './utils/constants';
 import type { NoticeboardConfig } from '../api/org-config';
@@ -108,6 +110,7 @@ export default function AccountingSystem({
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataError, setDataError] = useState('');
   const [trusteeFilter, setTrusteeFilter] = useState<string>('');
+  const [staffMembers, setStaffMembers] = useState<string[]>([]);
   const [editingTransactionId, setEditingTransactionId] = useState<number | null>(null);
   const [showSuccessAck, setShowSuccessAck] = useState(false);
   const successTimer = useRef<number | null>(null);
@@ -179,7 +182,7 @@ export default function AccountingSystem({
     if (customList && customList.length > 0) return customList.map(sub => ({ value: sub, label: sub }));
     return getSubcategoryOptions(formData.category);
   })();
-  const fieldLabels = getFieldLabels(formData.category);
+  const fieldLabels = getFieldLabels(formData.category, formData.subcategory);
 
 
 
@@ -248,6 +251,21 @@ export default function AccountingSystem({
     }
   }, []);
 
+  // Fetch staff members from server
+  const fetchStaffMembers = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/saved-senders?type=staff');
+      if (!response.ok) {
+        throw new Error('Unable to load staff members from the server.');
+      }
+      const data: string[] = await response.json();
+      setStaffMembers(data);
+    } catch (error) {
+      console.error('Error loading staff members:', error);
+      setStaffMembers([]);
+    }
+  }, []);
+
   // Fetch org noticeboard config (non-blocking — fails silently, defaults used)
   const fetchOrgConfig = useCallback(async () => {
     try {
@@ -261,13 +279,12 @@ export default function AccountingSystem({
     }
   }, []);
 
-
-
   useEffect(() => {
     if (isLoggedIn) {
       fetchSavedCounterparties();
+      fetchStaffMembers();
     }
-  }, [isLoggedIn, fetchSavedCounterparties]);
+  }, [isLoggedIn, fetchSavedCounterparties, fetchStaffMembers]);
 
   // In saasMode the logout button calls Clerk signOut; otherwise old flow
   const effectiveLogout = saasMode && onSignOut ? onSignOut : handleLogout;
@@ -410,31 +427,54 @@ export default function AccountingSystem({
   };
 
   const handleCategorySelect = (option: SingleValue<CategoryOption>) => {
-    const value = option?.value ?? 'Income';
-    // Default to first available subcategory in the org's custom list, or classic defaults
+    const value = (option?.value ?? 'Income') as TransactionCategory;
     let subcategory = '';
+    let counterparty = '';
     if (value === 'Income') {
-      subcategory = (orgConfig.customIncomeSubcats  && orgConfig.customIncomeSubcats.length  > 0)
+      subcategory = (orgConfig.customIncomeSubcats && orgConfig.customIncomeSubcats.length > 0)
         ? orgConfig.customIncomeSubcats[0]
         : 'Donations';
+      if (!isDonorRequired(subcategory)) {
+        counterparty = subcategory;
+      }
     } else if (value === 'Expense') {
       subcategory = (orgConfig.customExpenseSubcats && orgConfig.customExpenseSubcats.length > 0)
         ? orgConfig.customExpenseSubcats[0]
         : 'Salaries';
+      const prepop = getExpensePrepopulation(subcategory);
+      if (prepop) counterparty = prepop;
     }
     // For Transfer, subcategory stays empty
     setFormData({
       ...formData,
       category: value,
       subcategory: subcategory,
-      // Clear counterparty when switching categories to avoid stale selections
-      counterparty: '',
+      counterparty: counterparty,
     });
   };
 
   const handleSubcategorySelect = (option: SingleValue<SubcategoryOption>) => {
     const value = option?.value ?? '';
-    setFormData({ ...formData, subcategory: value });
+    let nextCounterparty = formData.counterparty;
+
+    if (formData.category === 'Expense') {
+      const prepop = getExpensePrepopulation(value);
+      if (prepop) {
+        nextCounterparty = prepop;
+      } else if (/salary|salaries|teacher|staff|imam/.test(value.toLowerCase())) {
+        if (['Sohel Bhai (Makaan Malik)', 'Torrent Electricity Provider', 'Kaif Mugal (Drinking Water Plant - FaridBaug)'].includes(nextCounterparty)) {
+          nextCounterparty = '';
+        }
+      }
+    } else if (formData.category === 'Income') {
+      if (!isDonorRequired(value)) {
+        nextCounterparty = value || 'Donation Box';
+      } else if (['Donation Box', 'Student Fees', 'Others', 'Other Income'].includes(nextCounterparty)) {
+        nextCounterparty = '';
+      }
+    }
+
+    setFormData({ ...formData, subcategory: value, counterparty: nextCounterparty });
   };
 
   const handleCustodianSelect = (option: SingleValue<TrusteeOption>) => {
@@ -512,7 +552,8 @@ export default function AccountingSystem({
     if (!formData.custodian.trim()) {
       errors.custodian = `${labels.custodianLabel} is required`;
     }
-    if (!formData.counterparty.trim()) {
+    const isIncomeWithoutDonor = formData.category === 'Income' && !isDonorRequired(formData.subcategory);
+    if (!isIncomeWithoutDonor && !formData.counterparty.trim()) {
       errors.counterparty = `${labels.counterpartyLabel} is required`;
     }
     // For Transfer, custodian and counterparty must be different
@@ -585,10 +626,14 @@ export default function AccountingSystem({
     setIsSyncing(true);
     setDataError('');
 
+    const effectiveCounterparty = (formData.category === 'Income' && !isDonorRequired(formData.subcategory))
+      ? (formData.counterparty.trim() || formData.subcategory || 'Donation Box')
+      : formData.counterparty.trim();
+
     const payload = {
       ...formData,
       custodian: formData.custodian.trim(),
-      counterparty: formData.counterparty.trim(),
+      counterparty: effectiveCounterparty,
       remarks: formData.remarks.trim() || 'Not Available',
       amount: Number(formData.amount),
     };
@@ -720,11 +765,15 @@ export default function AccountingSystem({
     const milliseconds = String(now.getMilliseconds()).padStart(3, '0');
     const modifiedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
 
+    const effectiveCounterparty = (formData.category === 'Income' && !isDonorRequired(formData.subcategory))
+      ? (formData.counterparty.trim() || formData.subcategory || 'Donation Box')
+      : formData.counterparty.trim();
+
     const payload = {
       id: editingTransactionId,
       ...formData,
       custodian: formData.custodian.trim(),
-      counterparty: formData.counterparty.trim(),
+      counterparty: effectiveCounterparty,
       remarks: formData.remarks.trim() || 'Not Available',
       amount: Number(formData.amount),
       modifiedDate: modifiedDate,
@@ -1050,6 +1099,7 @@ export default function AccountingSystem({
             subcategoryOptions={subcategoryOptions}
             trusteeOptions={trusteeOptions}
             filteredSavedCounterparties={filteredSavedCounterparties}
+            staffMembers={staffMembers}
             showCounterpartyDropdown={showCounterpartyDropdown}
             setShowCounterpartyDropdown={setShowCounterpartyDropdown}
             playSoundOnSuccess={playSoundOnSuccess}

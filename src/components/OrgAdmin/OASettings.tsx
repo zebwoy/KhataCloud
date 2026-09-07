@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/react';
-import { Save, Loader2, LayoutTemplate, ListPlus, X as XIcon, RotateCcw } from 'lucide-react';
+import { Save, Loader2, LayoutTemplate, ListPlus, X as XIcon, RotateCcw, Users, Plus } from 'lucide-react';
 import { Spinner, Input, Button, Alert } from '../../ui';
 import type { NoticeboardConfig } from '../../../api/org-config';
 
@@ -59,6 +59,14 @@ export default function OASettings({ trialMode = false }: Props) {
   const [subSuccess,    setSubSuccess]    = useState('');
   const [subError,      setSubError]      = useState('');
 
+  // ── Staff Members (Salaries) state ───────────────────────────────────────
+  const [staffMembers,  setStaffMembers]  = useState<string[]>([]);
+  const [newStaffName,  setNewStaffName]  = useState('');
+  const [staffLoading,  setStaffLoading]  = useState(!trialMode);
+  const [staffSaving,   setStaffSaving]   = useState(false);
+  const [staffSuccess,  setStaffSuccess]  = useState('');
+  const [staffError,    setStaffError]    = useState('');
+
   const fetch_ = useCallback(async () => {
     if (trialMode) return;
     setLoading(true);
@@ -96,6 +104,30 @@ export default function OASettings({ trialMode = false }: Props) {
   }, [getToken, trialMode]);
 
   useEffect(() => { fetchSubConfig(); }, [fetchSubConfig]);
+
+  // ── Staff Members load ───────────────────────────────────────────────────
+  const fetchStaff = useCallback(async () => {
+    if (trialMode) {
+      setStaffMembers(['Molana Farhan', 'Qari Bilal', 'Mufti Rizwan']);
+      setStaffLoading(false);
+      return;
+    }
+    setStaffLoading(true);
+    try {
+      const token = await getToken();
+      const r = await fetch('/api/saved-senders?type=staff', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const d: string[] = await r.json();
+        setStaffMembers(d);
+      }
+    } finally {
+      setStaffLoading(false);
+    }
+  }, [getToken, trialMode]);
+
+  useEffect(() => { fetchStaff(); }, [fetchStaff]);
 
   const handleSave = async () => {
     if (trialMode) return;
@@ -148,7 +180,71 @@ export default function OASettings({ trialMode = false }: Props) {
   const removeSub = (list: string[], setList: (v: string[]) => void, value: string) =>
     setList(list.filter(s => s !== value));
 
-  if (loading || subLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+  // ── Staff Members Handlers ───────────────────────────────────────────────
+  const handleAddStaff = async () => {
+    const trimmed = newStaffName.trim();
+    if (!trimmed || staffMembers.includes(trimmed)) return;
+    if (trialMode) {
+      setStaffMembers([...staffMembers, trimmed]);
+      setNewStaffName('');
+      return;
+    }
+    setStaffSaving(true);
+    setStaffError('');
+    setStaffSuccess('');
+    try {
+      const token = await getToken();
+      const r = await fetch('/api/saved-senders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sender: trimmed, type: 'staff' }),
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        setStaffError(d.error ?? 'Failed to add staff member');
+        return;
+      }
+      setStaffSuccess(`Added "${trimmed}" to staff members.`);
+      setNewStaffName('');
+      setTimeout(() => setStaffSuccess(''), 3000);
+      await fetchStaff();
+    } catch {
+      setStaffError('Network error adding staff member.');
+    } finally {
+      setStaffSaving(false);
+    }
+  };
+
+  const handleRemoveStaff = async (name: string) => {
+    if (trialMode) {
+      setStaffMembers(staffMembers.filter(s => s !== name));
+      return;
+    }
+    setStaffSaving(true);
+    setStaffError('');
+    setStaffSuccess('');
+    try {
+      const token = await getToken();
+      const r = await fetch(`/api/saved-senders?sender=${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        setStaffError(d.error ?? 'Failed to remove staff member');
+        return;
+      }
+      setStaffSuccess(`Removed "${name}".`);
+      setTimeout(() => setStaffSuccess(''), 3000);
+      await fetchStaff();
+    } catch {
+      setStaffError('Network error removing staff member.');
+    } finally {
+      setStaffSaving(false);
+    }
+  };
+
+  if (loading || subLoading || staffLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
   if (!settings) return <div className="text-center py-12 text-gray-400 text-sm">Could not load settings.</div>;
 
   return (
@@ -438,6 +534,78 @@ export default function OASettings({ trialMode = false }: Props) {
             {trialMode ? 'Save Subcategories (Demo Mode Locked)' : subSaving ? 'Saving…' : 'Save Subcategories'}
           </Button>
         </div>
+      </div>
+
+      {/* Staff Members Management Card */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 mt-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Users size={14} className="text-violet-500" />
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Staff Members (Salaries)</h3>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">
+          Maintain the staff members and teachers shown in the Salaries dropdown when recording expenses.
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-4 min-h-[36px]">
+          {staffMembers.map(staff => (
+            <span
+              key={staff}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300 text-xs font-medium"
+            >
+              {staff}
+              <button
+                type="button"
+                disabled={trialMode || staffSaving}
+                onClick={() => handleRemoveStaff(staff)}
+                className="ml-0.5 hover:text-red-500 transition-colors disabled:opacity-40"
+                title="Remove staff member"
+              >
+                <XIcon size={11} />
+              </button>
+            </span>
+          ))}
+          {staffMembers.length === 0 && (
+            <p className="text-xs text-gray-400 dark:text-slate-500 italic">No staff members configured yet. Add members below.</p>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Add staff member (e.g. Molana Zubair)…"
+            value={newStaffName}
+            disabled={trialMode || staffSaving}
+            onChange={e => setNewStaffName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddStaff();
+              }
+            }}
+            className="flex-1 px-3 py-1.5 text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 transition-all"
+          />
+          <button
+            type="button"
+            disabled={trialMode || staffSaving || !newStaffName.trim()}
+            onClick={handleAddStaff}
+            className="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {staffSaving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={13} />}
+            <span>Add Staff</span>
+          </button>
+        </div>
+
+        {/* Feedback Alerts */}
+        {staffError && (
+          <div className="mt-4">
+            <Alert variant="error">{staffError}</Alert>
+          </div>
+        )}
+        {staffSuccess && (
+          <div className="mt-4">
+            <Alert variant="success">{staffSuccess}</Alert>
+          </div>
+        )}
       </div>
     </div>
   );

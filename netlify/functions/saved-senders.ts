@@ -49,12 +49,36 @@ const handler: Handler = async (event) => {
     const userType = auth.userType;
     const tableName = userType === 'trial' ? 'trial_saved_senders' : 'saved_senders';
 
+    const type = event.queryStringParameters?.type;
+
+    // Auto-heal table and column
+    try {
+      await runQuery(`
+        CREATE TABLE IF NOT EXISTS ${tableName} (
+          id SERIAL PRIMARY KEY,
+          sender VARCHAR(255) UNIQUE NOT NULL,
+          sender_type VARCHAR(50) DEFAULT 'general',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await runQuery(`
+        ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS sender_type VARCHAR(50) DEFAULT 'general'
+      `);
+    } catch {
+      // Non-fatal
+    }
+
     // GET - Fetch all saved senders
     if (event.httpMethod === 'GET') {
       try {
-        const result = await runQuery<{ sender: string }>(
-          `SELECT DISTINCT sender FROM ${tableName} ORDER BY sender ASC`
-        );
+        let query = `SELECT DISTINCT sender FROM ${tableName}`;
+        const params: unknown[] = [];
+        if (type) {
+          query += ` WHERE sender_type = $1`;
+          params.push(type.trim());
+        }
+        query += ` ORDER BY sender ASC`;
+        const result = await runQuery<{ sender: string }>(query, params);
         
         const senders = result.rows.map(row => row.sender);
         return {
@@ -63,8 +87,6 @@ const handler: Handler = async (event) => {
           body: JSON.stringify(senders),
         };
       } catch (error) {
-        // If table doesn't exist, return empty array
-        // The table will be created on first POST
         return {
           statusCode: 200,
           headers: corsHeaders,
@@ -84,7 +106,7 @@ const handler: Handler = async (event) => {
       }
 
       const payload = JSON.parse(event.body);
-      const { sender } = payload;
+      const { sender, type: senderTypeInput } = payload;
 
       if (!sender || typeof sender !== 'string' || !sender.trim()) {
         return {
@@ -95,37 +117,22 @@ const handler: Handler = async (event) => {
       }
 
       const trimmedSender = sender.trim();
+      const senderType = (typeof senderTypeInput === 'string' && senderTypeInput.trim()) ? senderTypeInput.trim() : 'general';
 
       try {
-        // Create table if it doesn't exist
-        await runQuery(`
-          CREATE TABLE IF NOT EXISTS ${tableName} (
-            id SERIAL PRIMARY KEY,
-            sender VARCHAR(255) UNIQUE NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-
-        // Try to insert the sender (will fail if already exists due to UNIQUE constraint)
         await runQuery(
-          `INSERT INTO ${tableName} (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING`,
-          [trimmedSender]
+          `INSERT INTO ${tableName} (sender, sender_type) 
+           VALUES ($1, $2) 
+           ON CONFLICT (sender) DO UPDATE SET sender_type = EXCLUDED.sender_type`,
+          [trimmedSender, senderType]
         );
 
         return {
           statusCode: 201,
           headers: corsHeaders,
-          body: JSON.stringify({ message: 'Sender saved successfully.', sender: trimmedSender }),
+          body: JSON.stringify({ message: 'Sender saved successfully.', sender: trimmedSender, type: senderType }),
         };
       } catch (error) {
-        // If it's a unique constraint violation, that's fine - sender already exists
-        if ((error as Error).message.includes('duplicate key') || (error as Error).message.includes('UNIQUE')) {
-          return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: JSON.stringify({ message: 'Sender already exists.', sender: trimmedSender }),
-          };
-        }
         throw error;
       }
     }

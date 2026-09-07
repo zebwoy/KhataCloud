@@ -10,7 +10,7 @@ import type {
   Theme,
 } from '../types';
 import type { FieldLabels } from '../utils/constants';
-import { categoryOptions, remarkLabels } from '../utils/constants';
+import { categoryOptions, remarkLabels, isDonorRequired } from '../utils/constants';
 
 interface TransactionFormProps {
   formData: FormState;
@@ -23,6 +23,7 @@ interface TransactionFormProps {
   subcategoryOptions: SubcategoryOption[];
   trusteeOptions: TrusteeOption[];
   filteredSavedCounterparties: string[];
+  staffMembers?: string[];
   showCounterpartyDropdown: boolean;
   setShowCounterpartyDropdown: (show: boolean) => void;
   playSoundOnSuccess: boolean;
@@ -109,6 +110,7 @@ export default function TransactionForm({
   subcategoryOptions,
   trusteeOptions,
   filteredSavedCounterparties,
+  staffMembers = [],
   showCounterpartyDropdown,
   setShowCounterpartyDropdown,
   playSoundOnSuccess,
@@ -124,6 +126,10 @@ export default function TransactionForm({
   onSubmit,
 }: TransactionFormProps) {
   const isDark = theme.mode === 'dark';
+  // Determine if counterparty is applicable for this entry
+  const shouldShowCounterparty = formData.category !== 'Income' || isDonorRequired(formData.subcategory);
+  const isSalaryExpense = formData.category === 'Expense' && /salary|salaries|teacher|staff|imam/.test((formData.subcategory || '').toLowerCase());
+  const staffOptions = staffMembers.map((s: string) => ({ value: s, label: s }));
 
   return (
     <div className="bg-white dark:bg-black dark:border dark:border-gray-900 border border-gray-200 rounded-lg shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6">
@@ -233,9 +239,9 @@ export default function TransactionForm({
         </div>
 
         {/* Row 3: Custodian | Counterparty */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${shouldShowCounterparty ? 'md:grid-cols-2' : ''} gap-4`}>
           {/* Custodian Field — Always a trustee dropdown */}
-          <div className="w-full">
+          <div className={`w-full ${!shouldShowCounterparty ? 'md:col-span-2' : ''}`}>
             <label className={labelClass}>
               {fieldLabels.custodianLabel} *
             </label>
@@ -253,88 +259,105 @@ export default function TransactionForm({
             )}
           </div>
 
-          {/* Counterparty Field — Dropdown for Transfer, text input for Income/Expense */}
-          <div className="relative w-full">
-            <label className={labelClass}>
-              {fieldLabels.counterpartyLabel} *
-            </label>
-            {formData.category === 'Transfer' ? (
-              <Select<TrusteeOption>
-                options={trusteeOptions.filter(opt => opt.value !== formData.custodian.trim())}
-                value={trusteeOptions.find((opt) => opt.value === formData.counterparty) ?? null}
-                onChange={onCounterpartySelect}
-                classNamePrefix="hk-select"
-                className="text-sm"
-                placeholder={fieldLabels.counterpartyPlaceholder}
-                styles={getSelectStyles(isDark)}
-              />
-            ) : (
-              <div className="relative">
-                <input
-                  type="text"
+          {/* Counterparty Field — Dropdown for Transfer / Salary, text input for other Income/Expense */}
+          {shouldShowCounterparty && (
+            <div className="relative w-full">
+              <label className={labelClass}>
+                {fieldLabels.counterpartyLabel} *
+              </label>
+              {formData.category === 'Transfer' ? (
+                <Select<TrusteeOption>
+                  options={trusteeOptions.filter(opt => opt.value !== formData.custodian.trim())}
+                  value={trusteeOptions.find((opt) => opt.value === formData.counterparty) ?? null}
+                  onChange={onCounterpartySelect}
+                  classNamePrefix="hk-select"
+                  className="text-sm"
                   placeholder={fieldLabels.counterpartyPlaceholder}
-                  value={formData.counterparty}
-                  onChange={(e) => {
-                    setFormData({ ...formData, counterparty: e.target.value });
-                    setShowCounterpartyDropdown(true);
-                  }}
-                  onFocus={() => {
-                    if (filteredSavedCounterparties.length > 0) {
-                      setShowCounterpartyDropdown(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setShowCounterpartyDropdown(false), 200);
-                  }}
-                  className={inputClass}
+                  styles={getSelectStyles(isDark)}
                 />
+              ) : isSalaryExpense ? (
+                <div>
+                  <Select<{ value: string; label: string }>
+                    options={staffOptions}
+                    value={staffOptions.find(opt => opt.value === formData.counterparty) ?? (formData.counterparty ? { value: formData.counterparty, label: formData.counterparty } : null)}
+                    onChange={(opt: SingleValue<{ value: string; label: string }>) => {
+                      setFormData({ ...formData, counterparty: opt?.value ?? '' });
+                    }}
+                    classNamePrefix="hk-select"
+                    className="text-sm"
+                    placeholder={fieldLabels.counterpartyPlaceholder}
+                    styles={getSelectStyles(isDark)}
+                    noOptionsMessage={() => 'No staff members configured in Admin Settings'}
+                  />
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={fieldLabels.counterpartyPlaceholder}
+                    value={formData.counterparty}
+                    onChange={(e) => {
+                      setFormData({ ...formData, counterparty: e.target.value });
+                      setShowCounterpartyDropdown(true);
+                    }}
+                    onFocus={() => {
+                      if (filteredSavedCounterparties.length > 0) {
+                        setShowCounterpartyDropdown(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setShowCounterpartyDropdown(false), 200);
+                    }}
+                    className={inputClass}
+                  />
 
-                {/* Saved Counterparties Dropdown */}
-                {showCounterpartyDropdown && filteredSavedCounterparties.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] max-h-60 overflow-y-auto">
-                    {filteredSavedCounterparties.map((cp) => (
-                      <div
-                        key={cp}
-                        className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
-                        onMouseDown={(e) => {
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          e.preventDefault();
-                          setFormData({ ...formData, counterparty: cp });
-                          setShowCounterpartyDropdown(false);
-                        }}
-                      >
-                        <span
-                          className="text-sm text-gray-900 dark:text-gray-100 flex-1"
+                  {/* Saved Counterparties Dropdown */}
+                  {showCounterpartyDropdown && filteredSavedCounterparties.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-gray-200 dark:border-gray-900 rounded-lg shadow-lg dark:shadow-[0_10px_25px_rgba(0,0,0,0.7)] max-h-60 overflow-y-auto">
+                      {filteredSavedCounterparties.map((cp) => (
+                        <div
+                          key={cp}
+                          className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
                           onMouseDown={(e) => {
+                            if ((e.target as HTMLElement).closest('button')) return;
                             e.preventDefault();
                             setFormData({ ...formData, counterparty: cp });
                             setShowCounterpartyDropdown(false);
                           }}
                         >
-                          {cp}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => onDeleteSavedCounterparty(cp, e)}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          className="ml-2 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                          title="Delete"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {formErrors.counterparty && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.counterparty}</p>
-            )}
-          </div>
+                          <span
+                            className="text-sm text-gray-900 dark:text-gray-100 flex-1"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFormData({ ...formData, counterparty: cp });
+                              setShowCounterpartyDropdown(false);
+                            }}
+                          >
+                            {cp}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => onDeleteSavedCounterparty(cp, e)}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="ml-2 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                            title="Delete"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {formErrors.counterparty && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">{formErrors.counterparty}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Row 4: Remarks */}

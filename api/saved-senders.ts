@@ -52,40 +52,58 @@ export default async function handler(req: VercelReq, res: VercelRes) {
           ? `org_${auth.orgSlug.replace(/-/g, '_')}.saved_senders`
           : 'saved_senders';
 
+    // Auto-heal table and sender_type column
+    try {
+      await runQuery(`
+        CREATE TABLE IF NOT EXISTS ${tableName} (
+          id          SERIAL PRIMARY KEY,
+          sender      VARCHAR(255) UNIQUE NOT NULL,
+          sender_type VARCHAR(50) DEFAULT 'general',
+          created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await runQuery(`
+        ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS sender_type VARCHAR(50) DEFAULT 'general'
+      `);
+    } catch {
+      // Non-fatal if schema permissions or table in creation
+    }
+
     // ── GET ─────────────────────────────────────────────────────────────────
     if (req.method === 'GET') {
+      const type = qp(req.query, 'type');
       try {
-        const result = await runQuery<{ sender: string }>(
-          `SELECT DISTINCT sender FROM ${tableName} ORDER BY sender ASC`
-        );
+        let query = `SELECT DISTINCT sender FROM ${tableName}`;
+        const params: unknown[] = [];
+        if (type) {
+          query += ` WHERE sender_type = $1`;
+          params.push(type.trim());
+        }
+        query += ` ORDER BY sender ASC`;
+        const result = await runQuery<{ sender: string }>(query, params);
         return res.status(200).json(result.rows.map(r => r.sender));
       } catch {
-        // Table doesn't exist yet — return empty (will be created on first POST)
+        // Table doesn't exist yet — return empty
         return res.status(200).json([]);
       }
     }
 
     // ── POST ─────────────────────────────────────────────────────────────────
     if (req.method === 'POST') {
-      const { sender } = req.body ?? {};
+      const { sender, type } = req.body ?? {};
       if (!sender || typeof sender !== 'string' || !sender.trim()) {
         return res.status(400).json({ error: 'sender must be a non-empty string.' });
       }
       const trimmed = sender.trim();
+      const senderType = (typeof type === 'string' && type.trim()) ? type.trim() : 'general';
 
-      // Create table if needed, then upsert
-      await runQuery(`
-        CREATE TABLE IF NOT EXISTS ${tableName} (
-          id         SERIAL PRIMARY KEY,
-          sender     VARCHAR(255) UNIQUE NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
       await runQuery(
-        `INSERT INTO ${tableName} (sender) VALUES ($1) ON CONFLICT (sender) DO NOTHING`,
-        [trimmed]
+        `INSERT INTO ${tableName} (sender, sender_type) 
+         VALUES ($1, $2) 
+         ON CONFLICT (sender) DO UPDATE SET sender_type = EXCLUDED.sender_type`,
+        [trimmed, senderType]
       );
-      return res.status(201).json({ message: 'Sender saved.', sender: trimmed });
+      return res.status(201).json({ message: 'Sender saved.', sender: trimmed, type: senderType });
     }
 
     // ── DELETE ───────────────────────────────────────────────────────────────

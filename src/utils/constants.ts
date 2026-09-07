@@ -26,6 +26,32 @@ export const getSubcategoryOptions = (category: TransactionCategory): Subcategor
   return list.map((sub) => ({ value: sub, label: sub }));
 };
 
+// ---- Subcategory helper checks & prepopulations ----
+
+export const isDonorRequired = (subcategory?: string): boolean => {
+  if (!subcategory) return true;
+  const sub = subcategory.toLowerCase();
+  if (sub.includes('donation box') || sub.includes('student fee') || sub.includes('other')) {
+    return false;
+  }
+  return true;
+};
+
+export const getExpensePrepopulation = (subcategory?: string): string | null => {
+  if (!subcategory) return null;
+  const sub = subcategory.toLowerCase();
+  if (sub.includes('rent')) {
+    return 'Sohel Bhai (Makaan Malik)';
+  }
+  if (sub.includes('electric') || sub.includes('light bill')) {
+    return 'Torrent Electricity Provider';
+  }
+  if (sub.includes('water')) {
+    return 'Kaif Mugal (Drinking Water Plant - FaridBaug)';
+  }
+  return null;
+};
+
 // ---- Dynamic field labels based on category ----
 
 export interface FieldLabels {
@@ -35,7 +61,7 @@ export interface FieldLabels {
   counterpartyPlaceholder: string;
 }
 
-export const getFieldLabels = (category: TransactionCategory): FieldLabels => {
+export const getFieldLabels = (category: TransactionCategory, subcategory?: string): FieldLabels => {
   switch (category) {
     case 'Income':
       return {
@@ -44,13 +70,15 @@ export const getFieldLabels = (category: TransactionCategory): FieldLabels => {
         counterpartyLabel: 'Donor',
         counterpartyPlaceholder: 'Name of donor',
       };
-    case 'Expense':
+    case 'Expense': {
+      const isSalary = subcategory && /salary|salaries|teacher|staff|imam/.test(subcategory.toLowerCase());
       return {
         custodianLabel: 'Paid by',
         custodianPlaceholder: 'Trust member who paid',
-        counterpartyLabel: 'Vendor / Payee',
-        counterpartyPlaceholder: 'Vendor or shop name',
+        counterpartyLabel: isSalary ? 'Staff Member' : 'Vendor / Payee',
+        counterpartyPlaceholder: isSalary ? 'Select staff member' : 'Vendor or shop name',
       };
+    }
     case 'Transfer':
       return {
         custodianLabel: 'From Trustee',
