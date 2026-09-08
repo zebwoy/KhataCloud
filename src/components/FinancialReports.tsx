@@ -468,29 +468,6 @@ export default function FinancialReports({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 no-print">
-          {/* Floating Filter & Period Drawer Trigger Button */}
-          <button
-            id="btn-report-filters"
-            type="button"
-            onClick={() => setFilterDrawerOpen(true)}
-            className={`
-              relative flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold
-              transition-all duration-150 shadow-sm hover:shadow-md
-              ${ (dateFilterMode !== 'thisMonth' || !!trusteeFilter)
-                ? 'bg-violet-600 border-violet-600 text-white shadow-violet-500/25'
-                : 'bg-white dark:bg-black text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900'
-              }
-            `}
-          >
-            <SlidersHorizontal size={16} />
-            <span>Filter &amp; Period</span>
-            {(dateFilterMode !== 'thisMonth' || !!trusteeFilter) && (
-              <span className="min-w-[18px] h-4.5 px-1 rounded-full bg-white text-violet-700 text-[10px] font-black flex items-center justify-center">
-                ●
-              </span>
-            )}
-          </button>
-
           <button
             onClick={() => { trackAction('action:print-report'); window.print(); }}
             className="bg-indigo-600 dark:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-sm font-semibold transition-all shadow-sm hover:shadow-md"
