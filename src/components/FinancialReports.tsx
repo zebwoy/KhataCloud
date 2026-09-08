@@ -585,6 +585,54 @@ export default function FinancialReports({
         flatpickrInputRef={flatpickrInputRef}
       />
 
+      {/* ── Persistent Floating Filter & Period Trigger Pill ── */}
+      {!filterDrawerOpen && createPortal(
+        <button
+          id="btn-floating-report-filters"
+          type="button"
+          onClick={() => setFilterDrawerOpen(true)}
+          aria-label="Filter and Period Settings"
+          title={`Current Period: ${formatPeriodLabel()}${trusteeFilter ? ` | Trustee: ${trusteeFilter}` : ''}. Click to change period or filter.`}
+          className={`
+            no-print fixed z-30
+            bottom-24 left-4 md:left-auto md:right-20 md:bottom-8
+            flex items-center gap-2.5 px-4 py-2.5 rounded-full
+            bg-slate-900/90 hover:bg-slate-900 text-white
+            border ${
+              dateFilterMode !== 'thisMonth' || !!trusteeFilter
+                ? 'border-violet-500/80 shadow-violet-950/60 ring-2 ring-violet-500/25'
+                : 'border-white/20 shadow-black/40 hover:border-violet-400/50'
+            }
+            shadow-2xl backdrop-blur-xl
+            transition-all duration-200 ease-out hover:scale-105 active:scale-95
+            group cursor-pointer select-none
+          `}
+        >
+          <div className="flex items-center justify-center p-1 rounded-full bg-violet-500/20 text-violet-300 group-hover:bg-violet-500/30 transition-colors">
+            <SlidersHorizontal size={14} className="group-hover:rotate-12 transition-transform duration-200" />
+          </div>
+
+          <span className="text-xs font-bold tracking-tight text-white/95">
+            Filter &amp; Period
+          </span>
+
+          <span className="w-px h-3.5 bg-white/20" />
+
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-violet-500/25 text-violet-200 border border-violet-400/30 max-w-[140px] truncate">
+            <Calendar size={11} className="shrink-0 text-violet-300" />
+            <span className="truncate">{formatPeriodLabel()}</span>
+          </span>
+
+          {(dateFilterMode !== 'thisMonth' || !!trusteeFilter) && (
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-400" />
+            </span>
+          )}
+        </button>,
+        document.body
+      )}
+
       {/* Surplus/Deficit Badge */}
       <div className="mb-6 flex justify-center">
         <div className={`px-8 py-4 rounded-lg shadow-2xl dark:shadow-[0_15px_35px_rgba(0,0,0,0.9)] transition-all duration-300 hover:scale-105 ${stats.balance >= 0
